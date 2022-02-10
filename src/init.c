@@ -11,6 +11,7 @@ SEXP nano_ProtocolSymbol;
 SEXP nano_SocketSymbol;
 SEXP nano_StateSymbol;
 SEXP nano_UrlSymbol;
+SEXP nano_AioSymbol;
 
 static void RegisterSymbols(void) {
   nano_ContextSymbol = Rf_install("context");
@@ -21,13 +22,17 @@ static void RegisterSymbols(void) {
   nano_SocketSymbol = Rf_install("socket");
   nano_StateSymbol = Rf_install("state");
   nano_UrlSymbol = Rf_install("url");
+  nano_AioSymbol = Rf_install("aio");
 }
 
 static const R_CallMethodDef CallEntries[] = {
+  {"rnng_aio_get_msg", (DL_FUNC) &rnng_aio_get_msg, 1},
+  {"rnng_aio_result", (DL_FUNC) &rnng_aio_result, 1},
+  {"rnng_aio_stop", (DL_FUNC) &rnng_aio_stop, 1},
   {"rnng_close", (DL_FUNC) &rnng_close, 1},
   {"rnng_ctx_close", (DL_FUNC) &rnng_ctx_close, 1},
   {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 1},
-  {"rnng_ctx_recv", (DL_FUNC) &rnng_ctx_recv, 3},
+  {"rnng_ctx_recv", (DL_FUNC) &rnng_ctx_recv, 2},
   {"rnng_ctx_send", (DL_FUNC) &rnng_ctx_send, 3},
   {"rnng_ctx_set_bool", (DL_FUNC) &rnng_ctx_set_bool, 3},
   {"rnng_ctx_set_int", (DL_FUNC) &rnng_ctx_set_int, 3},
@@ -55,10 +60,11 @@ static const R_CallMethodDef CallEntries[] = {
   {"rnng_listener_set_string", (DL_FUNC) &rnng_listener_set_string, 3},
   {"rnng_listener_set_uint64", (DL_FUNC) &rnng_listener_set_uint64, 3},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
+  {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 1},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 1},
   {"rnng_recv", (DL_FUNC) &rnng_recv, 2},
-  {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 3},
-  {"rnng_send", (DL_FUNC) &rnng_send, 4},
+  {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 2},
+  {"rnng_send", (DL_FUNC) &rnng_send, 3},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 3},
   {"rnng_socket_set_bool", (DL_FUNC) &rnng_socket_set_bool, 3},
   {"rnng_socket_set_int", (DL_FUNC) &rnng_socket_set_int, 3},
@@ -67,6 +73,7 @@ static const R_CallMethodDef CallEntries[] = {
   {"rnng_socket_set_string", (DL_FUNC) &rnng_socket_set_string, 3},
   {"rnng_socket_set_uint64", (DL_FUNC) &rnng_socket_set_uint64, 3},
   {"rnng_strerror", (DL_FUNC) &rnng_strerror, 1},
+  {"rnng_threaded_timer", (DL_FUNC) &rnng_threaded_timer, 1},
   {"rnng_version", (DL_FUNC) &rnng_version, 0},
   {NULL, NULL, 0}
 };

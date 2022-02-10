@@ -16,12 +16,16 @@ extern SEXP nano_ProtocolSymbol;
 extern SEXP nano_SocketSymbol;
 extern SEXP nano_StateSymbol;
 extern SEXP nano_UrlSymbol;
+extern SEXP nano_AioSymbol;
 
 /* define functions */
+extern SEXP rnng_aio_get_msg(SEXP);
+extern SEXP rnng_aio_result(SEXP);
+extern SEXP rnng_aio_stop(SEXP);
 extern SEXP rnng_close(SEXP);
 extern SEXP rnng_ctx_close(SEXP);
 extern SEXP rnng_ctx_open(SEXP);
-extern SEXP rnng_ctx_recv(SEXP, SEXP, SEXP);
+extern SEXP rnng_ctx_recv(SEXP, SEXP);
 extern SEXP rnng_ctx_send(SEXP, SEXP, SEXP);
 extern SEXP rnng_ctx_set_bool(SEXP, SEXP, SEXP);
 extern SEXP rnng_ctx_set_int(SEXP, SEXP, SEXP);
@@ -49,10 +53,11 @@ extern SEXP rnng_listener_set_size(SEXP, SEXP, SEXP);
 extern SEXP rnng_listener_set_string(SEXP, SEXP, SEXP);
 extern SEXP rnng_listener_set_uint64(SEXP, SEXP, SEXP);
 extern SEXP rnng_listener_start(SEXP);
+extern SEXP rnng_ncurl(SEXP);
 extern SEXP rnng_protocol_open(SEXP);
 extern SEXP rnng_recv(SEXP, SEXP);
-extern SEXP rnng_recv_aio(SEXP, SEXP, SEXP);
-extern SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_recv_aio(SEXP, SEXP);
+extern SEXP rnng_send(SEXP, SEXP, SEXP);
 extern SEXP rnng_send_aio(SEXP, SEXP, SEXP);
 extern SEXP rnng_socket_set_bool(SEXP, SEXP, SEXP);
 extern SEXP rnng_socket_set_int(SEXP, SEXP, SEXP);
@@ -61,6 +66,7 @@ extern SEXP rnng_socket_set_size(SEXP, SEXP, SEXP);
 extern SEXP rnng_socket_set_string(SEXP, SEXP, SEXP);
 extern SEXP rnng_socket_set_uint64(SEXP, SEXP, SEXP);
 extern SEXP rnng_strerror(SEXP);
+extern SEXP rnng_threaded_timer(SEXP);
 extern SEXP rnng_version(void);
 
 #endif

@@ -27,7 +27,7 @@ NULL
 start.nanoListener <- function(x, ...) {
 
   xc <- .Call(rnng_listener_start, x)
-  if (xc) message(xc, " : ", nng_error(xc)) else message("listener started...")
+  if (xc) message(xc, " : ", nng_error(xc))
   invisible(xc)
 
 }
@@ -39,7 +39,7 @@ start.nanoListener <- function(x, ...) {
 start.nanoDialer <- function(x, async = TRUE, ...) {
 
   xc <- .Call(rnng_dialer_start, x, async)
-  if (xc) message(xc, " : ", nng_error(xc)) else message("dialer started...")
+  if (xc) message(xc, " : ", nng_error(xc))
   invisible(xc)
 
 }
@@ -53,6 +53,21 @@ start.nanoDialer <- function(x, async = TRUE, ...) {
 #'
 #' @return Zero (invisibly) on success.
 #'
+#' @details Closing an object explicitly frees its resources. An object can also
+#'     be removed directly in which case its resources are freed when the object
+#'     is garbage collected.
+#'
+#'     Dialers and Listeners are implicitly closed when the socket they are
+#'     associated with is closed.
+#'
+#'     Closing a socket associated with a context also closes the context.
+#'
+#'     When closing a socket or a context: messages that have been submitted for
+#'     sending may be flushed or delivered, depending upon the transport. Closing
+#'     the socket while data is in transmission will likely lead to loss of that
+#'     data. There is no automatic linger or flush to ensure that the socket
+#'     send buffers have completely transmitted.
+#'
 #' @name close
 #' @rdname close
 #'
@@ -65,7 +80,7 @@ NULL
 close.nanoSocket <- function(con, ...) {
 
   xc <- .Call(rnng_close, con)
-  if (xc) message(xc, " : ", nng_error(xc)) else message("socket closed")
+  if (xc) message(xc, " : ", nng_error(xc))
   invisible(xc)
 
 }
@@ -77,7 +92,7 @@ close.nanoSocket <- function(con, ...) {
 close.nanoContext <- function(con, ...) {
 
   xc <- .Call(rnng_ctx_close, con)
-  if (xc) message(xc, " : ", nng_error(xc)) else message("context closed")
+  if (xc) message(xc, " : ", nng_error(xc))
   invisible(xc)
 
 }
@@ -89,7 +104,7 @@ close.nanoContext <- function(con, ...) {
 close.nanoDialer <- function(con, ...) {
 
   xc <- .Call(rnng_dialer_close, con)
-  if (xc) message(xc, " : ", nng_error(xc)) else message("dialer closed")
+  if (xc) message(xc, " : ", nng_error(xc))
   invisible(xc)
 
 }
@@ -101,7 +116,7 @@ close.nanoDialer <- function(con, ...) {
 close.nanoListener <- function(con, ...) {
 
   xc <- .Call(rnng_listener_close, con)
-  if (xc) message(xc, " : ", nng_error(xc)) else message("listener closed")
+  if (xc) message(xc, " : ", nng_error(xc))
   invisible(xc)
 
 }

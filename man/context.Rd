@@ -29,9 +29,10 @@ For convenience, this function may be called on a nano object as well
 
     Note: not every protocol supports creation of separate contexts.
 
-    To send and receive over a context use \code{\link{ctx_send}} or
-    \code{\link{ctx_send_vec}} and \code{\link{ctx_recv}} or
-    \code{\link{ctx_recv_vec}} respectively.
+    To send and receive over a context use \code{\link{send_ctx}} and
+    \code{\link{recv_ctx}} respectively. It is also possible to perform async
+    send and receive over a context using \code{\link{send_aio}} and
+    \code{\link{recv_aio}}.
 }
 \examples{
 s <- socket("req", listen = "inproc://nanonext")
@@ -44,6 +45,6 @@ n <- nano("req", listen = "inproc://nanonext")
 ctx <- context(n)
 ctx
 close(ctx)
-n$socket_close()
+n$close()
 
 }

@@ -4,12 +4,13 @@
 \encoding{UTF-8}
 \name{nanonext-package}
 \alias{nanonext-package}
-\alias{nanonext}
 \title{nanonext: NNG (Nanomsg Next Gen) Lightweight Messaging Library}
 \description{
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a socket
-    library providing high-performance scalability protocols, or common
-    communication patterns, the basic building blocks for distributed systems.
+    library providing high-performance scalability protocols, implementing a
+    cross-platform standard for messaging and communications. Serves as a
+    concurrency framework that can be used for building distributed
+    applications.
 }
 \section{Usage notes}{
 
@@ -71,10 +72,9 @@ R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a socket
 
 
     nanonext website: \url{https://shikokuchuo.net/nanonext/} \cr
-    nanonext Github: \url{https://github.com/shikokuchuo/nanonext/}
+    nanonext on CRAN: \url{https://cran.r-project.org/package=nanonext}
 
-    NNG website: \url{https://nng.nanomsg.org/} \cr
-    NNG Github: \url{https://github.com/nanomsg/nng}
+    NNG website: \url{https://nng.nanomsg.org/}
 }
 
 \section{Licence notices}{

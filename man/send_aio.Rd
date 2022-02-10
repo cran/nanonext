@@ -4,36 +4,45 @@
 \alias{send_aio}
 \title{Send Async}
 \usage{
-send_aio(socket, ..., timeout)
+send_aio(socket, data, mode = c("serial", "raw"), timeout)
 }
 \arguments{
-\item{socket}{a Socket.}
+\item{socket}{a Socket or Context.}
 
-\item{...}{one or more R objects to send (serialised) asynchronously.}
+\item{data}{an R object (if mode = 'raw', an R vector).}
+
+\item{mode}{[default 'serial'] whether data will be sent serialized or as a
+raw vector. Use 'serial' for sending and receiving within R to ensure
+perfect reproducibility. Use 'raw' for sending vectors of any type (will be
+converted to a raw byte vector for sending) - essential when interfacing
+with external applications.}
 
 \item{timeout}{in ms. If unspecified, a socket-specific default timeout will
 be used.}
 }
 \value{
-A vector of zeros (invisibly) on success.
+A send Aio (object of class 'sendAio').
 }
 \description{
-Send any number of R objects asynchronously over a Socket, with the ability
-    to set (optional) send timeouts. For sending and receiving within R -
-    objects are sent serialized to ensure perfect reproducibility.
+Send data asynchronously over a Socket or Context.
 }
 \details{
-Will block if the send is in progress and has not yet completed -
-    certain protocol / transport combinations may limit the number of messages
-    that can be queued if they have yet to be received. Set a timeout to
-    ensure the function returns under all conditions.
+Async send is always non-blocking and returns immediately.
+
+    To wait for and check the result of the send operation, use
+    \code{\link{call_aio}} on the returned 'sendAio' object.
+
+    Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
 }
 \examples{
 pub <- socket("pub", dial = "inproc://nanonext")
 
-send_aio(pub, data.frame(a = 1, b = 2), data.frame(c = 3, d = 4), timeout = 100)
-out <- send_aio(pub, data.frame(a = 1, b = 2), data.frame(c = 3, d = 4), timeout = 100)
-out
+aio <- send_aio(pub, data.frame(a = 1, b = 2), timeout = 100)
+aio
+call_aio(aio)$result
+
+aio <- send_aio(pub, "example message", mode = "raw", timeout = 100)
+call_aio(aio)$result
 
 close(pub)
 

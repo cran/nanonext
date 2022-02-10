@@ -4,51 +4,63 @@
 \alias{recv_aio}
 \title{Receive Async}
 \usage{
-recv_aio(socket, n = 1L, timeout, keep.raw = TRUE)
+recv_aio(
+  socket,
+  mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
+    "raw"),
+  timeout,
+  keep.raw = TRUE
+)
 }
 \arguments{
-\item{socket}{a Socket.}
+\item{socket}{a Socket or Context.}
 
-\item{n}{[default 1L] number of messages to receive asynchronously.}
+\item{mode}{[default 'serial'] mode of vector to be received - one of 'serial',
+'character', 'complex', 'double', 'integer', 'logical', 'numeric', or 'raw'.
+The default 'serial' means a serialised R object, for the other modes,
+the raw vector received will be converted into the respective mode.}
 
 \item{timeout}{in ms. If unspecified, a socket-specific default timeout will
 be used.}
 
-\item{keep.raw}{[default TRUE] TRUE to keep the received raw vector (useful
-for verification e.g. via hashing). If FALSE, will return the
-unserialised object only.}
+\item{keep.raw}{[default TRUE] logical flag whether to keep the received raw
+vector (useful for verification e.g. via hashing). If FALSE, will return
+the converted data only.}
 }
 \value{
-Named list of 2 elements: 'raw' containing a list of received raw
-    vectors and 'data' containing a list of unserialised R objects, or else a
-    list of unserialised R objects if keep.raw is set to FALSE.
-
-    Note: a list of lists is always returned even when n = 1. To access the
-    first raw element, for example, use \code{$raw[[1]]} and the first data
-    element use \code{$data[[1]]}.
+A recv Aio (object of class 'recvAio').
 }
 \description{
-Receive serialised data asynchronously over a Socket (with ability to set a
-    timeout). For sending and receiving within R.
+Receive data asynchronously over a Socket or Context.
 }
 \details{
-Async recv will block while awaiting all 'n' messages to arrive. Set
-    a timeout to ensure that the function returns under all conditions.
+Async receive is always non-blocking and returns immediately.
 
-    In case of an error in unserialisation (e.g. the data was not sent
-    serialised), the function will still return a list of received raw vectors
-    to allow the data to be recovered.
+    To wait for the AIO to complete and retrieve the received message,
+    use \code{\link{call_aio}} on the returned 'recvAio' object.
+
+    Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
 }
 \examples{
 s1 <- socket("pair", listen = "inproc://nanonext")
 s2 <- socket("pair", dial = "inproc://nanonext")
 
-send_aio(s1, data.frame(a = 1, b = 2), data.frame(c = 3, d = 4), timeout = 100)
-res <- recv_aio(s2, 2L, timeout = 100)
+send_aio(s1, data.frame(a = 1, b = 2), timeout = 100)
+res <- recv_aio(s2, timeout = 100, keep.raw = FALSE)
+res
+call_aio(res)
 res
 
-send_aio(s1, data.frame(a = 1, b = 2), data.frame(c = 3, d = 4), timeout = 100)
-recv_aio(s2, 2L, timeout = 100, keep.raw = FALSE)
+send_aio(s1, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
+res <- recv_aio(s2, mode = "double", timeout = 100)
+call_aio(res)
+res
+
+send_aio(s1, "example message", mode = "raw", timeout = 100)
+res <- recv_aio(s2, mode = "character", timeout = 100)
+call_aio(res)
+res$raw
+res$data
 
 close(s1)
 close(s2)
