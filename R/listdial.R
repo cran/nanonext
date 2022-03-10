@@ -12,8 +12,9 @@
 #'     you wish to set configuration options on the dialer as it is not
 #'     generally possible to change these once started.
 #'
-#' @return Invisible NULL on success. A new Dialer (object of class 'nanoDialer'
-#'     and 'nano') is created and bound to the Socket.
+#' @return Invisibly, an integer exit code (zero on success). A new Dialer
+#'     (object of class 'nanoDialer' and 'nano') is created and bound to the
+#'     Socket or nano object if successful.
 #'
 #' @details To view all Dialers bound to a socket use \code{$dialer} on the
 #'     socket, which returns a list of Dialer objects. To access any individual
@@ -78,14 +79,16 @@ dial <- function(socket,
     if (missing(autostart) || isTRUE(autostart)) {
       res <- .Call(rnng_dial, .subset2(socket, "socket"), url)
       if (is.integer(res)) {
-        message(res, " : ", nng_error(res))
-        return(res)
+        logerror(res)
+        return(invisible(res))
       }
+      if (logging()) loginfo(evt = "dial start", pkey = "sock", pval = attr(res, "socket"),
+                             skey = "url", sval = url)
     } else {
       res <- .Call(rnng_dialer_create, .subset2(socket, "socket"), url)
       if (is.integer(res)) {
-        message(res, " : ", nng_error(res))
-        return(res)
+        logerror(res)
+        return(invisible(res))
       }
     }
     socket[["dialer"]] <- c(.subset2(socket, "dialer"), res)
@@ -103,20 +106,22 @@ dial <- function(socket,
     if (missing(autostart) || isTRUE(autostart)) {
       res <- .Call(rnng_dial, socket, url)
       if (is.integer(res)) {
-        message(res, " : ", nng_error(res))
-        return(res)
+        logerror(res)
+        return(invisible(res))
       }
+      if (logging()) loginfo(evt = "dial start", pkey = "sock", pval = attr(res, "socket"),
+                             skey = "url", sval = url)
     } else {
       res <- .Call(rnng_dialer_create, socket, url)
       if (is.integer(res)) {
-        message(res, " : ", nng_error(res))
-        return(res)
+        logerror(res)
+        return(invisible(res))
       }
     }
     attr(socket, "dialer") <- c(attr(socket, "dialer"), res)
   }
 
-  invisible()
+  invisible(0L)
 
 }
 
@@ -132,8 +137,9 @@ dial <- function(socket,
 #'     if you wish to set configuration options on the listener as it is not
 #'     generally possible to change these once started.
 #'
-#' @return Invisible NULL on success. A new Listener (object of class
-#'     'nanoListener' and 'nano') is created and bound to the Socket or nano object.
+#' @return Invisibly, an integer exit code (zero on success). A new Listener
+#'     (object of class 'nanoListener' and 'nano') is created and bound to the
+#'     Socket or nano object if successful.
 #'
 #' @details  To view all Listeners bound to a socket use \code{$listener} on the
 #'     socket, which returns a list of Listener objects. To access any individual
@@ -199,14 +205,16 @@ listen <- function(socket,
     if (missing(autostart) || isTRUE(autostart)) {
       res <- .Call(rnng_listen, .subset2(socket, "socket"), url)
       if (is.integer(res)) {
-        message(res, " : ", nng_error(res))
-        return(res)
+        logerror(res)
+        return(invisible(res))
       }
+      if (logging()) loginfo(evt = "list start", pkey = "sock", pval = attr(res, "socket"),
+                             skey = "url", sval = url)
     } else {
       res <- .Call(rnng_listener_create, .subset2(socket, "socket"), url)
       if (is.integer(res)) {
-        message(res, " : ", nng_error(res))
-        return(res)
+        logerror(res)
+        return(invisible(res))
       }
     }
     socket[["listener"]] <- c(.subset2(socket, "listener"), res)
@@ -224,20 +232,22 @@ listen <- function(socket,
     if (missing(autostart) || isTRUE(autostart)) {
       res <- .Call(rnng_listen, socket, url)
       if (is.integer(res)) {
-        message(res, " : ", nng_error(res))
-        return(res)
+        logerror(res)
+        return(invisible(res))
       }
+      if (logging()) loginfo(evt = "list start", pkey = "sock", pval = attr(res, "socket"),
+                             skey = "url", sval = url)
     } else {
       res <- .Call(rnng_listener_create, socket, url)
       if (is.integer(res)) {
-        message(res, " : ", nng_error(res))
-        return(res)
+        logerror(res)
+        return(invisible(res))
       }
     }
     attr(socket, "listener") <- c(attr(socket, "listener"), res)
   }
 
-  invisible()
+  invisible(0L)
 
 }
 

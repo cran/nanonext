@@ -64,7 +64,12 @@ socket <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
 
   protocol <- match.arg(protocol)
   res <- .Call(rnng_protocol_open, protocol)
-  if (is.integer(res)) message(res, " : ", nng_error(res))
+  if (is.integer(res)) {
+    logerror(res)
+  } else if (logging()) {
+    loginfo(evt = "sock open", pkey = "id", pval = attr(res, "id"),
+            skey = "protocol", sval = attr(res, "protocol"))
+  }
   if (!missing(dial)) {
     dial(res, url = dial, autostart = autostart)
   }
@@ -84,7 +89,7 @@ socket <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
 #' @param topic [default NULL] a topic (given as a character string). The default
 #'     NULL subscribes to all topics.
 #'
-#' @return Zero (invisibly) on success.
+#' @return Invisibly, an integer exit code (zero on success).
 #'
 #' @details To use pub/sub the publisher must:
 #'     \itemize{
@@ -92,13 +97,14 @@ socket <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
 #'     recognised by the receiving party.}
 #'     \item{send a vector that separates the topic from the rest of the message
 #'     e.g. \code{send(socket, c("topic", "message"), mode = "raw")} - this
-#'     ensures that topic ends with the required null byte for it to be
+#'     ensures that topic ends with the required nul byte for it to be
 #'     recognised.}
 #'     }
 #'
 #' @examples
 #' pub <- socket("pub", listen = "inproc://nanonext")
 #' sub <- socket("sub", dial = "inproc://nanonext")
+#' logging(level = "info")
 #'
 #' subscribe(sub, "examples")
 #' send(pub, c("examples", "this is an example"), mode = "raw")
@@ -106,6 +112,7 @@ socket <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
 #' send(pub, c("other", "this other topic will not be received"), mode = "raw")
 #' recv(sub, "character")
 #'
+#' logging(level = "error")
 #' close(pub)
 #' close(sub)
 #'
@@ -114,8 +121,12 @@ socket <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
 subscribe <- function(socket, topic = NULL) {
 
   xc <- .Call(rnng_socket_set_string, socket, "sub:subscribe" , topic)
-  if (xc) message(xc, " : ", nng_error(xc)) else message("subscribed topic: ",
-                                                         if (is.null(topic)) "ALL" else topic)
+  if (xc) {
+    logerror(xc)
+  } else if (logging()) {
+    loginfo(evt = "subscribe", pkey = "sock", pval = attr(socket, "id"),
+            skey = "topic", sval = if (is.null(topic)) "ALL" else topic)
+  }
   invisible(xc)
 
 }
@@ -129,7 +140,7 @@ subscribe <- function(socket, topic = NULL) {
 #' @param topic [default NULL] a topic (given as a character string). The default
 #'     NULL unsubscribes from all topics (if all topics were previously subscribed).
 #'
-#' @return Zero (invisibly) on success.
+#' @return Invisibly, an integer exit code (zero on success).
 #'
 #' @details Note that if the topic was not previously subscribed to then an
 #'     'entry not found' error will result.
@@ -140,13 +151,14 @@ subscribe <- function(socket, topic = NULL) {
 #'     recognised by the receiving party.}
 #'     \item{send a vector that separates the topic from the rest of the message
 #'     e.g. \code{send(socket, c("topic", "message"), mode = "raw")} - this
-#'     ensures that topic ends with the required null byte for it to be
+#'     ensures that topic ends with the required nul byte for it to be
 #'     recognised.}
 #'     }
 #'
 #' @examples
 #' pub <- socket("pub", listen = "inproc://nanonext")
 #' sub <- socket("sub", dial = "inproc://nanonext")
+#' logging(level = "info")
 #'
 #' subscribe(sub, NULL)
 #' send(pub, c("examples", "this is an example"), mode = "raw")
@@ -155,6 +167,7 @@ subscribe <- function(socket, topic = NULL) {
 #' send(pub, c("examples", "this example will not be received"), mode = "raw")
 #' recv(sub, "character")
 #'
+#' logging(level = "error")
 #' close(pub)
 #' close(sub)
 #'
@@ -163,8 +176,69 @@ subscribe <- function(socket, topic = NULL) {
 unsubscribe <- function(socket, topic = NULL) {
 
   xc <- .Call(rnng_socket_set_string, socket, "sub:unsubscribe" , topic)
-  if (xc) message(xc, " : ", nng_error(xc)) else message("unsubscribed topic: ",
-                                                         if (is.null(topic)) "ALL" else topic)
+  if (xc) {
+    logerror(xc)
+  } else if (logging()) {
+    loginfo(evt = "unsubscribe", pkey = "sock", pval = attr(socket, "id"),
+            skey = "topic", sval = if (is.null(topic)) "ALL" else topic)
+  }
+  invisible(xc)
+
+}
+
+#' Set Survey Time
+#'
+#' For a socket using the surveyor protocol in a surveyor/respondent pattern.
+#'     Set a survey timeout in ms (remains valid for all subsequent surveys).
+#'     Messages received by the surveyor after the timer has ended are discarded.
+#'
+#' @param socket a Socket or Context using the surveyor protocol.
+#' @param time the survey timeout in ms.
+#'
+#' @return Invisibly, an integer exit code (zero on success).
+#'
+#' @details After using this function, to start a new survey, the surveyor must:
+#'     \itemize{
+#'     \item{send a message using any of the send functions.}
+#'     \item{switch to receiving responses.}
+#'     }
+#'
+#'     To respond to a survey, the respondent must:
+#'     \itemize{
+#'     \item{receive the survey message.}
+#'     \item{send a reply \emph{using an AIO send function} before the survey
+#'     has timed out (a reply can only be sent after receiving a survey).}
+#'     }
+#'
+#' @examples
+#' sur <- socket("surveyor", listen = "inproc://nanonext")
+#' res <- socket("respondent", dial = "inproc://nanonext")
+#' logging(level = "info")
+#'
+#' survey_time(sur, 1000)
+#' send(sur, "reply to this survey")
+#' aio <- recv_aio(sur)
+#'
+#' recv(res)
+#' s <- send_aio(res, "replied")
+#'
+#' call_aio(aio)$data
+#'
+#' logging(level = "error")
+#' close(sur)
+#' close(res)
+#'
+#' @export
+#'
+survey_time <- function(socket, time) {
+
+  xc <- .Call(rnng_socket_set_ms, socket, "surveyor:survey-time", time)
+  if (xc) {
+    logerror(xc)
+  } else if (logging()) {
+    loginfo(evt = "survey", pkey = "sock", pval = attr(socket, "id"),
+            skey = "set time", sval = as.character(time))
+  }
   invisible(xc)
 
 }

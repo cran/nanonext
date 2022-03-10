@@ -9,7 +9,7 @@ send(socket, data, mode = c("serial", "raw"), block = FALSE, echo = TRUE)
 \arguments{
 \item{socket}{a Socket.}
 
-\item{data}{an R object (if mode = 'raw', an R vector).}
+\item{data}{an object (if mode = 'raw', a vector).}
 
 \item{mode}{[default 'serial'] whether data will be sent serialized or as a
 raw vector. Use 'serial' for sending and receiving within R to ensure
@@ -21,11 +21,12 @@ with external applications.}
 or return immediately even if unsuccessful (e.g. no connection available).}
 
 \item{echo}{[default TRUE] logical flag whether to return the raw vector of
-sent data. Set to FALSE for performance-critical applications where
-invisble NULL will be returned instead.}
+sent data. Set to FALSE for performance-critical applications where zero
+will be returned (invisibly) instead.}
 }
 \value{
-Raw vector of sent data, or zero (invisibly) if 'echo' is set to FALSE.
+Raw vector of sent data, or (invisibly) an integer exit code (zero on
+    success) if 'echo' is set to FALSE.
 }
 \description{
 Send data over a Socket.

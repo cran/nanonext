@@ -1,12 +1,13 @@
 Package: nanonext
 Type: Package
 Title: NNG (Nanomsg Next Gen) Lightweight Messaging Library
-Version: 0.2.0
+Version: 0.3.0
 Description: R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is 
     a socket library providing high-performance scalability protocols,
     implementing a cross-platform standard for messaging and communications.
-    Serves as a concurrency framework that can be used for building distributed 
-    applications.
+    Serves as a concurrency framework for building distributed applications,
+    utilising 'Aio' objects which automatically resolve upon completion of
+    asynchronous operations.
 Authors@R: 
     c(person(given = "Charlie", 
              family = "Gao",
@@ -27,9 +28,9 @@ SystemRequirements: either 'libnng' (deb: libnng-dev, rpm: nng-devel)
 Depends: R (>= 2.4)
 RoxygenNote: 7.1.2
 NeedsCompilation: yes
-Packaged: 2022-02-10 08:17:00 UTC; cg334
+Packaged: 2022-03-10 07:38:52 UTC; cg334
 Author: Charlie Gao [aut, cre] (<https://orcid.org/0000-0002-0750-061X>),
   Ling Li [ctb]
 Maintainer: Charlie Gao <charlie.gao@shikokuchuo.net>
 Repository: CRAN
-Date/Publication: 2022-02-10 10:00:02 UTC
+Date/Publication: 2022-03-10 11:20:15 UTC

@@ -64,10 +64,8 @@ nano <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
   makeActiveBinding("socket", function(x) socket, nano)
 
   if (!missing(dial)) {
-    if(isTRUE(autostart)) {
-      dial(nano, url = dial, autostart = TRUE)
-    } else {
-      dial(nano, url = dial, autostart = FALSE)
+    dial(nano, url = dial, autostart = autostart)
+    if(!isTRUE(autostart)) {
       nano[["dialer_start"]] <- function(async = TRUE) {
         rm("dialer_start", envir = nano)
         start(.subset2(nano, "dialer")[[1L]], async = async)
@@ -76,10 +74,8 @@ nano <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
   }
 
   if (!missing(listen)) {
-    if(isTRUE(autostart)) {
-      listen(nano, url = listen, autostart = TRUE)
-    } else {
-      listen(nano, url = listen, autostart = FALSE)
+    listen(nano, url = listen, autostart = autostart)
+    if(!isTRUE(autostart)) {
       nano[["listener_start"]] <- function() {
         rm("listener_start", envir = nano)
         start(.subset2(nano, "listener")[[1L]])
@@ -138,6 +134,9 @@ nano <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
     nano[["unsubscribe"]] <- function(topic = NULL) unsubscribe(socket,
                                                                 topic = topic)
   }
+  if (protocol == "surveyor") {
+    nano[["survey_time"]] <- function(time) survey_time(socket, time = time)
+  }
 
   nano
 
@@ -149,11 +148,13 @@ print.nanoObject <- function(x, ...) {
 
   cat("< nano object >\n - socket id:", attr(.subset2(x, "socket"), "id"),
       "\n - state:", attr(.subset2(x, "socket"), "state"),
-      "\n - protocol:", attr(.subset2(x, "socket"), "protocol"), "\n")
+      "\n - protocol:", attr(.subset2(x, "socket"), "protocol"), "\n", file = stdout())
       if (!is.null(.subset2(x, "listener")))
-        cat(" - listener:", unlist(lapply(.subset2(x, "listener"), attr, "url")), sep = "\n    ")
+        cat(" - listener:", unlist(lapply(.subset2(x, "listener"), attr, "url")),
+            sep = "\n    ", file = stdout())
       if (!is.null(.subset2(x, "dialer")))
-        cat(" - dialer:", unlist(lapply(.subset2(x, "dialer"), attr, "url")), sep = "\n    ")
+        cat(" - dialer:", unlist(lapply(.subset2(x, "dialer"), attr, "url")),
+            sep = "\n    ", file = stdout())
   invisible(x)
 
 }
@@ -164,11 +165,13 @@ print.nanoSocket <- function(x, ...) {
 
   cat("< nanoSocket >\n - id:", attr(x, "id"),
       "\n - state:", attr(x, "state"),
-      "\n - protocol:", attr(x, "protocol"), "\n")
+      "\n - protocol:", attr(x, "protocol"), "\n", file = stdout())
   if (!is.null(attr(x, "listener")))
-    cat(" - listener:", unlist(lapply(attr(x, "listener"), attr, "url")), sep = "\n    ")
+    cat(" - listener:", unlist(lapply(attr(x, "listener"), attr, "url")),
+        sep = "\n    ", file = stdout())
   if (!is.null(attr(x, "dialer")))
-    cat(" - dialer:", unlist(lapply(attr(x, "dialer"), attr, "url")), sep = "\n    ")
+    cat(" - dialer:", unlist(lapply(attr(x, "dialer"), attr, "url")),
+        sep = "\n    ", file = stdout())
   invisible(x)
 
 }
@@ -180,7 +183,7 @@ print.nanoContext <- function(x, ...) {
   cat("< nanoContext >\n - id:", attr(x, "id"),
       "\n - socket:", attr(x, "socket"),
       "\n - state:", attr(x, "state"),
-      "\n - protocol:", attr(x, "protocol"), "\n")
+      "\n - protocol:", attr(x, "protocol"), "\n", file = stdout())
   invisible(x)
 
 }
@@ -192,7 +195,7 @@ print.nanoDialer <- function(x, ...) {
   cat("< nanoDialer >\n - id:", attr(x, "id"),
       "\n - socket:", attr(x, "socket"),
       "\n - state:", attr(x, "state"),
-      "\n - url:", attr(x, "url"), "\n")
+      "\n - url:", attr(x, "url"), "\n", file = stdout())
   invisible(x)
 
 }
@@ -204,7 +207,7 @@ print.nanoListener <- function(x, ...) {
   cat("< nanoListener >\n - id:", attr(x, "id"),
       "\n - socket:", attr(x, "socket"),
       "\n - state:", attr(x, "state"),
-      "\n - url:", attr(x, "url"), "\n")
+      "\n - url:", attr(x, "url"), "\n", file = stdout())
   invisible(x)
 
 }
@@ -213,15 +216,8 @@ print.nanoListener <- function(x, ...) {
 #'
 print.recvAio <- function(x, ...) {
 
-  cat("< recvAio >\n")
-  if (length(.subset2(x, "aio"))) {
-    cat(": use call_aio() to retrieve message\n")
-  } else {
-    if (length(.subset2(x, "raw")))
-      cat(" - $raw for raw message\n")
-    if (length(.subset2(x, "data")))
-      cat(" - $data for message data\n")
-  }
+  cat("< recvAio >\n - $data for message data\n",
+      if (.subset2(x, "keep.raw")) "- $raw for raw message\n", file = stdout())
   invisible(x)
 
 }
@@ -230,12 +226,7 @@ print.recvAio <- function(x, ...) {
 #'
 print.sendAio <- function(x, ...) {
 
-  cat("< sendAio >\n")
-  if (length(.subset2(x, "aio"))) {
-    cat(": use call_aio() to retrieve result\n")
-  } else {
-    cat(" - $result for send result\n")
-  }
+  cat("< sendAio >\n - $result for send result\n", file = stdout())
   invisible(x)
 
 }
@@ -269,6 +260,40 @@ print.sendAio <- function(x, ...) {
 .DollarNames.nano <- function(x, pattern = "") {
 
   grep(pattern, names(attributes(x)), value = TRUE, fixed = TRUE)
+
+}
+
+#' @export
+#'
+.DollarNames.recvAio <- function(x, pattern = "") {
+
+  grep(pattern, c("data", if (.subset2(x, "keep.raw")) "raw"), value = TRUE, fixed = TRUE)
+
+}
+
+#' @export
+#'
+.DollarNames.sendAio <- function(x, pattern = "") {
+
+  grep(pattern, "result", value = TRUE, fixed = TRUE)
+
+}
+
+#' @export
+#'
+print.unresolvedValue <- function(x, ...) {
+
+  cat("'unresolved' logi NA\n", file = stdout())
+  invisible(x)
+
+}
+
+#' @export
+#'
+print.errorValue <- function(x, ...) {
+
+  cat("'errorValue' int", x, "\n", file = stdout())
+  invisible(x)
 
 }
 

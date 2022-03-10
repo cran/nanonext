@@ -26,9 +26,11 @@ static void RegisterSymbols(void) {
 }
 
 static const R_CallMethodDef CallEntries[] = {
+  {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
   {"rnng_aio_get_msg", (DL_FUNC) &rnng_aio_get_msg, 1},
   {"rnng_aio_result", (DL_FUNC) &rnng_aio_result, 1},
   {"rnng_aio_stop", (DL_FUNC) &rnng_aio_stop, 1},
+  {"rnng_aio_unresolv", (DL_FUNC) &rnng_aio_unresolv, 0},
   {"rnng_close", (DL_FUNC) &rnng_close, 1},
   {"rnng_ctx_close", (DL_FUNC) &rnng_ctx_close, 1},
   {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 1},
@@ -60,10 +62,11 @@ static const R_CallMethodDef CallEntries[] = {
   {"rnng_listener_set_string", (DL_FUNC) &rnng_listener_set_string, 3},
   {"rnng_listener_set_uint64", (DL_FUNC) &rnng_listener_set_uint64, 3},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
-  {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 1},
+  {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 2},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 1},
   {"rnng_recv", (DL_FUNC) &rnng_recv, 2},
   {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 2},
+  {"rnng_scm", (DL_FUNC) &rnng_scm, 0},
   {"rnng_send", (DL_FUNC) &rnng_send, 3},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 3},
   {"rnng_socket_set_bool", (DL_FUNC) &rnng_socket_set_bool, 3},
@@ -73,7 +76,6 @@ static const R_CallMethodDef CallEntries[] = {
   {"rnng_socket_set_string", (DL_FUNC) &rnng_socket_set_string, 3},
   {"rnng_socket_set_uint64", (DL_FUNC) &rnng_socket_set_uint64, 3},
   {"rnng_strerror", (DL_FUNC) &rnng_strerror, 1},
-  {"rnng_threaded_timer", (DL_FUNC) &rnng_threaded_timer, 1},
   {"rnng_version", (DL_FUNC) &rnng_version, 0},
   {NULL, NULL, 0}
 };

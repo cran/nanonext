@@ -9,8 +9,9 @@
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a socket
     library providing high-performance scalability protocols, implementing a
     cross-platform standard for messaging and communications. Serves as a
-    concurrency framework that can be used for building distributed
-    applications.
+    concurrency framework for building distributed applications, utilising
+    'Aio' objects which automatically resolve upon completion of asynchronous
+    operations.
 }
 \section{Usage notes}{
 

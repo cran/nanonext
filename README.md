@@ -15,8 +15,9 @@ badge](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https:/
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a
 socket library providing high-performance scalability protocols,
 implementing a cross-platform standard for messaging and communications.
-Serves as a concurrency framework that can be used for building
-distributed applications.
+Serves as a concurrency framework for building distributed applications,
+utilising ‘Aio’ objects which automatically resolve upon completion of
+asynchronous operations.
 
 Designed for performance and reliability, the NNG library is written in
 C and {nanonext} is a lightweight wrapper depending on no other
@@ -49,9 +50,10 @@ Implemented transports:
 4.  [Async and Concurrency](#async-and-concurrency)
 5.  [RPC and Distributed Computing](#rpc-and-distributed-computing)
 6.  [Publisher / Subscriber Model](#publisher-subscriber-model)
-7.  [ncurl Minimalist http Client](#ncurl-minimalist-http-client)
-8.  [Building from source](#building-from-source)
-9.  [Links](#links)
+7.  [Surveyor / Repondent Model](#surveyor-respondent-model)
+8.  [ncurl Minimalist http Client](#ncurl-minimalist-http-client)
+9.  [Building from source](#building-from-source)
+10. [Links](#links)
 
 ### Installation
 
@@ -164,10 +166,9 @@ The following example demonstrates the exchange of numerical data
 between R and Python (NumPy), two of the most commonly-used languages
 for data science and machine learning.
 
-Using a messaging interface provides a clean and robust approach which
-is light on resources and offers limited and identifiable points of
-failure. This is especially relevant when processing real-time data, as
-an example.
+Using a messaging interface provides a clean and robust approach, light
+on resources with limited and identifiable points of failure. This is
+especially relevant when processing real-time data, as an example.
 
 This approach can also serve as an interface / pipe between different
 processes written in the same or different languages, running on the
@@ -221,59 +222,97 @@ n$recv(mode = "double")
 ### Async and Concurrency
 
 {nanonext} implements true async send and receive, leveraging NNG as a
-massively-scalable concurrency framework.
-
-`send_aio()` and `recv_aio()` functions return immediately but perform
-their operations async. Their results can be called using `call_aio()`
-when required.
+massively-scaleable concurrency framework.
 
 ``` r
-library(nanonext)
 s1 <- socket("pair", listen = "inproc://nano")
 s2 <- socket("pair", dial = "inproc://nano")
 ```
 
-For a ‘sendAio’ object, calling the result causes it to be stored in the
-AIO as `$result`. An exit code of 0 denotes a successful send.
+`send_aio()` and `recv_aio()` functions return immediately with an ‘Aio’
+object, but perform their operations async.
+
+An ‘Aio’ object returns an unresolved value whilst its asynchronous
+operation is ongoing, automatically resolving to a final value once
+complete.
+
+``` r
+# an async receive is requested, but no mesages are waiting (yet to be sent)
+msg <- recv_aio(s2)
+msg
+#> < recvAio >
+#>  - $data for message data
+#>  - $raw for raw message
+msg$data
+#> 'unresolved' logi NA
+```
+
+For a ‘sendAio’ object, the result is stored at `$result`.
 
 ``` r
 res <- send_aio(s1, data.frame(a = 1, b = 2))
 res
 #> < sendAio >
-#> : use call_aio() to retrieve result
-call_aio(res)
-res
-#> < sendAio >
 #>  - $result for send result
 res$result
 #> [1] 0
+
+# an exit code of 0 denotes a successful send
+# note: the send is successful as long as the message has been accepted by the socket for sending
+# the message itself may still be buffered within the system
 ```
 
-For a ‘recvAio’ object, calling the message causes it to be stored in
-the AIO as `$raw` (if kept) and `$data`.
+For a ‘recvAio’ object, the message is stored at `$data`, and the raw
+message at `$raw` (if kept).
 
 ``` r
-msg <- recv_aio(s2)
-msg
-#> < recvAio >
-#> : use call_aio() to retrieve message
-call_aio(msg)
-msg
-#> < recvAio >
-#>  - $raw for raw message
-#>  - $data for message data
+# now that a message has been sent, the 'recvAio' automatically resolves
 msg$data
 #>   a b
 #> 1 1 2
+msg$raw
+#>   [1] 58 0a 00 00 00 03 00 04 01 02 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>  [26] 03 13 00 00 00 02 00 00 00 0e 00 00 00 01 3f f0 00 00 00 00 00 00 00 00 00
+#>  [51] 0e 00 00 00 01 40 00 00 00 00 00 00 00 00 00 04 02 00 00 00 01 00 04 00 09
+#>  [76] 00 00 00 05 6e 61 6d 65 73 00 00 00 10 00 00 00 02 00 04 00 09 00 00 00 01
+#> [101] 61 00 04 00 09 00 00 00 01 62 00 00 04 02 00 00 00 01 00 04 00 09 00 00 00
+#> [126] 05 63 6c 61 73 73 00 00 00 10 00 00 00 01 00 04 00 09 00 00 00 0a 64 61 74
+#> [151] 61 2e 66 72 61 6d 65 00 00 04 02 00 00 00 01 00 04 00 09 00 00 00 09 72 6f
+#> [176] 77 2e 6e 61 6d 65 73 00 00 00 0d 00 00 00 02 80 00 00 00 ff ff ff ff 00 00
+#> [201] 00 fe
 ```
 
-The values can also be accessed directly from the call as per the
-example below:
+Auxiliary function `unresolved()` may be used in control flow statements
+to perform actions which depend on resolution of the Aio, both before
+and after. This means there is no need to actually wait (block) for an
+Aio to resolve, as the example below demonstrates.
 
 ``` r
+msg <- recv_aio(s2)
+
+# unresolved() queries for resolution itself so no need to use it again within the while loop
+while (unresolved(msg)) {
+  # do stuff before checking resolution again
+  send_aio(s1, "resolved")
+  cat("unresolved")
+}
+#> unresolved
+
+# perform actions which depend on the Aio value outside the while loop
+msg$data
+#> [1] "resolved"
+```
+
+The values may also be called explicitly using `call_aio()`. This will
+wait for completion of the Aio (blocking).
+
+``` r
+# will wait for completion then return the resolved Aio
+call_aio(msg)
+
+# to access the resolved value directly (waiting if required)
 call_aio(msg)$data
-#>   a b
-#> 1 1 2
+#> [1] "resolved"
 
 close(s1)
 close(s2)
@@ -291,7 +330,7 @@ I/O-bound operations such as writing large amounts of data to disk in a
 separate ‘server’ process running concurrently.
 
 Server process: `reply()` will wait for a message and apply a function,
-in this case `rnorm()`, before sending back the result
+in this case `rnorm()`, before sending back the result.
 
 ``` r
 library(nanonext)
@@ -329,16 +368,24 @@ call_aio(aio)
 aio
 #> < recvAio >
 #>  - $data for message data
-str(aio$data)
-#>  num [1:100000000] -0.69 -1.535 -0.463 0.012 0.768 ...
+aio$data |> str()
+#>  num [1:100000000] -2.0235 -1.8686 0.7019 0.0643 -1.2512 ...
 ```
+
+As `call_aio()` is blocking and will wait for completion, an alternative
+is to query `aio$data` directly. This will return an ‘unresolved’
+logical NA value if the calculation is yet to complete.
 
 In this example the calculation is returned, but other operations may
 reside entirely on the server side, for example writing data to disk.
 
-In such a case, using `call_aio()` confirms that the operation has
-completed (or it will wait for completion) and calls the return value of
-the function, which may typically be NULL or an exit code.
+In such a case, calling or querying the value confirms that the
+operation has completed, and provides the return value of the function,
+which may typically be NULL or an exit code.
+
+The {mirai} package <https://shikokuchuo.net/mirai/> (available on CRAN)
+uses {nanonext} as the back-end to provide asynchronous execution of
+arbitrary R code using the RPC model.
 
 [« Back to ToC](#table-of-contents)
 
@@ -347,40 +394,56 @@ the function, which may typically be NULL or an exit code.
 {nanonext} fully implements NNG’s pub/sub protocol as per the below
 example.
 
-This example uses the new R4.1 pipe for clarity of code, although this
-is of course not required.
+The built-in logging levels are also demonstrated here. NNG errors are
+always output to stderr and operation is otherwise silent by default. To
+enable key information events to be sent to stdout, use
+`logging(level = "info")`.
+
+The log level can also be set externally in production environments via
+an environment variable `NANONEXT_LOG`.
 
 ``` r
+logging(level = "info")
+#> 2022-03-10 07:36:02 [ log level ] set to: info
+
 pub <- socket("pub", listen = "inproc://nanobroadcast")
+#> 2022-03-10 07:36:02 [ sock open ] id: 9 | protocol: pub
+#> 2022-03-10 07:36:02 [ list start ] sock: 9 | url: inproc://nanobroadcast
 sub <- socket("sub", dial = "inproc://nanobroadcast")
+#> 2022-03-10 07:36:02 [ sock open ] id: 10 | protocol: sub
+#> 2022-03-10 07:36:02 [ dial start ] sock: 10 | url: inproc://nanobroadcast
 
 sub |> subscribe(topic = "examples")
-#> subscribed topic: examples
+#> 2022-03-10 07:36:02 [ subscribe ] sock: 10 | topic: examples
 pub |> send(c("examples", "this is an example"), mode = "raw", echo = FALSE)
 sub |> recv(mode = "character", keep.raw = FALSE)
 #> [1] "examples"           "this is an example"
 
 pub |> send(c("other", "this other topic will not be received"), mode = "raw", echo = FALSE)
 sub |> recv(mode = "character", keep.raw = FALSE)
-#> 8 : Try again
+#> 2022-03-10 07:36:02 [ 8 ] Try again
 
 # specify NULL to subscribe to ALL topics
 sub |> subscribe(topic = NULL)
-#> subscribed topic: ALL
+#> 2022-03-10 07:36:02 [ subscribe ] sock: 10 | topic: ALL
 pub |> send(c("newTopic", "this is a new topic"), mode = "raw", echo = FALSE)
 sub |> recv("character", keep.raw = FALSE)
 #> [1] "newTopic"            "this is a new topic"
 
 sub |> unsubscribe(topic = NULL)
-#> unsubscribed topic: ALL
+#> 2022-03-10 07:36:02 [ unsubscribe ] sock: 10 | topic: ALL
 pub |> send(c("newTopic", "this topic will now not be received"), mode = "raw", echo = FALSE)
 sub |> recv("character", keep.raw = FALSE)
-#> 8 : Try again
+#> 2022-03-10 07:36:02 [ 8 ] Try again
 
 # however the topics explicitly subscribed to are still received
 pub |> send(c("examples", "this example will still be received"), mode = "raw", echo = FALSE)
 sub |> recv(mode = "character", keep.raw = FALSE)
 #> [1] "examples"                            "this example will still be received"
+
+# set logging level back to the default of errors only
+logging(level = "error")
+#> 2022-03-10 07:36:02 [ log level ] set to: error
 
 close(pub)
 close(sub)
@@ -388,10 +451,68 @@ close(sub)
 
 [« Back to ToC](#table-of-contents)
 
+### Surveyor Respondent Model
+
+This type of pattern is useful for applications such as service
+discovery.
+
+A surveyor sends a survey, which is broadcast to all peer respondents.
+Respondents are then able to reply, but are not obliged to. The survey
+itself is a timed event, and responses received after the timeout are
+discarded.
+
+``` r
+sur <- socket("surveyor", listen = "inproc://nanoservice")
+res1 <- socket("respondent", dial = "inproc://nanoservice")
+res2 <- socket("respondent", dial = "inproc://nanoservice")
+
+# sur sets a survey timeout, applying to this and subsequent surveys
+sur |> survey_time(500)
+
+# sur sends a message and then requests 2 async receives
+sur |> send("service check", echo = FALSE)
+aio1 <- sur |> recv_aio()
+aio2 <- sur |> recv_aio()
+
+# res1 receives the message and replies using an aio send function
+res1 |> recv(keep.raw = FALSE)
+#> [1] "service check"
+res1 |> send_aio("res1")
+#> < sendAio >
+#>  - $result for send result
+
+# res2 receives the message but fails to reply
+res2 |> recv(keep.raw = FALSE)
+#> [1] "service check"
+
+# checking the aio - only the first will have resolved
+aio1$data
+#> [1] "res1"
+aio2$data
+#> 'unresolved' logi NA
+
+# after the survey expires, the second resolves into a timeout error
+Sys.sleep(0.5)
+aio2$data
+#> 2022-03-10 07:36:03 [ 5 ] Timed out
+#> 'errorValue' int 5
+
+close(sur)
+close(res1)
+close(res2)
+```
+
+Above it can be seen that the final value resolves into a timeout, which
+is an integer 5 classed as ‘errorValue’. All receive functions class
+integer error codes as ‘errorValue’ to be easily distinguishable from
+integer message values.
+
+[« Back to ToC](#table-of-contents)
+
 ### ncurl Minimalist http Client
 
-`ncurl()` is a minimalistic http(s) client. It takes only one argument,
-the URL. It can follow redirects.
+`ncurl()` is a minimalistic http(s) client. In normal use, it takes only
+one argument, the URL. It can follow redirects.
 
 ``` r
 ncurl("http://httpbin.org/headers")
@@ -399,12 +520,14 @@ ncurl("http://httpbin.org/headers")
 #>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
 #>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
 #>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 32 30 34 63 34 63 34 2d 32 30 34 38 64 39 38 64 34 36 36 32 34 61 39
-#> [101] 64 33 63 32 37 33 33 36 34 22 0a 20 20 7d 0a 7d 0a
+#>  [76] 2d 36 32 32 39 61 61 36 33 2d 33 34 39 63 37 35 30 30 31 65 65 39 36 39 64
+#> [101] 32 31 30 37 39 62 31 64 66 22 0a 20 20 7d 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6204c4c4-2048d98d46624a9d3c273364\"\n  }\n}\n"
+#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6229aa63-349c75001ee969d21079b1df\"\n  }\n}\n"
 ```
+
+For advanced use, supports additional HTTP methods such as POST or PUT.
 
 [« Back to ToC](#table-of-contents)
 
@@ -433,6 +556,26 @@ requires ‘cmake’).
 
 Pre-built libraries (for i386 / x64 / x64-UCRT) are automatically
 downloaded during the package installation process.
+
+#### TLS Support
+
+If a system installation of ‘libnng’ and ‘libmbedtls’ development
+headers are both detected in the same location, it is assumed that NNG
+was built with TLS support (using Mbed TLS) and the appropriate options
+are set to ensure a successful install.
+
+If your system installation of NNG was built with TLS support (using
+Mbed TLS) but detection of ‘libmbedtls’ failed (possibly as it was
+installed in another location), you may also set the environment
+variable `Sys.setenv(NANONEXT_TLS=1)` before installing the package to
+ensure that the appropriate options are set.
+
+#### Certain ARM architectures
+
+If package installation initially fails with an error message of
+`unable to load shared object:[ ] undefined symbol: __atomic_fetch_sub_8`
+or similar, please set the environment variable
+`Sys.setenv(NANONEXT_ARM=1)` and then proceed with installation again.
 
 ### Links
 

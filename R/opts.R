@@ -2,16 +2,16 @@
 
 #' Set Option on Socket, Context, Dialer or Listener
 #'
-#' Set an option for a Socket, Context, Dialer or Listener.
+#' Set \link{opts} on a Socket, Context, Dialer or Listener.
 #'
 #' @param object a Socket, Context, Listener or Dialer.
 #' @param type [default 'bool'] type of option - either 'bool', 'int', 'ms'
 #'     (duration), 'size', 'string' or 'uint64'.
 #' @param opt name of option, e.g. 'reconnect-time-min', as a character string.
-#'     See \link{options}.
+#'     See \link{opts}.
 #' @param value value of option.
 #'
-#' @return Zero (invisibly) on success.
+#' @return Invisibly, an integer exit code (zero on success).
 #'
 #' @details Note: once a dialer or listener has started, it is not generally
 #'     possible to change its configuration. Hence create the dialer or listener
@@ -53,7 +53,7 @@ setopt.nanoSocket <- function(object,
                string = .Call(rnng_socket_set_string, object, opt, value),
                uint64 = .Call(rnng_socket_set_uint64, object, opt, value))
 
-  if (xc) message(xc, " : ", nng_error(xc))
+  if (xc) logerror(xc)
   invisible(xc)
 
 }
@@ -83,7 +83,7 @@ setopt.nanoDialer <- function(object,
                string = .Call(rnng_dialer_set_string, object, opt, value),
                uint64 = .Call(rnng_dialer_set_uint64, object, opt, value))
 
-  if (xc) message(xc, " : ", nng_error(xc))
+  if (xc) logerror(xc)
   invisible(xc)
 
 }
@@ -113,7 +113,7 @@ setopt.nanoListener <- function(object,
                string = .Call(rnng_listener_set_string, object, opt, value),
                uint64 = .Call(rnng_listener_set_uint64, object, opt, value))
 
-  if (xc) message(xc, " : ", nng_error(xc))
+  if (xc) logerror(xc)
   invisible(xc)
 
 }
@@ -144,7 +144,7 @@ setopt.nanoContext <- function(object,
                string = .Call(rnng_ctx_set_string, object, opt, value),
                uint64 = .Call(rnng_ctx_set_uint64, object, opt, value))
 
-  if (xc) message(xc, " : ", nng_error(xc))
+  if (xc) logerror(xc)
   invisible(xc)
 
 }

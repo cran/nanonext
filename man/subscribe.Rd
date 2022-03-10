@@ -13,7 +13,7 @@ subscribe(socket, topic = NULL)
 NULL subscribes to all topics.}
 }
 \value{
-Zero (invisibly) on success.
+Invisibly, an integer exit code (zero on success).
 }
 \description{
 For a socket using the sub protocol in a publisher/subscriber pattern. Set a
@@ -26,13 +26,14 @@ To use pub/sub the publisher must:
     recognised by the receiving party.}
     \item{send a vector that separates the topic from the rest of the message
     e.g. \code{send(socket, c("topic", "message"), mode = "raw")} - this
-    ensures that topic ends with the required null byte for it to be
+    ensures that topic ends with the required nul byte for it to be
     recognised.}
     }
 }
 \examples{
 pub <- socket("pub", listen = "inproc://nanonext")
 sub <- socket("sub", dial = "inproc://nanonext")
+logging(level = "info")
 
 subscribe(sub, "examples")
 send(pub, c("examples", "this is an example"), mode = "raw")
@@ -40,6 +41,7 @@ recv(sub, "character")
 send(pub, c("other", "this other topic will not be received"), mode = "raw")
 recv(sub, "character")
 
+logging(level = "error")
 close(pub)
 close(sub)
 

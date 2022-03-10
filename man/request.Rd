@@ -17,7 +17,7 @@ request(
 \arguments{
 \item{context}{a Context.}
 
-\item{data}{an R object (if send_mode = 'raw', an R vector).}
+\item{data}{an object (if send_mode = 'raw', a vector).}
 
 \item{send_mode}{[default 'serial'] whether data will be sent serialized or
 as a raw vector. Use 'serial' for sending and receiving within R to ensure
@@ -38,7 +38,7 @@ vector (useful for verification e.g. via hashing). If FALSE, will return
 the converted data only.}
 }
 \value{
-A recv Aio (object of class 'recvAio').
+A 'recvAio' (object of class 'recvAio').
 }
 \description{
 Implements a caller/client for the req node of the req/rep protocol. Sends
@@ -47,16 +47,19 @@ Implements a caller/client for the req node of the req/rep protocol. Sends
 }
 \details{
 Sending the request and receiving the result are both performed async,
-    hence the function will return immediately with a 'recvAio' object.
+    hence the function will return immediately with a 'recvAio' object. Access
+    the return value at \code{$data}.
 
     This is designed so that the process on the server can run concurrently
-    without blocking the client. Use \code{\link{call_aio}} on the 'recvAio'
-    to call the result when required.
+    without blocking the client.
+
+    Optionally use \code{\link{call_aio}} on the 'recvAio' to call (and wait
+    for) the result.
 
     If an error occured in the server process, a nul byte \code{00} will be
     received (as \code{$data} if 'recv_mode' = 'serial', as \code{$raw}
     otherwise). This allows an error to be easily distinguished from a NULL
-    return value.
+    return value. \code{\link{is_nul_byte}} can be used to test for a nul byte.
 }
 \examples{
 req <- socket("req", listen = "tcp://127.0.0.1:6546")

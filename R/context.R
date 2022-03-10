@@ -45,7 +45,7 @@ context <- function(socket) {
 
   if (is.environment(socket)) socket <- .subset2(socket, "socket")
   res <- .Call(rnng_ctx_open, socket)
-  if (is.integer(res)) message(res, " : ", nng_error(res))
+  if (is.integer(res)) logerror(res)
   res
 
 }
@@ -58,7 +58,8 @@ context <- function(socket) {
 #' @inheritParams send
 #' @inheritParams send_aio
 #'
-#' @return Raw vector of sent data, or zero (invisibly) if 'echo' is set to FALSE.
+#' @return Raw vector of sent data, or (invisibly) an integer exit code (zero on
+#'     success) if 'echo' is set to FALSE.
 #'
 #' @details Will block if the send is in progress and has not yet completed -
 #'     certain protocol / transport combinations may limit the number of messages
@@ -85,12 +86,10 @@ send_ctx <- function(context, data, mode = c("serial", "raw"), timeout, echo = T
   mode <- match.arg(mode)
   if (missing(timeout)) timeout <- -2L
   force(data)
-  data <- switch(mode,
-                 serial = serialize(object = data, connection = NULL),
-                 raw = if (is.raw(data)) data else writeBin(object = data, con = raw()))
+  data <- encode(data = data, mode = mode)
   res <- .Call(rnng_ctx_send, context, data, timeout)
   is.integer(res) && {
-    message(res, " : ", nng_error(res))
+    logerror(res)
     return(invisible(res))
   }
   if (missing(echo) || isTRUE(echo)) res else invisible(0L)
@@ -106,14 +105,20 @@ send_ctx <- function(context, data, mode = c("serial", "raw"), timeout, echo = T
 #' @inheritParams send_aio
 #'
 #' @return Named list of 2 elements: 'raw' containing the received raw vector
-#'     and 'data' containing the converted R object, or else the converted R
-#'     object if 'keep.raw' is set to FALSE.
+#'     and 'data' containing the converted object, or else the converted object
+#'     if 'keep.raw' is set to FALSE.
 #'
 #' @details Will block while awaiting the receive operation to complete.
 #'     Set a timeout to ensure that the function returns under all scenarios.
 #'
-#'     In case of an error in unserialisation or data conversion, the function
-#'     will still return the received raw vector to allow the data to be recovered.
+#'     In case of an error, an integer 'errorValue' is returned (to be
+#'     distiguishable from an integer message value). This can be verified using
+#'     \code{\link{is_error_value}}.
+#'
+#'     If the raw data was successfully received but an error occurred in
+#'     unserialisation or data conversion (for example if the incorrect mode was
+#'     specified), the received raw vector will always be returned to allow for
+#'     the data to be recovered.
 #'
 #' @examples
 #' req <- socket("req", listen = "inproc://nanonext")
@@ -142,16 +147,13 @@ recv_ctx <- function(context,
   if (missing(timeout)) timeout <- -2L
   res <- .Call(rnng_ctx_recv, context, timeout)
   is.integer(res) && {
-    message(res, " : ", nng_error(res))
-    return(invisible(res))
+    logerror(res)
+    return(invisible(`class<-`(res, "errorValue")))
   }
   on.exit(expr = return(res))
-  data <- switch(mode,
-                 serial = unserialize(connection = res),
-                 character = (r <- readBin(con = res, what = mode, n = length(res)))[r != ""],
-                 raw = res,
-                 readBin(con = res, what = mode, n = length(res)))
-  on.exit(expr = NULL)
+  data <- decode(con = res, mode = mode)
+  on.exit()
+  missing(data) && return(.Call(rnng_scm))
   if (missing(keep.raw) || isTRUE(keep.raw)) list(raw = res, data = data) else data
 
 }
@@ -182,7 +184,7 @@ recv_ctx <- function(context,
 #'     that the requestor has become unavailable since sending the request).
 #' @param ... additional arguments passed to the function specified by 'execute'.
 #'
-#' @return Invisible NULL.
+#' @return Invisibly, an integer exit code (zero on success).
 #'
 #' @details Receive will block while awaiting a message to arrive and is usually
 #'     the desired behaviour. Set a timeout to allow the function to return
@@ -190,8 +192,9 @@ recv_ctx <- function(context,
 #'
 #'     In the event of an error in either processing the messages or in evaluation
 #'     of the function with respect to the data, a nul byte \code{00} (or serialized
-#'     nul byte) will be sent in reply to the client to signal an error. This makes
-#'     it easy to distigush an error from a NULL return value.
+#'     nul byte) will be sent in reply to the client to signal an error. This is
+#'     to be distinguishable from a possible return value. \code{\link{is_nul_byte}}
+#'     can be used to test for a nul byte.
 #'
 #' @examples
 #' req <- socket("req", listen = "tcp://127.0.0.1:6546")
@@ -226,23 +229,17 @@ reply <- function(context,
   if (missing(timeout)) timeout <- -2L
   res <- .Call(rnng_ctx_recv, context, timeout)
   is.integer(res) && {
-    message(res, " : ", nng_error(res))
-    return(invisible(res))
+    logerror(res)
+    return(invisible(`class<-`(res, "errorValue")))
   }
   on.exit(expr = send_aio(context, as.raw(0L), mode = send_mode))
-  data <- switch(recv_mode,
-                 serial = unserialize(connection = res),
-                 character = (r <- readBin(con = res, what = recv_mode, n = length(res)))[r != ""],
-                 raw = res,
-                 readBin(con = res, what = recv_mode, n = length(res)))
+  data <- decode(con = res, mode = recv_mode)
   data <- execute(data, ...)
-  data <- switch(send_mode,
-                 serial = serialize(object = data, connection = NULL),
-                 raw = if (is.raw(data)) data else writeBin(object = data, con = raw()))
-  on.exit(expr = NULL)
+  data <- encode(data = data, mode = send_mode)
+  on.exit()
   res <- .Call(rnng_ctx_send, context, data, timeout)
   is.integer(res) && {
-    message(res, " : ", nng_error(res))
+    logerror(res)
     return(invisible(res))
   }
   invisible(0L)
@@ -257,23 +254,26 @@ reply <- function(context,
 #'
 #' @inheritParams reply
 #' @inheritParams recv
-#' @param data an R object (if send_mode = 'raw', an R vector).
+#' @param data an object (if send_mode = 'raw', a vector).
 #' @param timeout in ms. If unspecified, a socket-specific default timeout will
 #'     be used. Note that this applies to receiving the result.
 #'
-#' @return A recv Aio (object of class 'recvAio').
+#' @return A 'recvAio' (object of class 'recvAio').
 #'
 #' @details Sending the request and receiving the result are both performed async,
-#'     hence the function will return immediately with a 'recvAio' object.
+#'     hence the function will return immediately with a 'recvAio' object. Access
+#'     the return value at \code{$data}.
 #'
 #'     This is designed so that the process on the server can run concurrently
-#'     without blocking the client. Use \code{\link{call_aio}} on the 'recvAio'
-#'     to call the result when required.
+#'     without blocking the client.
+#'
+#'     Optionally use \code{\link{call_aio}} on the 'recvAio' to call (and wait
+#'     for) the result.
 #'
 #'     If an error occured in the server process, a nul byte \code{00} will be
 #'     received (as \code{$data} if 'recv_mode' = 'serial', as \code{$raw}
 #'     otherwise). This allows an error to be easily distinguished from a NULL
-#'     return value.
+#'     return value. \code{\link{is_nul_byte}} can be used to test for a nul byte.
 #'
 #' @examples
 #' req <- socket("req", listen = "tcp://127.0.0.1:6546")
@@ -302,25 +302,71 @@ request <- function(context,
 
   send_mode <- match.arg(send_mode)
   recv_mode <- match.arg(recv_mode)
+  keep.raw <- missing(keep.raw) || isTRUE(keep.raw)
   if (missing(timeout)) timeout <- -2L
   force(data)
-  data <- switch(send_mode,
-                 serial = serialize(object = data, connection = NULL),
-                 raw = if (is.raw(data)) data else writeBin(object = data, con = raw()))
+  data <- encode(data = data, mode = send_mode)
   res <- .Call(rnng_send_aio, context, data, -2L)
   is.integer(res) && {
-    message(res, " : ", nng_error(res))
+    logerror(res)
     return(invisible(res))
   }
+
   aio <- .Call(rnng_recv_aio, context, timeout)
-  env <- `class<-`(new.env(), "recvAio")
-  env[["aio"]] <- aio
-  if (is.integer(aio)) {
-    message(aio, " : ", nng_error(aio))
-  } else {
-    env[["callparams"]] <- list(recv_mode, missing(keep.raw) || isTRUE(keep.raw))
+  is.integer(aio) && {
+    logerror(aio)
+    return(invisible(`class<-`(aio, "errorValue")))
   }
-  env
+  env <- `class<-`(new.env(), "recvAio")
+  data <- raw <- resolv <- NULL
+  if (keep.raw) {
+    makeActiveBinding(sym = "raw", fun = function(x) {
+      if (is.null(resolv)) {
+        res <- .Call(rnng_aio_get_msg, aio)
+        missing(res) && return(.Call(rnng_aio_unresolv))
+        is.integer(res) && {
+          data <<- raw <<- resolv <<- `class<-`(res, "errorValue")
+          logerror(res)
+          return(invisible(resolv))
+        }
+        on.exit(expr = {
+          raw <<- res
+          resolv <<- 0L
+          return(res)
+        })
+        data <- decode(con = res, mode = recv_mode)
+        on.exit()
+        raw <<- res
+        data <<- data
+        resolv <<- 0L
+      }
+      raw
+    }, env = env)
+  }
+  makeActiveBinding(sym = "data", fun = function(x) {
+    if (is.null(resolv)) {
+      res <- .Call(rnng_aio_get_msg, aio)
+      missing(res) && return(.Call(rnng_aio_unresolv))
+      is.integer(res) && {
+        data <<- raw <<- resolv <<- `class<-`(res, "errorValue")
+        logerror(res)
+        return(invisible(resolv))
+      }
+      on.exit(expr = {
+        data <<- res
+        resolv <<- 0L
+        return(res)
+      })
+      data <- decode(con = res, mode = recv_mode)
+      on.exit()
+      if (keep.raw) raw <<- res
+      data <<- data
+      resolv <<- 0L
+    }
+    data
+  }, env = env)
+  `[[<-`(env, "keep.raw", keep.raw)
+  `[[<-`(env, "aio", aio)
 
 }
 

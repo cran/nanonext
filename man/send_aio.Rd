@@ -9,7 +9,7 @@ send_aio(socket, data, mode = c("serial", "raw"), timeout)
 \arguments{
 \item{socket}{a Socket or Context.}
 
-\item{data}{an R object (if mode = 'raw', an R vector).}
+\item{data}{an object (if mode = 'raw', a vector).}
 
 \item{mode}{[default 'serial'] whether data will be sent serialized or as a
 raw vector. Use 'serial' for sending and receiving within R to ensure
@@ -21,13 +21,19 @@ with external applications.}
 be used.}
 }
 \value{
-A send Aio (object of class 'sendAio').
+A 'sendAio' (object of class 'sendAio').
 }
 \description{
 Send data asynchronously over a Socket or Context.
 }
 \details{
-Async send is always non-blocking and returns immediately.
+Async send is always non-blocking and returns a 'sendAio'
+    immediately.
+
+    For a 'sendAio', the send result is available at \code{$result}. An
+    'unresolved' logical NA is returned if the async operation is yet to
+    complete, The resolved value will be zero on success, or else an integer
+    error code.
 
     To wait for and check the result of the send operation, use
     \code{\link{call_aio}} on the returned 'sendAio' object.
@@ -37,12 +43,12 @@ Async send is always non-blocking and returns immediately.
 \examples{
 pub <- socket("pub", dial = "inproc://nanonext")
 
-aio <- send_aio(pub, data.frame(a = 1, b = 2), timeout = 100)
-aio
-call_aio(aio)$result
+res <- send_aio(pub, data.frame(a = 1, b = 2), timeout = 100)
+res
+res$result
 
-aio <- send_aio(pub, "example message", mode = "raw", timeout = 100)
-call_aio(aio)$result
+res <- send_aio(pub, "example message", mode = "raw", timeout = 100)
+call_aio(res)$result
 
 close(pub)
 

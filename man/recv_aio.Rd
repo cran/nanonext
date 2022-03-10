@@ -28,39 +28,53 @@ vector (useful for verification e.g. via hashing). If FALSE, will return
 the converted data only.}
 }
 \value{
-A recv Aio (object of class 'recvAio').
+A 'recvAio' (object of class 'recvAio').
 }
 \description{
 Receive data asynchronously over a Socket or Context.
 }
 \details{
-Async receive is always non-blocking and returns immediately.
+Async receive is always non-blocking and returns a 'recvAio'
+    immediately.
 
-    To wait for the AIO to complete and retrieve the received message,
-    use \code{\link{call_aio}} on the returned 'recvAio' object.
+    For a 'recvAio', the received message is available at \code{$data}, and
+    the raw message at \code{$raw} (if kept). An 'unresolved' logical NA is
+    returned if the async operation is yet to complete.
+
+    To wait for the async operation to complete and retrieve the received
+    message, use \code{\link{call_aio}} on the returned 'recvAio' object.
 
     Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
+
+    In case of an error, an integer 'errorValue' is returned (to be
+    distiguishable from an integer message value). This can be verified using
+    \code{\link{is_error_value}}.
+
+    If the raw data was successfully received but an error occurred in
+    unserialisation or data conversion (for example if the incorrect mode was
+    specified), the received raw vector will be stored at \code{$data} to
+    allow for the data to be recovered.
 }
 \examples{
 s1 <- socket("pair", listen = "inproc://nanonext")
 s2 <- socket("pair", dial = "inproc://nanonext")
 
-send_aio(s1, data.frame(a = 1, b = 2), timeout = 100)
-res <- recv_aio(s2, timeout = 100, keep.raw = FALSE)
-res
-call_aio(res)
-res
+res <- send_aio(s1, data.frame(a = 1, b = 2), timeout = 100)
+msg <- recv_aio(s2, timeout = 100, keep.raw = FALSE)
+msg
+msg$data
 
-send_aio(s1, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
-res <- recv_aio(s2, mode = "double", timeout = 100)
-call_aio(res)
-res
+res <- send_aio(s1, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
+msg <- recv_aio(s2, mode = "double", timeout = 100)
+msg
+msg$raw
+msg$data
 
-send_aio(s1, "example message", mode = "raw", timeout = 100)
-res <- recv_aio(s2, mode = "character", timeout = 100)
-call_aio(res)
-res$raw
-res$data
+res <- send_aio(s1, "example message", mode = "raw", timeout = 100)
+msg <- recv_aio(s2, mode = "character", timeout = 100)
+call_aio(msg)
+msg$raw
+msg$data
 
 close(s1)
 close(s2)
