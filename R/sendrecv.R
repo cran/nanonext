@@ -2,130 +2,149 @@
 
 #' Send
 #'
-#' Send data over a Socket.
+#' Send data over a connection (Socket, Context or Stream).
 #'
-#' @param socket a Socket.
-#' @param data an object (if mode = 'raw', a vector).
-#' @param mode [default 'serial'] whether data will be sent serialized or as a
-#'     raw vector. Use 'serial' for sending and receiving within R to ensure
-#'     perfect reproducibility. Use 'raw' for sending vectors of any type (will be
-#'     converted to a raw byte vector for sending) - essential when interfacing
-#'     with external applications.
-#' @param block [default FALSE] logical flag whether to block until successful
-#'     or return immediately even if unsuccessful (e.g. no connection available).
-#' @param echo [default TRUE] logical flag whether to return the raw vector of
-#'     sent data. Set to FALSE for performance-critical applications where zero
-#'     will be returned (invisibly) instead.
+#' @param con a Socket, Context or Stream.
+#' @param data an object (a vector, if mode = 'raw').
+#' @param mode either 'serial' for sending serialised R objects, or 'raw' for
+#'     sending vectors of any type (converted to a raw byte vector for sending).
+#'     For Streams, 'raw' is the only choice and any other value is ignored. Use
+#'     'serial' for perfect reproducibility within R, although 'raw' must be used
+#'     when interfacing with external applications that do not understand R
+#'     serialisation.
+#' @param block logical TRUE to block until successful or FALSE to return
+#'     immediately even if unsuccessful  (e.g. if no connection is available),
+#'     or else an integer value specifying the maximum time to block in
+#'     milliseconds, after which the operation will time out.
+#' @param echo [default TRUE] logical TRUE to return the raw vector of sent data,
+#'     or FALSE to return an integer exit code (invisibly).
 #'
 #' @return Raw vector of sent data, or (invisibly) an integer exit code (zero on
 #'     success) if 'echo' is set to FALSE.
+#'
+#' @section Blocking:
+#'
+#'     For Sockets: the default behaviour is non-blocking with \code{block = FALSE}.
+#'     This will return immediately with an error if the message could not be
+#'     queued for sending. Certain protocol / transport combinations may limit
+#'     the number of messages that can be queued if they have yet to be received.
+#'
+#'     For Contexts and Streams: the default behaviour is blocking with \code{block = TRUE}.
+#'     This will wait until the send has completed. Set a timeout in this case
+#'     to ensure that the function returns under all scenarios. As the underlying
+#'     implementation uses an asynchronous send with a wait, it is recommended
+#'     to set a positive integer value for \code{block} rather than FALSE.
 #'
 #' @examples
 #' pub <- socket("pub", dial = "inproc://nanonext")
 #'
 #' send(pub, data.frame(a = 1, b = 2))
-#' send(pub, c(10.1, 20.2, 30.3), mode = "raw")
+#' send(pub, c(10.1, 20.2, 30.3), mode = "raw", block = 100)
 #'
 #' close(pub)
 #'
+#' req <- socket("req", listen = "inproc://nanonext")
+#' rep <- socket("rep", dial = "inproc://nanonext")
+#'
+#' ctx <- context(req)
+#' send(ctx, data.frame(a = 1, b = 2), block = 100)
+#'
+#' msg <- recv_aio(rep, timeout = 100)
+#' send(ctx, c(1.1, 2.2, 3.3), mode = "raw", block = 100)
+#'
+#' close(req)
+#' close(rep)
+#'
+#' @rdname send
 #' @export
 #'
-send <- function(socket,
+send <- function(con,
                  data,
                  mode = c("serial", "raw"),
-                 block = FALSE,
-                 echo = TRUE) {
+                 block,
+                 echo = TRUE) UseMethod("send")
 
-  mode <- match.arg(mode)
+#' @rdname send
+#' @method send nanoSocket
+#' @export
+#'
+send.nanoSocket <- function(con,
+                            data,
+                            mode = c("serial", "raw"),
+                            block = FALSE,
+                            echo = TRUE) {
+
+  mode <- match.arg2(mode, c("serial", "raw"))
   force(data)
   data <- encode(data = data, mode = mode)
-  res <- .Call(rnng_send, socket, data, block)
-  is.integer(res) && {
-    logerror(res)
-    return(invisible(res))
-  }
+  res <- .Call(rnng_send, con, data, block)
+  is.integer(res) && return(invisible(res))
   if (missing(echo) || isTRUE(echo)) res else invisible(0L)
 
 }
 
-#' Send Async
-#'
-#' Send data asynchronously over a Socket or Context.
-#'
-#' @param socket a Socket or Context.
-#' @inheritParams send
-#' @param timeout in ms. If unspecified, a socket-specific default timeout will
-#'     be used.
-#'
-#' @return A 'sendAio' (object of class 'sendAio').
-#'
-#' @details Async send is always non-blocking and returns a 'sendAio'
-#'     immediately.
-#'
-#'     For a 'sendAio', the send result is available at \code{$result}. An
-#'     'unresolved' logical NA is returned if the async operation is yet to
-#'     complete, The resolved value will be zero on success, or else an integer
-#'     error code.
-#'
-#'     To wait for and check the result of the send operation, use
-#'     \code{\link{call_aio}} on the returned 'sendAio' object.
-#'
-#'     Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
-#'
-#' @examples
-#' pub <- socket("pub", dial = "inproc://nanonext")
-#'
-#' res <- send_aio(pub, data.frame(a = 1, b = 2), timeout = 100)
-#' res
-#' res$result
-#'
-#' res <- send_aio(pub, "example message", mode = "raw", timeout = 100)
-#' call_aio(res)$result
-#'
-#' close(pub)
-#'
+#' @rdname send
+#' @method send nanoContext
 #' @export
 #'
-send_aio <- function(socket, data, mode = c("serial", "raw"), timeout) {
+send.nanoContext <- function(con,
+                             data,
+                             mode = c("serial", "raw"),
+                             block = TRUE,
+                             echo = TRUE) {
 
-  mode <- match.arg(mode)
-  if (missing(timeout)) timeout <- -2L
+  mode <- match.arg2(mode, c("serial", "raw"))
   force(data)
   data <- encode(data = data, mode = mode)
-  aio <- .Call(rnng_send_aio, socket, data, timeout)
-  is.integer(aio) && {
-    logerror(aio)
-    return(invisible(aio))
-  }
-  env <- `class<-`(new.env(), "sendAio")
-  result <- NULL
-  makeActiveBinding(sym = "result", fun = function(x) {
-    if (is.null(result)) {
-      res <- .Call(rnng_aio_result, aio)
-      missing(res) && return(.Call(rnng_aio_unresolv))
-      if (res) logerror(res)
-      result <<- res
-    }
-    result
-  }, env = env)
-  `[[<-`(env, "aio", aio)
+  if (missing(block) || isTRUE(block)) block <- -2L
+  res <- .Call(rnng_ctx_send, con, data, block)
+  is.integer(res) && return(invisible(res))
+  if (missing(echo) || isTRUE(echo)) res else invisible(0L)
 
 }
 
+#' @method send nanoStream
+#' @rdname send
+#' @export
+#'
+send.nanoStream <- function(con,
+                            data,
+                            mode = "raw",
+                            block = TRUE,
+                            echo = TRUE) {
+
+  force(data)
+  data <- encode(data = data, mode = 2L)
+  if (missing(block) || isTRUE(block)) block <- -2L
+  res <- .Call(rnng_stream_send, con, data, block)
+  is.integer(res) && return(invisible(res))
+  if (missing(echo) || isTRUE(echo)) res else invisible(0L)
+
+}
+
+
 #' Receive
 #'
-#' Receive data over a Socket.
+#' Receive data over a connection (Socket, Context or Stream).
 #'
-#' @param socket a Socket.
-#' @param mode [default 'serial'] mode of vector to be received - one of 'serial',
-#'     'character', 'complex', 'double', 'integer', 'logical', 'numeric', or 'raw'.
-#'     The default 'serial' means a serialised R object, for the other modes,
-#'     the raw vector received will be converted into the respective mode.
-#' @param block [default FALSE] logical flag whether to block until successful
-#'     or return immediately even if unsuccessful (e.g. nothing to receive).
+#' @param con a Socket, Context or Stream.
+#' @param mode <Sockets and Contexts> [default 'serial'] mode of vector to be
+#'     received - one of 'serial', 'character', 'complex', 'double', 'integer',
+#'     'logical', 'numeric', or 'raw'. The default 'serial' means a serialised
+#'     R object, for the other modes, the raw vector received will be converted
+#'     into the respective mode.
+#'     <Streams> [default 'character'] note that 'serial' is not an option for
+#'     Streams.
+#' @param block logical TRUE to block until successful or FALSE to return
+#'     immediately even if unsuccessful  (e.g. if no messages are available),
+#'     or else an integer value specifying the maximum time to block in
+#'     milliseconds, after which the operation will time out.
 #' @param keep.raw [default TRUE] logical flag whether to keep the received raw
 #'     vector (useful for verification e.g. via hashing). If FALSE, will return
 #'     the converted data only.
+#' @param n <Streams> [default 65536L] the maximum number of bytes to receive.
+#'     Can be an over-estimate, but note that a buffer of this size is reserved.
+#' @param ... currently unused.
 #'
 #' @return Named list of 2 elements: 'raw' containing the received raw vector
 #'     and 'data' containing the converted object, or else the converted object
@@ -140,6 +159,17 @@ send_aio <- function(socket, data, mode = c("serial", "raw"), timeout) {
 #'     specified), the received raw vector will always be returned to allow for
 #'     the data to be recovered.
 #'
+#' @section Blocking:
+#'
+#'     For Sockets: the default behaviour is non-blocking with \code{block = FALSE}.
+#'     This will return immediately with an error if no messages are available.
+#'
+#'     For Contexts and Streams: the default behaviour is blocking with \code{block = TRUE}.
+#'     This will wait until a message is received. Set a timeout in this case to
+#'     ensure that the function returns under all scenarios. As the underlying
+#'     implementation uses an asynchronous send with a wait, it is recommended
+#'     to set a positive integer value for \code{block} rather than FALSE.
+#'
 #' @examples
 #' s1 <- socket("bus", listen = "inproc://nanonext")
 #' s2 <- socket("bus", dial = "inproc://nanonext")
@@ -151,7 +181,7 @@ send_aio <- function(socket, data, mode = c("serial", "raw"), timeout) {
 #' recv(s2, keep.raw = FALSE)
 #'
 #' send(s1, c(1.1, 2.2, 3.3), mode = "raw")
-#' res <- recv(s2, mode = "double")
+#' res <- recv(s2, mode = "double", block = 100)
 #' res
 #' send(s1, "example message", mode = "raw", echo = FALSE)
 #' recv(s2, mode = "character", keep.raw = FALSE)
@@ -159,20 +189,46 @@ send_aio <- function(socket, data, mode = c("serial", "raw"), timeout) {
 #' close(s1)
 #' close(s2)
 #'
+#' req <- socket("req", listen = "inproc://nanonext")
+#' rep <- socket("rep", dial = "inproc://nanonext")
+#'
+#' ctxq <- context(req)
+#' ctxp <- context(rep)
+#' send(ctxq, data.frame(a = 1, b = 2), block = 100)
+#' recv(ctxp, block = 100)
+#'
+#' send(ctxq, c(1.1, 2.2, 3.3), mode = "raw", block = 100)
+#' recv(ctxp, mode = "double", block = 100)
+#'
+#' close(req)
+#' close(rep)
+#'
+#' @rdname recv
 #' @export
 #'
-recv <- function(socket,
+recv <- function(con,
                  mode = c("serial", "character", "complex", "double",
                           "integer", "logical", "numeric", "raw"),
-                 block = FALSE,
-                 keep.raw = TRUE) {
+                 block,
+                 keep.raw = TRUE,
+                 ...,
+                 n = 65536L) UseMethod("recv")
 
-  mode <- match.arg(mode)
-  res <- .Call(rnng_recv, socket, block)
-  is.integer(res) && {
-    logerror(res)
-    return(invisible(`class<-`(res, "errorValue")))
-  }
+#' @rdname recv
+#' @method recv nanoSocket
+#' @export
+#'
+recv.nanoSocket <- function(con,
+                            mode = c("serial", "character", "complex", "double",
+                                     "integer", "logical", "numeric", "raw"),
+                            block = FALSE,
+                            keep.raw = TRUE,
+                            ...) {
+
+  mode <- match.arg2(mode, c("serial", "character", "complex", "double",
+                             "integer", "logical", "numeric", "raw"))
+  res <- .Call(rnng_recv, con, block)
+  is.integer(res) && return(invisible(res))
   on.exit(expr = return(res))
   data <- decode(con = res, mode = mode)
   on.exit()
@@ -180,141 +236,51 @@ recv <- function(socket,
 
 }
 
-#' Receive Async
-#'
-#' Receive data asynchronously over a Socket or Context.
-#'
-#' @param socket a Socket or Context.
-#' @inheritParams recv
-#' @inheritParams send_aio
-#'
-#' @return A 'recvAio' (object of class 'recvAio').
-#'
-#' @details Async receive is always non-blocking and returns a 'recvAio'
-#'     immediately.
-#'
-#'     For a 'recvAio', the received message is available at \code{$data}, and
-#'     the raw message at \code{$raw} (if kept). An 'unresolved' logical NA is
-#'     returned if the async operation is yet to complete.
-#'
-#'     To wait for the async operation to complete and retrieve the received
-#'     message, use \code{\link{call_aio}} on the returned 'recvAio' object.
-#'
-#'     Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
-#'
-#'     In case of an error, an integer 'errorValue' is returned (to be
-#'     distiguishable from an integer message value). This can be verified using
-#'     \code{\link{is_error_value}}.
-#'
-#'     If the raw data was successfully received but an error occurred in
-#'     unserialisation or data conversion (for example if the incorrect mode was
-#'     specified), the received raw vector will be stored at \code{$data} to
-#'     allow for the data to be recovered.
-#'
-#' @examples
-#' s1 <- socket("pair", listen = "inproc://nanonext")
-#' s2 <- socket("pair", dial = "inproc://nanonext")
-#'
-#' res <- send_aio(s1, data.frame(a = 1, b = 2), timeout = 100)
-#' msg <- recv_aio(s2, timeout = 100, keep.raw = FALSE)
-#' msg
-#' msg$data
-#'
-#' res <- send_aio(s1, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
-#' msg <- recv_aio(s2, mode = "double", timeout = 100)
-#' msg
-#' msg$raw
-#' msg$data
-#'
-#' res <- send_aio(s1, "example message", mode = "raw", timeout = 100)
-#' msg <- recv_aio(s2, mode = "character", timeout = 100)
-#' call_aio(msg)
-#' msg$raw
-#' msg$data
-#'
-#' close(s1)
-#' close(s2)
-#'
+#' @rdname recv
+#' @method recv nanoContext
 #' @export
 #'
-recv_aio <- function(socket,
-                     mode = c("serial", "character", "complex", "double",
-                              "integer", "logical", "numeric", "raw"),
-                     timeout,
-                     keep.raw = TRUE) {
+recv.nanoContext <- function(con,
+                             mode = c("serial", "character", "complex", "double",
+                                      "integer", "logical", "numeric", "raw"),
+                             block = TRUE,
+                             keep.raw = TRUE,
+                             ...) {
 
-  mode <- match.arg(mode)
-  keep.raw <- missing(keep.raw) || isTRUE(keep.raw)
-  if (missing(timeout)) timeout <- -2L
-  aio <- .Call(rnng_recv_aio, socket, timeout)
-  is.integer(aio) && {
-    logerror(aio)
-    return(invisible(`class<-`(aio, "errorValue")))
-  }
-  env <- `class<-`(new.env(), "recvAio")
-  data <- raw <- resolv <- NULL
-  if (keep.raw) {
-    makeActiveBinding(sym = "raw", fun = function(x) {
-      if (is.null(resolv)) {
-        res <- .Call(rnng_aio_get_msg, aio)
-        missing(res) && return(.Call(rnng_aio_unresolv))
-        is.integer(res) && {
-          data <<- raw <<- resolv <<- `class<-`(res, "errorValue")
-          logerror(res)
-          return(invisible(resolv))
-        }
-        on.exit(expr = {
-          raw <<- res
-          resolv <<- 0L
-          return(res)
-        })
-        data <- decode(con = res, mode = mode)
-        on.exit()
-        raw <<- res
-        data <<- data
-        resolv <<- 0L
-      }
-      raw
-    }, env = env)
-  }
-  makeActiveBinding(sym = "data", fun = function(x) {
-    if (is.null(resolv)) {
-      res <- .Call(rnng_aio_get_msg, aio)
-      missing(res) && return(.Call(rnng_aio_unresolv))
-      is.integer(res) && {
-        data <<- raw <<- resolv <<- `class<-`(res, "errorValue")
-        logerror(res)
-        return(invisible(resolv))
-      }
-      on.exit(expr = {
-        data <<- res
-        resolv <<- 0L
-        return(res)
-      })
-      data <- decode(con = res, mode = mode)
-      on.exit()
-      if (keep.raw) raw <<- res
-      data <<- data
-      resolv <<- 0L
-    }
-    data
-  }, env = env)
-  `[[<-`(env, "keep.raw", keep.raw)
-  `[[<-`(env, "aio", aio)
+  mode <- match.arg2(mode, c("serial", "character", "complex", "double",
+                             "integer", "logical", "numeric", "raw"))
+  if (missing(block) || isTRUE(block)) block <- -2L
+  res <- .Call(rnng_ctx_recv, con, block)
+  is.integer(res) && return(invisible(res))
+  on.exit(expr = return(res))
+  data <- decode(con = res, mode = mode)
+  on.exit()
+  missing(data) && return(.Call(rnng_scm))
+  if (missing(keep.raw) || isTRUE(keep.raw)) list(raw = res, data = data) else data
 
 }
 
-encode <- function(data, mode) {
-  switch(mode,
-         serial = serialize(object = data, connection = NULL),
-         raw = if (is.raw(data)) data else writeBin(object = data, con = raw()))
-}
+#' @rdname recv
+#' @method recv nanoStream
+#' @export
+#'
+recv.nanoStream <- function(con,
+                            mode = c("character", "complex", "double", "integer",
+                                     "logical", "numeric", "raw"),
+                            block = TRUE,
+                            keep.raw = TRUE,
+                            n = 65536L,
+                            ...) {
 
-decode <- function(con, mode) {
-  switch(mode,
-         serial = unserialize(connection = con),
-         character = (r <- readBin(con = con, what = mode, n = length(con)))[r != ""],
-         raw = con,
-         readBin(con = con, what = mode, n = length(con)))
+  mode <- match.arg2(mode, c("character", "complex", "double", "integer",
+                             "logical", "numeric", "raw")) + 1L
+  if (missing(block) || isTRUE(block)) block <- -2L
+  res <- .Call(rnng_stream_recv, con, n, block)
+  is.integer(res) && return(invisible(res))
+  on.exit(expr = return(res))
+  data <- decode(con = res, mode = mode)
+  on.exit()
+  if (missing(keep.raw) || isTRUE(keep.raw)) list(raw = res, data = data) else data
+
 }
 

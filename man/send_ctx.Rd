@@ -4,32 +4,33 @@
 \alias{send_ctx}
 \title{Send over Context}
 \usage{
-send_ctx(context, data, mode = c("serial", "raw"), timeout, echo = TRUE)
+send_ctx(context, data, mode = c("serial", "raw"), timeout = -2L, echo = TRUE)
 }
 \arguments{
 \item{context}{a Context.}
 
-\item{data}{an object (if mode = 'raw', a vector).}
+\item{data}{an object (a vector, if mode = 'raw').}
 
-\item{mode}{[default 'serial'] whether data will be sent serialized or as a
-raw vector. Use 'serial' for sending and receiving within R to ensure
-perfect reproducibility. Use 'raw' for sending vectors of any type (will be
-converted to a raw byte vector for sending) - essential when interfacing
-with external applications.}
+\item{mode}{either 'serial' for sending serialised R objects, or 'raw' for
+sending vectors of any type (converted to a raw byte vector for sending).
+For Streams, 'raw' is the only choice and any other value is ignored. Use
+'serial' for perfect reproducibility within R, although 'raw' must be used
+when interfacing with external applications that do not understand R
+serialisation.}
 
-\item{timeout}{in ms. If unspecified, a socket-specific default timeout will
-be used.}
+\item{timeout}{(optional) integer value in milliseconds. If unspecified, the
+default of -2L uses a socket-specific default, which is usually the same
+as no timeout.}
 
-\item{echo}{[default TRUE] logical flag whether to return the raw vector of
-sent data. Set to FALSE for performance-critical applications where zero
-will be returned (invisibly) instead.}
+\item{echo}{[default TRUE] logical TRUE to return the raw vector of sent data,
+or FALSE to return an integer exit code (invisibly).}
 }
 \value{
 Raw vector of sent data, or (invisibly) an integer exit code (zero on
     success) if 'echo' is set to FALSE.
 }
 \description{
-Send data over a Context.
+Send data over a Context [Deprecated].
 }
 \details{
 Will block if the send is in progress and has not yet completed -
@@ -37,17 +38,4 @@ Will block if the send is in progress and has not yet completed -
     that can be queued if they have yet to be received. Set a timeout to
     ensure the function returns under all scenarios.
 }
-\examples{
-req <- socket("req", listen = "inproc://nanonext")
-rep <- socket("rep", dial = "inproc://nanonext")
-
-ctx <- context(req)
-send_ctx(ctx, data.frame(a = 1, b = 2), timeout = 100)
-
-msg <- recv_aio(rep, timeout = 100)
-send_ctx(ctx, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
-
-close(req)
-close(rep)
-
-}
+\keyword{internal}

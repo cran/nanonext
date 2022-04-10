@@ -11,6 +11,9 @@
 #'
 #' @section Usage notes:
 #'
+#'     Call \code{\link{nano_init}} after package load to set global options.
+#'     Using defaults will cause warnings to print immediately as they occur.
+#'
 #'     \{nanonext\} offers 2 equivalent interfaces: an object-oriented interface,
 #'     and a functional interface.
 #'
@@ -124,8 +127,19 @@
 NULL
 
 .onLoad <- function(libname, pkgname) {
-  logging <- logging()
-  logging <<- logging
+  .logging. <- switch(tolower(Sys.getenv("NANONEXT_LOG")),
+                              info = TRUE,
+                              FALSE)
+  .logging. <<- .logging.
   invisible()
 }
 
+.onUnload <- function(libpath) {
+  if (!is.null(warn <- getOption("nanonext.original.warn"))) {
+    options(warn = warn)
+    options(nanonext.original.warn = NULL)
+  }
+  invisible()
+}
+
+.logging. <- FALSE

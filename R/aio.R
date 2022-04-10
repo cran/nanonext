@@ -1,4 +1,428 @@
-# nanonext - Core Functions - Aio Functions ------------------------------------
+# nanonext - Core - Aio Functions ----------------------------------------------
+
+# send_aio/recv_aio ------------------------------------------------------------
+
+#' Send Async
+#'
+#' Send data asynchronously over a connection (Socket, Context or Stream).
+#'
+#' @inheritParams send
+#' @param timeout (optional) integer value in milliseconds. If unspecified, the
+#'     default of -2L uses a socket-specific default, which is usually the same
+#'     as no timeout.
+#'
+#' @return A 'sendAio' (object of class 'sendAio').
+#'
+#' @details Async send is always non-blocking and returns a 'sendAio'
+#'     immediately.
+#'
+#'     For a 'sendAio', the send result is available at \code{$result}. An
+#'     'unresolved' logical NA is returned if the async operation is yet to
+#'     complete, The resolved value will be zero on success, or else an integer
+#'     error code.
+#'
+#'     To wait for and check the result of the send operation, use
+#'     \code{\link{call_aio}} on the returned 'sendAio' object.
+#'
+#'     Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
+#'
+#' @examples
+#' pub <- socket("pub", dial = "inproc://nanonext")
+#'
+#' res <- send_aio(pub, data.frame(a = 1, b = 2), timeout = 100)
+#' res
+#' res$result
+#'
+#' res <- send_aio(pub, "example message", mode = "raw", timeout = 100)
+#' call_aio(res)$result
+#'
+#' close(pub)
+#'
+#' @rdname send_aio
+#' @export
+#'
+send_aio <- function(con, data, mode = c("serial", "raw"), timeout = -2L) UseMethod("send_aio")
+
+#' @rdname send_aio
+#' @method send_aio nanoSocket
+#' @export
+#'
+send_aio.nanoSocket <- function(con, data, mode = c("serial", "raw"), timeout = -2L) {
+
+  mode <- match.arg2(mode, c("serial", "raw"))
+  force(data)
+  data <- encode(data = data, mode = mode)
+  aio <- .Call(rnng_send_aio, con, data, timeout)
+  is.integer(aio) && return(invisible(aio))
+
+  data <- result <- NULL
+  unresolv <- TRUE
+  env <- new.env(hash = FALSE)
+  makeActiveBinding(sym = "result", fun = function(x) {
+    if (unresolv) {
+      res <- .Call(rnng_aio_result, aio)
+      missing(res) && return(.Call(rnng_aio_unresolv))
+      result <<- res
+      aio <<- env[["aio"]] <<- NULL
+      unresolv <<- FALSE
+    }
+    result
+  }, env = env)
+  `class<-`(`[[<-`(env, "aio", aio), "sendAio")
+
+}
+
+#' @rdname send_aio
+#' @method send_aio nanoContext
+#' @export
+#'
+send_aio.nanoContext <- function(con, data, mode = c("serial", "raw"), timeout = -2L) {
+
+  mode <- match.arg2(mode, c("serial", "raw"))
+  force(data)
+  data <- encode(data = data, mode = mode)
+  aio <- .Call(rnng_ctx_send_aio, con, data, timeout)
+  is.integer(aio) && return(invisible(aio))
+
+  data <- result <- NULL
+  unresolv <- TRUE
+  env <- new.env(hash = FALSE)
+  makeActiveBinding(sym = "result", fun = function(x) {
+    if (unresolv) {
+      res <- .Call(rnng_aio_result, aio)
+      missing(res) && return(.Call(rnng_aio_unresolv))
+      result <<- res
+      aio <<- env[["aio"]] <<- NULL
+      unresolv <<- FALSE
+    }
+    result
+  }, env = env)
+  `class<-`(`[[<-`(env, "aio", aio), "sendAio")
+
+}
+
+#' @rdname send_aio
+#' @method send_aio nanoStream
+#' @export
+#'
+send_aio.nanoStream <- function(con, data, mode = "raw", timeout = -2L) {
+
+  force(data)
+  data <- encode(data = data, mode = 2L)
+  aio <- .Call(rnng_stream_send_aio, con, data, timeout)
+  is.integer(aio) && return(invisible(aio))
+
+  data <- result <- NULL
+  unresolv <- TRUE
+  env <- new.env(hash = FALSE)
+  makeActiveBinding(sym = "result", fun = function(x) {
+    if (unresolv) {
+      res <- .Call(rnng_aio_result, aio)
+      missing(res) && return(.Call(rnng_aio_unresolv))
+      result <<- res
+      aio <<- env[["aio"]] <<- NULL
+      unresolv <<- FALSE
+    }
+    result
+  }, env = env)
+  `class<-`(`[[<-`(env, "aio", aio), "sendAio")
+
+}
+
+#' Receive Async
+#'
+#' Receive data asynchronously over a connection (Socket, Context or Stream).
+#'
+#' @inheritParams recv
+#' @inheritParams send_aio
+#'
+#' @return A 'recvAio' (object of class 'recvAio').
+#'
+#' @details Async receive is always non-blocking and returns a 'recvAio'
+#'     immediately.
+#'
+#'     For a 'recvAio', the received message is available at \code{$data}, and
+#'     the raw message at \code{$raw} (if kept). An 'unresolved' logical NA is
+#'     returned if the async operation is yet to complete.
+#'
+#'     To wait for the async operation to complete and retrieve the received
+#'     message, use \code{\link{call_aio}} on the returned 'recvAio' object.
+#'
+#'     Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
+#'
+#'     In case of an error, an integer 'errorValue' is returned (to be
+#'     distiguishable from an integer message value). This can be verified using
+#'     \code{\link{is_error_value}}.
+#'
+#'     If the raw data was successfully received but an error occurred in
+#'     unserialisation or data conversion (for example if the incorrect mode was
+#'     specified), the received raw vector will be stored at \code{$data} to
+#'     allow for the data to be recovered.
+#'
+#' @examples
+#' s1 <- socket("pair", listen = "inproc://nanonext")
+#' s2 <- socket("pair", dial = "inproc://nanonext")
+#'
+#' res <- send_aio(s1, data.frame(a = 1, b = 2), timeout = 100)
+#' msg <- recv_aio(s2, timeout = 100, keep.raw = FALSE)
+#' msg
+#' msg$data
+#'
+#' res <- send_aio(s1, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
+#' msg <- recv_aio(s2, mode = "double", timeout = 100)
+#' msg
+#' msg$raw
+#' msg$data
+#'
+#' res <- send_aio(s1, "example message", mode = "raw", timeout = 100)
+#' msg <- recv_aio(s2, mode = "character", timeout = 100)
+#' call_aio(msg)
+#' msg$raw
+#' msg$data
+#'
+#' close(s1)
+#' close(s2)
+#'
+#' @export
+#'
+recv_aio <- function(con,
+                     mode = c("serial", "character", "complex", "double",
+                              "integer", "logical", "numeric", "raw"),
+                     timeout = -2L,
+                     keep.raw = TRUE,
+                     ...,
+                     n = 65536L) UseMethod("recv_aio")
+
+#' @rdname recv_aio
+#' @method recv_aio nanoSocket
+#' @export
+#'
+recv_aio.nanoSocket <- function(con,
+                                mode = c("serial", "character", "complex", "double",
+                                         "integer", "logical", "numeric", "raw"),
+                                timeout = -2L,
+                                keep.raw = TRUE,
+                                ...) {
+
+  mode <- match.arg2(mode, c("serial", "character", "complex", "double",
+                             "integer", "logical", "numeric", "raw"))
+  aio <- .Call(rnng_recv_aio, con, timeout)
+  is.integer(aio) && return(invisible(aio))
+
+  keep.raw <- missing(keep.raw) || isTRUE(keep.raw)
+  data <- raw <- NULL
+  unresolv <- TRUE
+  env <- new.env(hash = FALSE)
+  if (keep.raw) {
+    makeActiveBinding(sym = "raw", fun = function(x) {
+      if (unresolv) {
+        res <- .Call(rnng_aio_get_msg, aio)
+        missing(res) && return(.Call(rnng_aio_unresolv))
+        is.integer(res) && {
+          data <<- raw <<- res
+          aio <<- env[["aio"]] <<- NULL
+          unresolv <<- FALSE
+          return(invisible(res))
+        }
+        on.exit(expr = {
+          raw <<- res
+          aio <<- env[["aio"]] <<- NULL
+          unresolv <<- FALSE
+          return(res)
+        })
+        data <- decode(con = res, mode = mode)
+        on.exit()
+        raw <<- res
+        data <<- data
+        aio <<- env[["aio"]] <<- NULL
+        unresolv <<- FALSE
+      }
+      raw
+    }, env = env)
+  }
+  makeActiveBinding(sym = "data", fun = function(x) {
+    if (unresolv) {
+      res <- .Call(rnng_aio_get_msg, aio)
+      missing(res) && return(.Call(rnng_aio_unresolv))
+      is.integer(res) && {
+        data <<- raw <<- res
+        aio <<- env[["aio"]] <<- NULL
+        unresolv <<- FALSE
+        return(invisible(res))
+      }
+      on.exit(expr = {
+        data <<- res
+        aio <<- env[["aio"]] <<- NULL
+        unresolv <<- FALSE
+        return(res)
+      })
+      data <- decode(con = res, mode = mode)
+      on.exit()
+      if (keep.raw) raw <<- res
+      data <<- data
+      aio <<- env[["aio"]] <<- NULL
+      unresolv <<- FALSE
+    }
+    data
+  }, env = env)
+  `class<-`(`[[<-`(`[[<-`(env, "keep.raw", keep.raw), "aio", aio), "recvAio")
+
+}
+
+#' @rdname recv_aio
+#' @method recv_aio nanoContext
+#' @export
+#'
+recv_aio.nanoContext <- function(con,
+                                 mode = c("serial", "character", "complex", "double",
+                                          "integer", "logical", "numeric", "raw"),
+                                 timeout = -2L,
+                                 keep.raw = TRUE,
+                                 ...) {
+
+  mode <- match.arg2(mode, c("serial", "character", "complex", "double",
+                             "integer", "logical", "numeric", "raw"))
+  aio <- .Call(rnng_ctx_recv_aio, con, timeout)
+  is.integer(aio) && return(invisible(aio))
+
+  keep.raw <- missing(keep.raw) || isTRUE(keep.raw)
+  data <- raw <- NULL
+  unresolv <- TRUE
+  env <- new.env(hash = FALSE)
+  if (keep.raw) {
+    makeActiveBinding(sym = "raw", fun = function(x) {
+      if (unresolv) {
+        res <- .Call(rnng_aio_get_msg, aio)
+        missing(res) && return(.Call(rnng_aio_unresolv))
+        is.integer(res) && {
+          data <<- raw <<- res
+          aio <<- env[["aio"]] <<- NULL
+          unresolv <<- FALSE
+          return(invisible(res))
+        }
+        on.exit(expr = {
+          raw <<- res
+          aio <<- env[["aio"]] <<- NULL
+          unresolv <<- FALSE
+          return(res)
+        })
+        data <- decode(con = res, mode = mode)
+        on.exit()
+        raw <<- res
+        data <<- data
+        aio <<- env[["aio"]] <<- NULL
+        unresolv <<- FALSE
+      }
+      raw
+    }, env = env)
+  }
+  makeActiveBinding(sym = "data", fun = function(x) {
+    if (unresolv) {
+      res <- .Call(rnng_aio_get_msg, aio)
+      missing(res) && return(.Call(rnng_aio_unresolv))
+      is.integer(res) && {
+        data <<- raw <<- res
+        aio <<- env[["aio"]] <<- NULL
+        unresolv <<- FALSE
+        return(invisible(res))
+      }
+      on.exit(expr = {
+        data <<- res
+        aio <<- env[["aio"]] <<- NULL
+        unresolv <<- FALSE
+        return(res)
+      })
+      data <- decode(con = res, mode = mode)
+      on.exit()
+      if (keep.raw) raw <<- res
+      data <<- data
+      aio <<- env[["aio"]] <<- NULL
+      unresolv <<- FALSE
+    }
+    data
+  }, env = env)
+  `class<-`(`[[<-`(`[[<-`(env, "keep.raw", keep.raw), "aio", aio), "recvAio")
+
+}
+
+#' @rdname recv_aio
+#' @method recv_aio nanoStream
+#' @export
+#'
+recv_aio.nanoStream <- function(con,
+                                mode = c("character", "complex", "double", "integer",
+                                         "logical", "numeric", "raw"),
+                                timeout = -2L,
+                                keep.raw = TRUE,
+                                n = 65536L,
+                                ...) {
+
+  mode <- match.arg2(mode, c("character", "complex", "double", "integer",
+                             "logical", "numeric", "raw")) + 1L
+  aio <- .Call(rnng_stream_recv_aio, con, n, timeout)
+  is.integer(aio) && return(invisible(aio))
+
+  keep.raw <- missing(keep.raw) || isTRUE(keep.raw)
+  data <- raw <- NULL
+  unresolv <- TRUE
+  env <- new.env(hash = FALSE)
+  if (keep.raw) {
+    makeActiveBinding(sym = "raw", fun = function(x) {
+      if (unresolv) {
+        res <- .Call(rnng_aio_stream_in, aio)
+        missing(res) && return(.Call(rnng_aio_unresolv))
+        is.integer(res) && {
+          data <<- raw <<- res
+          aio <<- env[["aio"]] <<- NULL
+          unresolv <<- FALSE
+          return(invisible(res))
+        }
+        on.exit(expr = {
+          raw <<- res
+          aio <<- env[["aio"]] <<- NULL
+          unresolv <<- FALSE
+          return(res)
+        })
+        data <- decode(con = res, mode = mode)
+        on.exit()
+        raw <<- res
+        data <<- data
+        aio <<- env[["aio"]] <<- NULL
+        unresolv <<- FALSE
+      }
+      raw
+    }, env = env)
+  }
+  makeActiveBinding(sym = "data", fun = function(x) {
+    if (unresolv) {
+      res <- .Call(rnng_aio_stream_in, aio)
+      missing(res) && return(.Call(rnng_aio_unresolv))
+      is.integer(res) && {
+        data <<- raw <<- res
+        aio <<- env[["aio"]] <<- NULL
+        unresolv <<- FALSE
+        return(invisible(res))
+      }
+      on.exit(expr = {
+        data <<- res
+        unresolv <<- FALSE
+        aio <<- env[["aio"]] <<- NULL
+        return(res)
+      })
+      data <- decode(con = res, mode = mode)
+      on.exit()
+      if (keep.raw) raw <<- res
+      data <<- data
+      aio <<- env[["aio"]] <<- NULL
+      unresolv <<- FALSE
+    }
+    data
+  }, env = env)
+  `class<-`(`[[<-`(`[[<-`(env, "keep.raw", keep.raw), "aio", aio), "recvAio")
+
+}
+
+# Core aio functions -----------------------------------------------------------
 
 #' Call the Value of an Asynchronous AIO Operation
 #'
@@ -7,7 +431,7 @@
 #'
 #' @param aio An Aio (object of class 'sendAio' or 'recvAio').
 #'
-#' @return The passed Aio object (invisibly).
+#' @return The passed object (invisibly).
 #'
 #' @details For a 'recvAio', the received raw vector may be retrieved at \code{$raw}
 #'     (unless 'keep.raw' was set to FALSE when receiving), and the converted R
@@ -25,6 +449,9 @@
 #'
 #'     Once the value has been successfully retrieved, the Aio is deallocated
 #'     and only the value is stored in the Aio object.
+#'
+#'     Note this function operates silently and does not error even if 'aio' is
+#'     not an active Aio, always returning invisibly the passed object.
 #'
 #' @section Alternatively:
 #'
@@ -57,13 +484,7 @@
 #'
 call_aio <- function(aio) {
 
-  .Call(rnng_aio_call, .subset2(aio, "aio")) && return(invisible(aio))
-  if (inherits(aio, "recvAio")) {
-    .subset2(aio, "data")
-  } else if (inherits(aio, "sendAio")) {
-    .subset2(aio, "result")
-  }
-  invisible(aio)
+  invisible(.Call(rnng_aio_call, aio))
 
 }
 
@@ -80,11 +501,14 @@ call_aio <- function(aio) {
 #'     The Aio is then deallocated and no further operations may be performed on
 #'     it.
 #'
+#'     Note this function operates silently and does not error even if 'aio' is
+#'     not an active Aio, always returning invisible NULL.
+#'
 #' @export
 #'
 stop_aio <- function(aio) {
 
-  invisible(.Call(rnng_aio_stop, .subset2(aio, "aio")))
+  invisible(.Call(rnng_aio_stop, aio))
 
 }
 
@@ -123,10 +547,7 @@ stop_aio <- function(aio) {
 #'
 unresolved <- function(aio) {
 
-  {inherits(aio, "unresolvedValue") ||
-      inherits(aio, "recvAio") && inherits(.subset2(aio, "data"), "unresolvedValue") ||
-      inherits(aio, "sendAio") && inherits(.subset2(aio, "result"), "unresolvedValue")} &&
-    return(TRUE)
+  .Call(rnng_unresolved, aio)
 
 }
 

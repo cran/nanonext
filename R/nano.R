@@ -51,7 +51,7 @@
 #'
 #' @export
 #'
-nano <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
+nano <- function(protocol = c("pair", "bus", "req", "rep", "push", "pull",
                               "pub", "sub", "surveyor", "respondent"),
                  dial = NULL,
                  listen = NULL,
@@ -59,9 +59,9 @@ nano <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
 
   protocol <- match.arg(protocol)
 
-  nano <- `class<-`(new.env(), "nanoObject")
+  nano <- `class<-`(new.env(hash = FALSE), "nanoObject")
   socket <- socket(protocol)
-  makeActiveBinding("socket", function(x) socket, nano)
+  makeActiveBinding(sym = "socket", fun = function(x) socket, env = nano)
 
   if (!missing(dial)) {
     dial(nano, url = dial, autostart = autostart)
@@ -95,38 +95,38 @@ nano <- function(protocol = c("pair", "bus", "push", "pull", "req", "rep",
   nano[["recv"]] <- function(mode = c("serial", "character", "complex", "double",
                                       "integer", "logical", "numeric", "raw"),
                              block = FALSE,
-                             keep.raw = TRUE) recv(socket,
-                                                   mode = mode,
-                                                   block = block,
-                                                   keep.raw = keep.raw)
+                             keep.raw = TRUE) recv.nanoSocket(socket,
+                                                              mode = mode,
+                                                              block = block,
+                                                              keep.raw = keep.raw)
   nano[["recv_aio"]] <- function(mode = c("serial", "character", "complex", "double",
                                           "integer", "logical", "numeric", "raw"),
-                                 timeout,
-                                 keep.raw = TRUE) recv_aio(socket,
-                                                           mode = mode,
-                                                           timeout = timeout,
-                                                           keep.raw = keep.raw)
+                                 timeout = -2L,
+                                 keep.raw = TRUE) recv_aio.nanoSocket(socket,
+                                                                      mode = mode,
+                                                                      timeout = timeout,
+                                                                      keep.raw = keep.raw)
   nano[["send"]] <- function(data,
                              mode = c("serial", "raw"),
                              block = FALSE,
-                             echo = TRUE) send(socket,
-                                               data = data,
-                                               mode = mode,
-                                               block = block,
-                                               echo = echo)
+                             echo = TRUE) send.nanoSocket(socket,
+                                                          data = data,
+                                                          mode = mode,
+                                                          block = block,
+                                                          echo = echo)
   nano[["send_aio"]] <- function(data,
                                  mode = c("serial", "raw"),
-                                 timeout) send_aio(socket,
-                                                   data = data,
-                                                   mode = mode,
-                                                   timeout = timeout)
+                                 timeout = -2L) send_aio.nanoSocket(socket,
+                                                                    data = data,
+                                                                    mode = mode,
+                                                                    timeout = timeout)
   nano[["socket_setopt"]] <- function(type = c("bool", "int", "ms", "size",
                                                "string", "uint64"),
                                       opt,
-                                      value) setopt(socket,
-                                                    type = type,
-                                                    opt = opt,
-                                                    value = value)
+                                      value) setopt.nanoSocket(socket,
+                                                               type = type,
+                                                               opt = opt,
+                                                               value = value)
 
   if (protocol == "sub") {
     nano[["subscribe"]] <- function(topic = NULL) subscribe(socket,
@@ -214,6 +214,18 @@ print.nanoListener <- function(x, ...) {
 
 #' @export
 #'
+print.nanoStream <- function(x, ...) {
+
+  cat("< nanoStream >\n - type:",
+      if (is.null(attr(x, "dialer"))) "listener" else "dialer",
+      "\n - url:", attr(x, "url"),
+      "\n - textframes:", attr(x, "textframes"), "\n", file = stdout())
+  invisible(x)
+
+}
+
+#' @export
+#'
 print.recvAio <- function(x, ...) {
 
   cat("< recvAio >\n - $data for message data\n",
@@ -241,7 +253,7 @@ print.sendAio <- function(x, ...) {
 
 #' @export
 #'
-`[.nanoSocket` <- function(x, i, exact = FALSE) {
+`[.nano` <- function(x, i, exact = FALSE) {
 
   attr(x, deparse(substitute(i)), exact = exact)
 
@@ -253,6 +265,24 @@ print.sendAio <- function(x, ...) {
 
   attr(x, name, exact = FALSE)
 
+}
+
+#' @export
+#'
+`$<-.nanoObject` <- function(x, name, value) {
+  x
+}
+
+#' @export
+#'
+`$<-.recvAio` <- function(x, name, value) {
+  x
+}
+
+#' @export
+#'
+`$<-.sendAio` <- function(x, name, value) {
+  x
 }
 
 #' @export

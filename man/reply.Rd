@@ -10,7 +10,7 @@ reply(
   recv_mode = c("serial", "character", "complex", "double", "integer", "logical",
     "numeric", "raw"),
   send_mode = c("serial", "raw"),
-  timeout,
+  timeout = -2L,
   ...
 )
 }
@@ -32,9 +32,10 @@ perfect reproducibility. Use 'raw' for sending vectors of any type (will be
 converted to a raw byte vector for sending) - essential when interfacing
 with external applications.}
 
-\item{timeout}{in ms. If unspecified, a socket-specific default timeout will
-be used. Note that this applies to receiving the request. The total elapsed
-time would also include the time for performing 'execute' on the received
+\item{timeout}{(optional) integer value in milliseconds. If unspecified, the
+default of -2L uses a socket-specific default, which is usually the same
+as no timeout. Note that this applies to receiving the request. The total
+elapsed time would also include performing 'execute' on the received
 data. The timeout then also applies to sending the result (in the event
 that the requestor has become unavailable since sending the request).}
 
@@ -66,13 +67,13 @@ rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
 ctxq <- context(req)
 ctxp <- context(rep)
 
-send_ctx(ctxq, 2022, timeout = 100, echo = FALSE)
+send(ctxq, 2022, block = 100, echo = FALSE)
 reply(ctxp, execute = function(x) x + 1, send_mode = "raw", timeout = 100)
-recv_ctx(ctxq, mode = "double", timeout = 100, keep.raw = FALSE)
+recv(ctxq, mode = "double", block = 100, keep.raw = FALSE)
 
-send_ctx(ctxq, 100, mode = "raw", timeout = 100, echo = FALSE)
+send(ctxq, 100, mode = "raw", block = 100, echo = FALSE)
 reply(ctxp, recv_mode = "double", execute = log, base = 10, timeout = 100)
-recv_ctx(ctxq, timeout = 100, keep.raw = FALSE)
+recv(ctxq, block = 100, keep.raw = FALSE)
 
 close(req)
 close(rep)
