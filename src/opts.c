@@ -10,11 +10,20 @@ SEXP rnng_socket_set(SEXP socket, SEXP type, SEXP opt, SEXP value) {
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
     error_return("'object' is not a valid Socket");
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
-  const int typ = *INTEGER(type);
   const char *op = CHAR(STRING_ELT(opt, 0));
+  const int typ = INTEGER(type)[0];
   int xc;
 
   switch (typ) {
+  case 0:
+    if (value == R_NilValue) {
+      xc = nng_socket_set(*sock, op, NULL, 0);
+    } else {
+      SEXP enc = nano_encode(value);
+      size_t sz = TYPEOF(value) == STRSXP ? Rf_xlength(enc) - 1 : Rf_xlength(enc);
+      xc = nng_socket_set(*sock, op, RAW(enc), sz);
+    }
+    break;
   case 1:
     xc = nng_socket_set_bool(*sock, op, (bool) Rf_asInteger(value));
     break;
@@ -42,7 +51,7 @@ SEXP rnng_socket_set(SEXP socket, SEXP type, SEXP opt, SEXP value) {
 
   if (xc)
     return mk_error(xc);
-  return Rf_ScalarInteger(0);
+  return Rf_ScalarInteger(xc);
 
 }
 
@@ -51,8 +60,8 @@ SEXP rnng_dialer_set(SEXP dialer, SEXP type, SEXP opt, SEXP value) {
   if (R_ExternalPtrTag(dialer) != nano_DialerSymbol)
     error_return("'object' is not a valid Dialer");
   nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(dialer);
-  const int typ = *INTEGER(type);
   const char *op = CHAR(STRING_ELT(opt, 0));
+  const int typ = INTEGER(type)[0];
   int xc;
 
   switch (typ) {
@@ -83,7 +92,7 @@ SEXP rnng_dialer_set(SEXP dialer, SEXP type, SEXP opt, SEXP value) {
 
   if (xc)
     return mk_error(xc);
-  return Rf_ScalarInteger(0);
+  return Rf_ScalarInteger(xc);
 
 }
 
@@ -92,8 +101,8 @@ SEXP rnng_listener_set(SEXP listener, SEXP type, SEXP opt, SEXP value) {
   if (R_ExternalPtrTag(listener) != nano_ListenerSymbol)
     error_return("'object' is not a valid Listener");
   nng_listener *list = (nng_listener *) R_ExternalPtrAddr(listener);
-  const int typ = *INTEGER(type);
   const char *op = CHAR(STRING_ELT(opt, 0));
+  const int typ = INTEGER(type)[0];
   int xc;
 
   switch (typ) {
@@ -124,7 +133,7 @@ SEXP rnng_listener_set(SEXP listener, SEXP type, SEXP opt, SEXP value) {
 
   if (xc)
     return mk_error(xc);
-  return Rf_ScalarInteger(0);
+  return Rf_ScalarInteger(xc);
 
 }
 
@@ -133,11 +142,19 @@ SEXP rnng_ctx_set(SEXP context, SEXP type, SEXP opt, SEXP value) {
   if (R_ExternalPtrTag(context) != nano_ContextSymbol)
     error_return("'object' is not a valid Context");
   nng_ctx *ctx = (nng_ctx *) R_ExternalPtrAddr(context);
-  const int typ = *INTEGER(type);
   const char *op = CHAR(STRING_ELT(opt, 0));
+  const int typ = INTEGER(type)[0];
   int xc;
 
   switch (typ) {
+  case 0:
+    if (value == R_NilValue) {
+      xc = nng_ctx_set(*ctx, op, NULL, 0);
+    } else {
+      SEXP enc = nano_encode(value);
+      xc = nng_ctx_set(*ctx, op, RAW(enc), Rf_xlength(enc));
+    }
+    break;
   case 1:
     xc = nng_ctx_set_bool(*ctx, op, (bool) Rf_asInteger(value));
     break;
@@ -165,7 +182,7 @@ SEXP rnng_ctx_set(SEXP context, SEXP type, SEXP opt, SEXP value) {
 
   if (xc)
     return mk_error(xc);
-  return Rf_ScalarInteger(0);
+  return Rf_ScalarInteger(xc);
 
 }
 
@@ -174,8 +191,8 @@ SEXP rnng_stream_set(SEXP stream, SEXP type, SEXP opt, SEXP value) {
   if (R_ExternalPtrTag(stream) != nano_StreamSymbol)
     error_return("'object' is not a valid Stream");
   nng_stream *st = (nng_stream *) R_ExternalPtrAddr(stream);
-  const int typ = *INTEGER(type);
   const char *op = CHAR(STRING_ELT(opt, 0));
+  const int typ = INTEGER(type)[0];
   int xc;
 
   switch (typ) {
@@ -206,7 +223,7 @@ SEXP rnng_stream_set(SEXP stream, SEXP type, SEXP opt, SEXP value) {
 
   if (xc)
     return mk_error(xc);
-  return Rf_ScalarInteger(0);
+  return Rf_ScalarInteger(xc);
 
 }
 

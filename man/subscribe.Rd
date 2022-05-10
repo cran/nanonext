@@ -2,43 +2,53 @@
 % Please edit documentation in R/protocol.R
 \name{subscribe}
 \alias{subscribe}
+\alias{subscribe.nanoSocket}
+\alias{subscribe.nanoContext}
 \title{Subscribe Topic}
 \usage{
-subscribe(socket, topic = NULL)
+subscribe(con, topic = NULL)
+
+\method{subscribe}{nanoSocket}(con, topic = NULL)
+
+\method{subscribe}{nanoContext}(con, topic = NULL)
 }
 \arguments{
-\item{socket}{a Socket using the sub protocol.}
+\item{con}{a Socket or Context using the 'sub' protocol.}
 
-\item{topic}{[default NULL] a topic (given as a character string). The default
-NULL subscribes to all topics.}
+\item{topic}{[default NULL] an atomic type or NULL. The default NULL
+subscribes to all topics.}
 }
 \value{
 Invisibly, an integer exit code (zero on success).
 }
 \description{
-For a socket using the sub protocol in a publisher/subscriber pattern. Set a
-    topic to subscribe to.
+For a socket or context using the sub protocol in a publisher/subscriber
+    pattern. Set a topic to subscribe to.
 }
 \details{
 To use pub/sub the publisher must:
     \itemize{
-    \item{specify \code{mode = 'raw'} when sending to allow the topics to be
-    recognised by the receiving party.}
-    \item{send a vector that separates the topic from the rest of the message
-    e.g. \code{send(socket, c("topic", "message"), mode = "raw")} - this
-    ensures that topic ends with the required nul byte for it to be
-    recognised.}
+    \item{specify \code{mode = 'raw'} when sending.}
+    \item{ensure the sent vector starts with the topic.}
     }
+    The subscriber should then receive specifying the correct mode.
 }
 \examples{
 pub <- socket("pub", listen = "inproc://nanonext")
 sub <- socket("sub", dial = "inproc://nanonext")
 
 subscribe(sub, "examples")
+
 send(pub, c("examples", "this is an example"), mode = "raw")
+recv(sub, "character")
+send(pub, "examples will also be received", mode = "raw")
 recv(sub, "character")
 send(pub, c("other", "this other topic will not be received"), mode = "raw")
 recv(sub, "character")
+
+subscribe(sub, 2)
+send(pub, c(2, 10, 10, 20), mode = "raw")
+recv(sub, "double", keep.raw = FALSE)
 
 close(pub)
 close(sub)

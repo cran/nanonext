@@ -6,9 +6,9 @@
 #'
 #' @param con a Socket, Context or Stream.
 #' @param data an object (a vector, if mode = 'raw').
-#' @param mode either 'serial' for sending serialised R objects, or 'raw' for
+#' @param mode [default 'serial'] for sending serialised R objects, or 'raw' for
 #'     sending vectors of any type (converted to a raw byte vector for sending).
-#'     For Streams, 'raw' is the only choice and any other value is ignored. Use
+#'     For Streams, 'raw' is the only option and any other value is ignored. Use
 #'     'serial' for perfect reproducibility within R, although 'raw' must be used
 #'     when interfacing with external applications that do not understand R
 #'     serialisation.
@@ -74,12 +74,10 @@ send.nanoSocket <- function(con,
                             block = FALSE,
                             echo = TRUE) {
 
-  mode <- match.arg2(mode, c("serial", "raw"))
-  force(data)
-  data <- encode(data = data, mode = mode)
-  res <- .Call(rnng_send, con, data, block)
-  is.integer(res) && return(invisible(res))
-  if (missing(echo) || isTRUE(echo)) res else invisible(0L)
+  if (.Call(rnng_serial, mode))
+    data <- serialize(object = data, connection = NULL)
+  res <- .Call(rnng_send, con, data, block, echo)
+  if (missing(res)) invisible(0L) else res
 
 }
 
@@ -93,13 +91,10 @@ send.nanoContext <- function(con,
                              block = TRUE,
                              echo = TRUE) {
 
-  mode <- match.arg2(mode, c("serial", "raw"))
-  force(data)
-  data <- encode(data = data, mode = mode)
-  if (missing(block) || isTRUE(block)) block <- -2L
-  res <- .Call(rnng_ctx_send, con, data, block)
-  is.integer(res) && return(invisible(res))
-  if (missing(echo) || isTRUE(echo)) res else invisible(0L)
+  if (.Call(rnng_serial, mode))
+    data <- serialize(object = data, connection = NULL)
+  res <- .Call(rnng_ctx_send, con, data, block, echo)
+  if (missing(res)) invisible(0L) else res
 
 }
 
@@ -113,28 +108,21 @@ send.nanoStream <- function(con,
                             block = TRUE,
                             echo = TRUE) {
 
-  force(data)
-  data <- encode(data = data, mode = 2L)
-  if (missing(block) || isTRUE(block)) block <- -2L
-  res <- .Call(rnng_stream_send, con, data, block)
-  is.integer(res) && return(invisible(res))
-  if (missing(echo) || isTRUE(echo)) res else invisible(0L)
+  res <- .Call(rnng_stream_send, con, data, block, echo)
+  if (missing(res)) invisible(0L) else res
 
 }
-
 
 #' Receive
 #'
 #' Receive data over a connection (Socket, Context or Stream).
 #'
 #' @param con a Socket, Context or Stream.
-#' @param mode <Sockets and Contexts> [default 'serial'] mode of vector to be
-#'     received - one of 'serial', 'character', 'complex', 'double', 'integer',
-#'     'logical', 'numeric', or 'raw'. The default 'serial' means a serialised
-#'     R object, for the other modes, the raw vector received will be converted
-#'     into the respective mode.
-#'     <Streams> [default 'character'] note that 'serial' is not an option for
-#'     Streams.
+#' @param mode [default 'serial'] mode of vector to be received - one of 'serial',
+#'     'character', 'complex', 'double', 'integer', 'logical', 'numeric', or 'raw'.
+#'     The default 'serial' means a serialised R object, for the other modes,
+#'     the raw vector received will be converted into the respective mode.
+#'     For Streams, 'serial' is not an option and the default is 'character'.
 #' @param block logical TRUE to block until successful or FALSE to return
 #'     immediately even if unsuccessful  (e.g. if no messages are available),
 #'     or else an integer value specifying the maximum time to block in
@@ -142,8 +130,9 @@ send.nanoStream <- function(con,
 #' @param keep.raw [default TRUE] logical flag whether to keep the received raw
 #'     vector (useful for verification e.g. via hashing). If FALSE, will return
 #'     the converted data only.
-#' @param n <Streams> [default 65536L] the maximum number of bytes to receive.
-#'     Can be an over-estimate, but note that a buffer of this size is reserved.
+#' @param n [default 65536L] applicable to Streams only, the maximum number of
+#'     bytes to receive. Can be an over-estimate, but note that a buffer of this
+#'     size is reserved.
 #' @param ... currently unused.
 #'
 #' @return Named list of 2 elements: 'raw' containing the received raw vector
@@ -171,8 +160,8 @@ send.nanoStream <- function(con,
 #'     to set a positive integer value for \code{block} rather than FALSE.
 #'
 #' @examples
-#' s1 <- socket("bus", listen = "inproc://nanonext")
-#' s2 <- socket("bus", dial = "inproc://nanonext")
+#' s1 <- socket("pair", listen = "inproc://nanonext")
+#' s2 <- socket("pair", dial = "inproc://nanonext")
 #'
 #' send(s1, data.frame(a = 1, b = 2))
 #' res <- recv(s2)
@@ -225,14 +214,7 @@ recv.nanoSocket <- function(con,
                             keep.raw = TRUE,
                             ...) {
 
-  mode <- match.arg2(mode, c("serial", "character", "complex", "double",
-                             "integer", "logical", "numeric", "raw"))
-  res <- .Call(rnng_recv, con, block)
-  is.integer(res) && return(invisible(res))
-  on.exit(expr = return(res))
-  data <- decode(con = res, mode = mode)
-  on.exit()
-  if (missing(keep.raw) || isTRUE(keep.raw)) list(raw = res, data = data) else data
+  .Call(rnng_recv, con, mode, block, keep.raw)
 
 }
 
@@ -247,16 +229,7 @@ recv.nanoContext <- function(con,
                              keep.raw = TRUE,
                              ...) {
 
-  mode <- match.arg2(mode, c("serial", "character", "complex", "double",
-                             "integer", "logical", "numeric", "raw"))
-  if (missing(block) || isTRUE(block)) block <- -2L
-  res <- .Call(rnng_ctx_recv, con, block)
-  is.integer(res) && return(invisible(res))
-  on.exit(expr = return(res))
-  data <- decode(con = res, mode = mode)
-  on.exit()
-  missing(data) && return(.Call(rnng_scm))
-  if (missing(keep.raw) || isTRUE(keep.raw)) list(raw = res, data = data) else data
+  .Call(rnng_ctx_recv, con, mode, block, keep.raw)
 
 }
 
@@ -272,15 +245,7 @@ recv.nanoStream <- function(con,
                             n = 65536L,
                             ...) {
 
-  mode <- match.arg2(mode, c("character", "complex", "double", "integer",
-                             "logical", "numeric", "raw")) + 1L
-  if (missing(block) || isTRUE(block)) block <- -2L
-  res <- .Call(rnng_stream_recv, con, n, block)
-  is.integer(res) && return(invisible(res))
-  on.exit(expr = return(res))
-  data <- decode(con = res, mode = mode)
-  on.exit()
-  if (missing(keep.raw) || isTRUE(keep.raw)) list(raw = res, data = data) else data
+  .Call(rnng_stream_recv, con, mode, block, keep.raw, n)
 
 }
 

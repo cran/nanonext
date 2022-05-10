@@ -20,27 +20,34 @@ utilising ‘Aio’ objects which automatically resolve upon completion of
 asynchronous operations.
 
 Designed for performance and reliability, the NNG library is written in
-C and {nanonext} is a lightweight wrapper depending on no other
-packages. Provides the interface for code and processes to communicate
-with each other - receive data generated in Python, perform analysis in
-R, and send results to a C++ program – all on the same computer or on
-networks spanning the globe.
+C and {nanonext} is a lightweight zero-dependency wrapper. Provides the
+interface for code and processes to communicate with each other -
+receive data generated in Python, perform analysis in R, and send
+results to a C++ program – all on the same computer or on networks
+spanning the globe.
 
 Implemented scalability protocols:
 
--   Bus (routing)
+-   Bus (mesh networks)
 -   Pair (two-way radio)
--   Pipeline (one-way pipe)
+-   Push/Pull (one-way pipeline)
 -   Publisher/Subscriber (topics & broadcast)
--   Request/Reply (I ask, you answer)
--   Survey (everyone votes)
+-   Request/Reply (RPC)
+-   Surveyor/Respondent (voting & service discovery)
 
-Implemented transports:
+Supported transports:
 
 -   inproc (intra-process)
 -   IPC (inter-process)
--   TCP/IP (IPv4 or IPv6)
+-   TCP (IPv4 or IPv6)
 -   WebSocket
+
+Web utilities:
+
+-   ncurl - (async) http(s) client
+-   stream - secure websockets client (and generic low-level socket
+    interface)
+-   messenger - console-based instant messaging
 
 ### Table of Contents
 
@@ -50,7 +57,7 @@ Implemented transports:
 4.  [Async and Concurrency](#async-and-concurrency)
 5.  [RPC and Distributed Computing](#rpc-and-distributed-computing)
 6.  [Publisher / Subscriber Model](#publisher-subscriber-model)
-7.  [Surveyor / Repondent Model](#surveyor-respondent-model)
+7.  [Surveyor / Respondent Model](#surveyor-respondent-model)
 8.  [ncurl: (Async) HTTP Client](#ncurl-async-http-client)
 9.  [stream: Websocket Client](#stream-websocket-client)
 10. [Building from source](#building-from-source)
@@ -72,8 +79,8 @@ install.packages("nanonext", repos = "https://shikokuchuo.r-universe.dev")
 
 ### Interfaces
 
-Call `nano_init()` after package load to set global options. Using
-defaults will cause warnings to print immediately as they occur.
+Call `nano_init()` after package load to set global options such as
+causing warnings to print immediately as they occur.
 
 {nanonext} offers 2 equivalent interfaces: an object-oriented interface,
 and a functional interface.
@@ -103,7 +110,7 @@ Send message from ‘nano1’:
 
 ``` r
 nano1$send("hello world!")
-#>  [1] 58 0a 00 00 00 03 00 04 01 03 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>  [1] 58 0a 00 00 00 03 00 04 02 00 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
 #> [26] 00 10 00 00 00 01 00 04 00 09 00 00 00 0c 68 65 6c 6c 6f 20 77 6f 72 6c 64
 #> [51] 21
 ```
@@ -113,7 +120,7 @@ Receive message using ‘nano2’:
 ``` r
 nano2$recv()
 #> $raw
-#>  [1] 58 0a 00 00 00 03 00 04 01 03 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>  [1] 58 0a 00 00 00 03 00 04 02 00 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
 #> [26] 00 10 00 00 00 01 00 04 00 09 00 00 00 0c 68 65 6c 6c 6f 20 77 6f 72 6c 64
 #> [51] 21
 #> 
@@ -124,9 +131,9 @@ nano2$recv()
 #### Functional Interface
 
 The primary object in the functional interface is the Socket. Use
-`socket()` to create a socket, and optionally dial or listen at an
-address. The socket is then passed as the first argument of subsequent
-actions such as `send()` or `recv()`.
+`socket()` to create a socket and dial or listen at an address. The
+socket is then passed as the first argument of subsequent actions such
+as `send()` or `recv()`.
 
 *Example using Pipeline (Push/Pull) protocol with TCP/IP transport:*
 
@@ -144,7 +151,7 @@ Send message from ‘socket1’:
 
 ``` r
 send(socket1, "hello world!")
-#>  [1] 58 0a 00 00 00 03 00 04 01 03 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>  [1] 58 0a 00 00 00 03 00 04 02 00 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
 #> [26] 00 10 00 00 00 01 00 04 00 09 00 00 00 0c 68 65 6c 6c 6f 20 77 6f 72 6c 64
 #> [51] 21
 ```
@@ -154,7 +161,7 @@ Receive message using ‘socket2’:
 ``` r
 recv(socket2)
 #> $raw
-#>  [1] 58 0a 00 00 00 03 00 04 01 03 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>  [1] 58 0a 00 00 00 03 00 04 02 00 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
 #> [26] 00 10 00 00 00 01 00 04 00 09 00 00 00 0c 68 65 6c 6c 6f 20 77 6f 72 6c 64
 #> [51] 21
 #> 
@@ -233,6 +240,7 @@ n$recv(mode = "double")
 massively-scaleable concurrency framework.
 
 ``` r
+
 s1 <- socket("pair", listen = "inproc://nano")
 s2 <- socket("pair", dial = "inproc://nano")
 ```
@@ -245,6 +253,7 @@ operation is ongoing, automatically resolving to a final value once
 complete.
 
 ``` r
+
 # an async receive is requested, but no messages are waiting (yet to be sent)
 msg <- recv_aio(s2)
 msg
@@ -258,6 +267,7 @@ msg$data
 For a ‘sendAio’ object, the result is stored at `$result`.
 
 ``` r
+
 res <- send_aio(s1, data.frame(a = 1, b = 2))
 res
 #> < sendAio >
@@ -274,12 +284,13 @@ For a ‘recvAio’ object, the message is stored at `$data`, and the raw
 message at `$raw` (if kept).
 
 ``` r
+
 # now that a message has been sent, the 'recvAio' automatically resolves
 msg$data
 #>   a b
 #> 1 1 2
 msg$raw
-#>   [1] 58 0a 00 00 00 03 00 04 01 03 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>   [1] 58 0a 00 00 00 03 00 04 02 00 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
 #>  [26] 03 13 00 00 00 02 00 00 00 0e 00 00 00 01 3f f0 00 00 00 00 00 00 00 00 00
 #>  [51] 0e 00 00 00 01 40 00 00 00 00 00 00 00 00 00 04 02 00 00 00 01 00 04 00 09
 #>  [76] 00 00 00 05 6e 61 6d 65 73 00 00 00 10 00 00 00 02 00 04 00 09 00 00 00 01
@@ -296,6 +307,7 @@ and after. This means there is no need to actually wait (block) for an
 Aio to resolve, as the example below demonstrates.
 
 ``` r
+
 msg <- recv_aio(s2)
 
 # unresolved() queries for resolution itself so no need to use it again within the while loop
@@ -315,6 +327,7 @@ The values may also be called explicitly using `call_aio()`. This will
 wait for completion of the Aio (blocking).
 
 ``` r
+
 # will wait for completion then return the resolved Aio
 call_aio(msg)
 
@@ -337,20 +350,22 @@ Can be used to perform computationally-expensive calculations or
 I/O-bound operations such as writing large amounts of data to disk in a
 separate ‘server’ process running concurrently.
 
-Server process: `reply()` will wait for a message and apply a function,
-in this case `rnorm()`, before sending back the result.
+\[S\] Server process: `reply()` will wait for a message and apply a
+function, in this case `rnorm()`, before sending back the result.
 
 ``` r
+
 library(nanonext)
 rep <- socket("rep", listen = "tcp://127.0.0.1:6546")
 ctxp <- context(rep)
 reply(ctxp, execute = rnorm, send_mode = "raw") 
 ```
 
-Client process: `request()` performs an async send and receive request
-and returns immediately with a `recvAio` object.
+\[C\] Client process: `request()` performs an async send and receive
+request and returns immediately with a `recvAio` object.
 
 ``` r
+
 library(nanonext)
 req <- socket("req", dial = "tcp://127.0.0.1:6546")
 ctxq <- context(req)
@@ -371,13 +386,14 @@ The return value from the server request is then retrieved and stored in
 the Aio as `$data`.
 
 ``` r
+
 call_aio(aio)
 
 aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] 1.361 -0.547 1.283 -0.905 -1.785 ...
+#>  num [1:100000000] 0.762 0.482 1.227 2.048 -2.218 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -404,18 +420,25 @@ example. A subscriber can subscribe to one or multiple topics broadcast
 by a publisher.
 
 ``` r
+
 pub <- socket("pub", listen = "inproc://nanobroadcast")
 sub <- socket("sub", dial = "inproc://nanobroadcast")
 
 sub |> subscribe(topic = "examples")
+
 pub |> send(c("examples", "this is an example"), mode = "raw", echo = FALSE)
 sub |> recv(mode = "character", keep.raw = FALSE)
 #> [1] "examples"           "this is an example"
+
+pub |> send("examples at the start of a single text message", mode = "raw", echo = FALSE)
+sub |> recv(mode = "character", keep.raw = FALSE)
+#> [1] "examples at the start of a single text message"
 
 pub |> send(c("other", "this other topic will not be received"), mode = "raw", echo = FALSE)
 sub |> recv(mode = "character", keep.raw = FALSE)
 #> Warning in recv.nanoSocket(sub, mode = "character", keep.raw = FALSE): 8 | Try
 #> again
+#> 'errorValue' int 8
 
 # specify NULL to subscribe to ALL topics
 sub |> subscribe(topic = NULL)
@@ -427,11 +450,24 @@ sub |> unsubscribe(topic = NULL)
 pub |> send(c("newTopic", "this topic will now not be received"), mode = "raw", echo = FALSE)
 sub |> recv("character", keep.raw = FALSE)
 #> Warning in recv.nanoSocket(sub, "character", keep.raw = FALSE): 8 | Try again
+#> 'errorValue' int 8
 
 # however the topics explicitly subscribed to are still received
-pub |> send(c("examples", "this example will still be received"), mode = "raw", echo = FALSE)
+pub |> send(c("examples will still be received"), mode = "raw", echo = FALSE)
 sub |> recv(mode = "character", keep.raw = FALSE)
-#> [1] "examples"                            "this example will still be received"
+#> [1] "examples will still be received"
+```
+
+The subscribed topic can be of any atomic type (not just character),
+allowing integer, double, logical, complex and raw vectors to be sent
+and received.
+
+``` r
+
+sub |> subscribe(topic = 1)
+pub |> send(c(1, 10, 10, 20), mode = "raw", echo = FALSE)
+sub |> recv(mode = "double", keep.raw = FALSE)
+#> [1]  1 10 10 20
 
 close(pub)
 close(sub)
@@ -450,6 +486,7 @@ itself is a timed event, and responses received after the timeout are
 discarded.
 
 ``` r
+
 sur <- socket("surveyor", listen = "inproc://nanoservice")
 res1 <- socket("respondent", dial = "inproc://nanoservice")
 res2 <- socket("respondent", dial = "inproc://nanoservice")
@@ -507,21 +544,23 @@ returning immediately with a ‘recvAio’.
 For normal use, it takes just the URL. It can follow redirects.
 
 ``` r
+
 ncurl("http://httpbin.org/headers")
 #> $raw
 #>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
 #>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
 #>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 32 35 33 33 33 66 37 2d 31 38 35 39 61 30 31 35 30 30 39 61 38 36 63
-#> [101] 64 35 37 31 63 38 31 35 35 22 0a 20 20 7d 0a 7d 0a
+#>  [76] 2d 36 32 37 39 66 66 64 31 2d 36 63 38 63 30 36 30 32 37 34 61 63 30 38 65
+#> [101] 66 37 32 32 35 30 66 65 63 22 0a 20 20 7d 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-625333f7-1859a015009a86cd571c8155\"\n  }\n}\n"
+#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6279ffd1-6c8c060274ac08ef72250fec\"\n  }\n}\n"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
 
 ``` r
+
 res <- ncurl("http://httpbin.org/post", async = TRUE, method = "POST",
              headers = c(`Content-Type` = "application/json", Authorization = "Bearer APIKEY"),
              data = '{"key": "value"}')
@@ -531,7 +570,7 @@ res
 #>  - $raw for raw message
 
 call_aio(res)$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-625333f8-02809e8e020ccb400cecf3e9\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"79.173.189.204\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6279ffd1-110ea4df1b50ecb96a19a80f\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"78.145.225.121\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -545,24 +584,31 @@ for making REST API requests.
 communicating with raw sockets. This may be used for connecting to
 arbitrary non-NNG endpoints.
 
+The stream interface can be used to communicate with websocket servers.
+Where TLS is enabled in the NNG library, connecting to secure websockets
+is configured automatically. The argument `textframes = TRUE` can be
+specified where the websocket server uses text rather than binary
+frames.
+
 ``` r
-s <- stream(dial = "wss://socketsbay.com/wss/v2/2/demo/", textframes = TRUE)
+
+s <- stream(dial = "wss://stream.binance.com:9443/ws/btcusdt@kline_1m", textframes = TRUE)
 s
 #> < nanoStream >
 #>  - type: dialer 
-#>  - url: wss://socketsbay.com/wss/v2/2/demo/ 
+#>  - url: wss://stream.binance.com:9443/ws/btcusdt@kline_1m 
 #>  - textframes: TRUE
-s |> send("hello world")
-#>  [1] 68 65 6c 6c 6f 20 77 6f 72 6c 64 00
+
+s |> recv(keep.raw = FALSE)
+#> [1] "{\"e\":\"kline\",\"E\":1652162517227,\"s\":\"BTCUSDT\",\"k\":{\"t\":1652162460000,\"T\":1652162519999,\"s\":\"BTCUSDT\",\"i\":\"1m\",\"f\":1355281603,\"L\":1355283235,\"o\":\"31840.01000000\",\"c\":\"31821.53000000\",\"h\":\"31887.25000000\",\"l\":\"31821.53000000\",\"v\":\"104.62077000\",\"n\":1633,\"x\":false,\"q\":\"3331956.61656560\",\"V\":\"49.29040000\",\"Q\":\"1569718.18064700\",\"B\":\"0\"}}"
+
+s |> recv(keep.raw = FALSE)
+#> [1] "{\"e\":\"kline\",\"E\":1652162519242,\"s\":\"BTCUSDT\",\"k\":{\"t\":1652162460000,\"T\":1652162519999,\"s\":\"BTCUSDT\",\"i\":\"1m\",\"f\":1355281603,\"L\":1355283278,\"o\":\"31840.01000000\",\"c\":\"31820.01000000\",\"h\":\"31887.25000000\",\"l\":\"31820.00000000\",\"v\":\"107.18185000\",\"n\":1676,\"x\":false,\"q\":\"3413451.15905990\",\"V\":\"51.10822000\",\"Q\":\"1627561.59975630\",\"B\":\"0\"}}"
+
+close(s)
 ```
 
-The stream interface can be used to communicate with websocket servers.
-Where TLS is enabled in the NNG library, connecting to secure websockets
-is configured automatically. Here, the argument `textframes = TRUE` can
-be specified where the websocket server uses text rather than binary
-frames.
-
-The same API for Sockets can equally be used on Streams: `send()` and
+The same API for Sockets is available for use on Streams: `send()` and
 `recv()`, as well as their asynchronous counterparts `send_aio()` and
 `recv_aio()`. This affords a great deal of flexibility in ingesting and
 processing streaming data.
@@ -581,13 +627,12 @@ This is available in system package repositories as:
 -   `libnng-dev` (deb)
 -   `nng-devel` (rpm)
 -   `nng` (Homebrew on MacOS)
--   `nng` from vcpkg (see <https://vcpkg.io/>).
 
 A system installation of ‘libnng’ in the standard filesystem locations
 will be detected and used if possible.
 
-Otherwise, a release version of ‘libnng’ will be downloaded and built
-from source automatically during package installation (note: this
+Otherwise, the latest release version of ‘libnng’ will be downloaded and
+built from source automatically during package installation (note: this
 requires ‘cmake’).
 
 #### Windows
@@ -597,23 +642,19 @@ downloaded during the package installation process.
 
 #### TLS Support
 
-If a system installation of ‘libnng’ and ‘libmbedtls’ development
-headers are both detected in the same location, it is assumed that NNG
-was built with TLS support (using Mbed TLS) and the appropriate options
-are set to ensure a successful install.
+If system installations of ‘libnng’ and ‘libmbedtls’ development headers
+are detected in the same location, it is assumed that NNG was built with
+TLS support (using Mbed TLS) and TLS support is configured
+appropriately.
 
-If your system installation of NNG was built with TLS support (using
-Mbed TLS) but detection of ‘libmbedtls’ failed (possibly as it was
-installed in another location), you may also set the environment
-variable `Sys.setenv(NANONEXT_TLS=1)` before installing the package to
-ensure that the appropriate options are set.
+Otherwise, the environment variable `Sys.setenv(NANONEXT_TLS=1)` may be
+set prior to installation if:
 
-#### Certain ARM architectures
-
-If package installation initially fails with an error message of
-`unable to load shared object:[ ] undefined symbol: __atomic_fetch_sub_8`
-or similar, please set the environment variable
-`Sys.setenv(NANONEXT_ARM=1)` and then proceed with installation again.
+-   system installations of ‘libnng’ (built with TLS support) and
+    ‘libmbedtls’ are in different locations; or
+-   there is a system installation of ‘libmbedtls’ but not ‘libnng’ - in
+    which case nanonext will download and build the latest release of
+    ‘libnng’ against this.
 
 ### Links
 

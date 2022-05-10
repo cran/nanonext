@@ -7,7 +7,7 @@
 #' @param url the URL address.
 #' @param async [default FALSE] logical value whether to perform actions async.
 #' @param convert [default TRUE] logical value whether to attempt conversion of
-#'     the received raw bytes to a character vetor.
+#'     the received raw bytes to a character vector.
 #' @param method (optional) the HTTP method (defaults to 'GET' if not specified).
 #' @param headers (optional) a named list or character vector specifying the
 #'     HTTP request headers e.g. \code{list(`Content-Type` = "text/plain")} or
@@ -59,11 +59,11 @@ ncurl <- function(url,
   if (missing(async) || !isTRUE(async)) {
 
     res <- .Call(rnng_ncurl, url, method, headers, data)
-    is.integer(res) && return(invisible(res))
+    is.integer(res) && return(res)
 
     if (is.character(res)) {
       continue <- if (interactive()) readline(sprintf("Follow redirect to <%s>? [Y/n] ", res)) else "n"
-      continue %in% c("n", "N", "no", "NO") && return(invisible(res))
+      continue %in% c("n", "N", "no", "NO") && return(res)
       return(ncurl(res))
     }
 
@@ -74,7 +74,7 @@ ncurl <- function(url,
   } else {
 
     aio <- .Call(rnng_ncurl_aio, url, method, headers, data)
-    is.integer(aio) && return(invisible(aio))
+    is.integer(aio) && return(aio)
 
     convert <- missing(convert) || isTRUE(convert)
     data <- raw <- NULL
@@ -84,14 +84,12 @@ ncurl <- function(url,
       if (unresolv) {
         res <- .Call(rnng_aio_http, aio)
         missing(res) && return(.Call(rnng_aio_unresolv))
-        is.integer(res) && {
+        if (is.integer(res)) {
           data <<- raw <<- res
-          aio <<- env[["aio"]] <<- NULL
-          unresolv <<- FALSE
-          return(invisible(res))
+        } else {
+          raw <<- res
+          data <<- if (convert) tryCatch(rawToChar(res), error = function(e) NULL)
         }
-        raw <<- res
-        data <<- if (convert) tryCatch(rawToChar(res), error = function(e) NULL)
         aio <<- env[["aio"]] <<- NULL
         unresolv <<- FALSE
       }
@@ -101,14 +99,12 @@ ncurl <- function(url,
       if (unresolv) {
         res <- .Call(rnng_aio_http, aio)
         missing(res) && return(.Call(rnng_aio_unresolv))
-        is.integer(res) && {
+        if (is.integer(res)) {
           data <<- raw <<- res
-          aio <<- env[["aio"]] <<- NULL
-          unresolv <<- FALSE
-          return(invisible(res))
+        } else {
+          raw <<- res
+          data <<- if (convert) tryCatch(rawToChar(res), error = function(e) NULL)
         }
-        raw <<- res
-        data <<- if (convert) tryCatch(rawToChar(res), error = function(e) NULL)
         aio <<- env[["aio"]] <<- NULL
         unresolv <<- FALSE
       }

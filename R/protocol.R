@@ -2,58 +2,75 @@
 
 #' Subscribe Topic
 #'
-#' For a socket using the sub protocol in a publisher/subscriber pattern. Set a
-#'     topic to subscribe to.
+#' For a socket or context using the sub protocol in a publisher/subscriber
+#'     pattern. Set a topic to subscribe to.
 #'
-#' @param socket a Socket using the sub protocol.
-#' @param topic [default NULL] a topic (given as a character string). The default
-#'     NULL subscribes to all topics.
+#' @param con a Socket or Context using the 'sub' protocol.
+#' @param topic [default NULL] an atomic type or NULL. The default NULL
+#'     subscribes to all topics.
 #'
 #' @return Invisibly, an integer exit code (zero on success).
 #'
 #' @details To use pub/sub the publisher must:
 #'     \itemize{
-#'     \item{specify \code{mode = 'raw'} when sending to allow the topics to be
-#'     recognised by the receiving party.}
-#'     \item{send a vector that separates the topic from the rest of the message
-#'     e.g. \code{send(socket, c("topic", "message"), mode = "raw")} - this
-#'     ensures that topic ends with the required nul byte for it to be
-#'     recognised.}
+#'     \item{specify \code{mode = 'raw'} when sending.}
+#'     \item{ensure the sent vector starts with the topic.}
 #'     }
+#'     The subscriber should then receive specifying the correct mode.
 #'
 #' @examples
 #' pub <- socket("pub", listen = "inproc://nanonext")
 #' sub <- socket("sub", dial = "inproc://nanonext")
 #'
 #' subscribe(sub, "examples")
+#'
 #' send(pub, c("examples", "this is an example"), mode = "raw")
+#' recv(sub, "character")
+#' send(pub, "examples will also be received", mode = "raw")
 #' recv(sub, "character")
 #' send(pub, c("other", "this other topic will not be received"), mode = "raw")
 #' recv(sub, "character")
 #'
+#' subscribe(sub, 2)
+#' send(pub, c(2, 10, 10, 20), mode = "raw")
+#' recv(sub, "double", keep.raw = FALSE)
+#'
 #' close(pub)
 #' close(sub)
 #'
+#' @rdname subscribe
 #' @export
 #'
-subscribe <- function(socket, topic = NULL) {
+subscribe <- function(con, topic = NULL) UseMethod("subscribe")
 
-  if (.logging.) {
-    loginfo(evt = "subscribe", pkey = "sock", pval = attr(socket, "id"),
-            skey = "topic", sval = if (is.null(topic)) "ALL" else topic)
-  }
-  invisible(.Call(rnng_socket_set, socket, 5L, "sub:subscribe", topic))
+#' @rdname subscribe
+#' @method subscribe nanoSocket
+#' @export
+#'
+subscribe.nanoSocket <- function(con, topic = NULL) {
+
+  invisible(.Call(rnng_socket_set, con, 0L, "sub:subscribe", topic))
+
+}
+
+#' @rdname subscribe
+#' @method subscribe nanoContext
+#' @export
+#'
+subscribe.nanoContext <- function(con, topic = NULL) {
+
+  invisible(.Call(rnng_ctx_set, con, 0L, "sub:subscribe", topic))
 
 }
 
 #' Unsubscribe Topic
 #'
-#' For a socket using the sub protocol in a publisher/subscriber pattern. Remove
-#'     a topic from the subscription list.
+#' For a socket or context using the sub protocol in a publisher/subscriber
+#'     pattern. Remove a topic from the subscription list.
 #'
-#' @param socket a Socket using the sub protocol.
-#' @param topic [default NULL] a topic (given as a character string). The default
-#'     NULL unsubscribes from all topics (if all topics were previously subscribed).
+#' @param con a Socket or Context using the 'sub' protocol.
+#' @param topic [default NULL] an atomic type or NULL. The default NULL
+#'     unsubscribes from all topics (if all topics were previously subscribed).
 #'
 #' @return Invisibly, an integer exit code (zero on success).
 #'
@@ -62,47 +79,65 @@ subscribe <- function(socket, topic = NULL) {
 #'
 #'     To use pub/sub the publisher must:
 #'     \itemize{
-#'     \item{specify \code{mode = 'raw'} when sending to allow the topics to be
-#'     recognised by the receiving party.}
-#'     \item{send a vector that separates the topic from the rest of the message
-#'     e.g. \code{send(socket, c("topic", "message"), mode = "raw")} - this
-#'     ensures that topic ends with the required nul byte for it to be
-#'     recognised.}
+#'     \item{specify \code{mode = 'raw'} when sending.}
+#'     \item{ensure the sent vector starts with the topic.}
 #'     }
+#'     The subscriber should then receive specifying the correct mode.
 #'
 #' @examples
 #' pub <- socket("pub", listen = "inproc://nanonext")
 #' sub <- socket("sub", dial = "inproc://nanonext")
 #'
 #' subscribe(sub, NULL)
+#'
 #' send(pub, c("examples", "this is an example"), mode = "raw")
+#' recv(sub, "character")
+#' send(pub, "examples will also be received", mode = "raw")
 #' recv(sub, "character")
 #' unsubscribe(sub, NULL)
 #' send(pub, c("examples", "this example will not be received"), mode = "raw")
 #' recv(sub, "character")
 #'
+#' subscribe(sub, 2)
+#' send(pub, c(2, 10, 10, 20), mode = "raw")
+#' recv(sub, "double", keep.raw = FALSE)
+#'
 #' close(pub)
 #' close(sub)
 #'
+#' @rdname unsubscribe
 #' @export
 #'
-unsubscribe <- function(socket, topic = NULL) {
+unsubscribe <- function(con, topic = NULL) UseMethod("unsubscribe")
 
-  if (.logging.) {
-    loginfo(evt = "unsubscribe", pkey = "sock", pval = attr(socket, "id"),
-            skey = "topic", sval = if (is.null(topic)) "ALL" else topic)
-  }
-  invisible(.Call(rnng_socket_set, socket, 5L, "sub:unsubscribe", topic))
+#' @rdname unsubscribe
+#' @method unsubscribe nanoSocket
+#' @export
+#'
+unsubscribe.nanoSocket <- function(con, topic = NULL) {
+
+  invisible(.Call(rnng_socket_set, con, 0L, "sub:unsubscribe", topic))
+
+}
+
+#' @rdname unsubscribe
+#' @method unsubscribe nanoContext
+#' @export
+#'
+unsubscribe.nanoContext <- function(con, topic = NULL) {
+
+  invisible(.Call(rnng_ctx_set, con, 0L, "sub:unsubscribe", topic))
 
 }
 
 #' Set Survey Time
 #'
-#' For a socket using the surveyor protocol in a surveyor/respondent pattern.
-#'     Set a survey timeout in ms (remains valid for all subsequent surveys).
-#'     Messages received by the surveyor after the timer has ended are discarded.
+#' For a socket or context using the surveyor protocol in a surveyor/respondent
+#'     pattern. Set a survey timeout in ms (remains valid for all subsequent
+#'     surveys). Messages received by the surveyor after the timer has ended are
+#'     discarded.
 #'
-#' @param socket a Socket or Context using the surveyor protocol.
+#' @param con a Socket or Context using the 'surveyor' protocol.
 #' @param time the survey timeout in ms.
 #'
 #' @return Invisibly, an integer exit code (zero on success).
@@ -136,15 +171,28 @@ unsubscribe <- function(socket, topic = NULL) {
 #' close(sur)
 #' close(res)
 #'
+#' @rdname survey_time
 #' @export
 #'
-survey_time <- function(socket, time) {
+survey_time <- function(con, time) UseMethod("survey_time")
 
-  if (.logging.) {
-    loginfo(evt = "survey", pkey = "sock", pval = attr(socket, "id"),
-            skey = "set time", sval = as.character(time))
-  }
-  invisible(.Call(rnng_socket_set, socket, 3L, "surveyor:survey-time", time))
+#' @rdname survey_time
+#' @method survey_time nanoSocket
+#' @export
+#'
+survey_time.nanoSocket <- function(con, time) {
+
+  invisible(.Call(rnng_socket_set, con, 3L, "surveyor:survey-time", time))
+
+}
+
+#' @rdname survey_time
+#' @method survey_time nanoContext
+#' @export
+#'
+survey_time.nanoContext <- function(con, time) {
+
+  invisible(.Call(rnng_ctx_set, con, 3L, "surveyor:survey-time", time))
 
 }
 

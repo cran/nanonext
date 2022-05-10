@@ -51,14 +51,13 @@
 #'
 #' @export
 #'
-nano <- function(protocol = c("pair", "bus", "req", "rep", "push", "pull",
-                              "pub", "sub", "surveyor", "respondent"),
+nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
+                              "req", "rep", "surveyor", "respondent"),
                  dial = NULL,
                  listen = NULL,
                  autostart = TRUE) {
 
   protocol <- match.arg(protocol)
-
   nano <- `class<-`(new.env(hash = FALSE), "nanoObject")
   socket <- socket(protocol)
   makeActiveBinding(sym = "socket", fun = function(x) socket, env = nano)
@@ -128,15 +127,26 @@ nano <- function(protocol = c("pair", "bus", "req", "rep", "push", "pull",
                                                                opt = opt,
                                                                value = value)
 
-  if (protocol == "sub") {
-    nano[["subscribe"]] <- function(topic = NULL) subscribe(socket,
-                                                            topic = topic)
-    nano[["unsubscribe"]] <- function(topic = NULL) unsubscribe(socket,
-                                                                topic = topic)
-  }
-  if (protocol == "surveyor") {
-    nano[["survey_time"]] <- function(time) survey_time(socket, time = time)
-  }
+  switch(protocol,
+         req =,
+         rep = {
+           nano[["context"]] <- function() context(socket)
+         },
+         sub = {
+           nano[["context"]] <- function() context(socket)
+           nano[["subscribe"]] <- function(topic = NULL) subscribe(socket,
+                                                                   topic = topic)
+           nano[["unsubscribe"]] <- function(topic = NULL) unsubscribe(socket,
+                                                                       topic = topic)
+         },
+         surveyor = {
+           nano[["context"]] <- function() context(socket)
+           nano[["survey_time"]] <- function(time) survey_time(socket, time = time)
+         },
+         respondent = {
+           nano[["context"]] <- function() context(socket)
+         },
+         NULL)
 
   nano
 
@@ -265,6 +275,12 @@ print.sendAio <- function(x, ...) {
 
   attr(x, name, exact = FALSE)
 
+}
+
+#' @export
+#'
+`$<-.nano` <- function(x, name, value) {
+  x
 }
 
 #' @export

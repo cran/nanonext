@@ -14,6 +14,7 @@ SEXP nano_SocketSymbol;
 SEXP nano_StateSymbol;
 SEXP nano_StreamSymbol;
 SEXP nano_TextframesSymbol;
+SEXP nano_UnserSymbol;
 SEXP nano_UrlSymbol;
 
 static void RegisterSymbols(void) {
@@ -29,23 +30,24 @@ static void RegisterSymbols(void) {
   nano_StateSymbol = Rf_install("state");
   nano_StreamSymbol = Rf_install("stream");
   nano_TextframesSymbol = Rf_install("textframes");
+  nano_UnserSymbol = Rf_install("unserialize");
   nano_UrlSymbol = Rf_install("url");
 }
 
 static const R_CallMethodDef CallEntries[] = {
   {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
-  {"rnng_aio_get_msg", (DL_FUNC) &rnng_aio_get_msg, 1},
+  {"rnng_aio_get_msg", (DL_FUNC) &rnng_aio_get_msg, 3},
   {"rnng_aio_http", (DL_FUNC) &rnng_aio_http, 1},
   {"rnng_aio_result", (DL_FUNC) &rnng_aio_result, 1},
   {"rnng_aio_stop", (DL_FUNC) &rnng_aio_stop, 1},
-  {"rnng_aio_stream_in", (DL_FUNC) &rnng_aio_stream_in, 1},
+  {"rnng_aio_stream_in", (DL_FUNC) &rnng_aio_stream_in, 3},
   {"rnng_aio_unresolv", (DL_FUNC) &rnng_aio_unresolv, 0},
   {"rnng_close", (DL_FUNC) &rnng_close, 1},
   {"rnng_ctx_close", (DL_FUNC) &rnng_ctx_close, 1},
   {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 1},
-  {"rnng_ctx_recv", (DL_FUNC) &rnng_ctx_recv, 2},
+  {"rnng_ctx_recv", (DL_FUNC) &rnng_ctx_recv, 4},
   {"rnng_ctx_recv_aio", (DL_FUNC) &rnng_ctx_recv_aio, 2},
-  {"rnng_ctx_send", (DL_FUNC) &rnng_ctx_send, 3},
+  {"rnng_ctx_send", (DL_FUNC) &rnng_ctx_send, 4},
   {"rnng_ctx_send_aio", (DL_FUNC) &rnng_ctx_send_aio, 3},
   {"rnng_ctx_set", (DL_FUNC) &rnng_ctx_set, 4},
   {"rnng_dial", (DL_FUNC) &rnng_dial, 2},
@@ -58,22 +60,25 @@ static const R_CallMethodDef CallEntries[] = {
   {"rnng_listener_create", (DL_FUNC) &rnng_listener_create, 2},
   {"rnng_listener_set", (DL_FUNC) &rnng_listener_set, 4},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
+  {"rnng_matcharg", (DL_FUNC) &rnng_matcharg, 1},
+  {"rnng_matchargs", (DL_FUNC) &rnng_matchargs, 1},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
   {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 4},
   {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 4},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 1},
-  {"rnng_recv", (DL_FUNC) &rnng_recv, 2},
+  {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
   {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 2},
   {"rnng_scm", (DL_FUNC) &rnng_scm, 0},
-  {"rnng_send", (DL_FUNC) &rnng_send, 3},
+  {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 3},
+  {"rnng_serial", (DL_FUNC) &rnng_serial, 1},
   {"rnng_socket_set", (DL_FUNC) &rnng_socket_set, 4},
   {"rnng_stream_close", (DL_FUNC) &rnng_stream_close, 1},
   {"rnng_stream_dial", (DL_FUNC) &rnng_stream_dial, 2},
   {"rnng_stream_listen", (DL_FUNC) &rnng_stream_listen, 2},
-  {"rnng_stream_recv", (DL_FUNC) &rnng_stream_recv, 3},
+  {"rnng_stream_recv", (DL_FUNC) &rnng_stream_recv, 5},
   {"rnng_stream_recv_aio", (DL_FUNC) &rnng_stream_recv_aio, 3},
-  {"rnng_stream_send", (DL_FUNC) &rnng_stream_send, 3},
+  {"rnng_stream_send", (DL_FUNC) &rnng_stream_send, 4},
   {"rnng_stream_send_aio", (DL_FUNC) &rnng_stream_send_aio, 3},
   {"rnng_stream_set", (DL_FUNC) &rnng_stream_set, 4},
   {"rnng_strerror", (DL_FUNC) &rnng_strerror, 1},

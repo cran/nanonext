@@ -3,6 +3,10 @@
 
 # set -x
 
+# Find compiler
+CC=`${R_HOME}/bin/R CMD config CC`
+CFLAGS=`${R_HOME}/bin/R CMD config CFLAGS`
+
 # Library settings
 PKG_TEST_HEADER="<nng/nng.h>"
 PKG_LIBS="-lnng"
@@ -10,11 +14,20 @@ if [ "$NANONEXT_TLS" ]; then
   echo "trying with TLS support"
   PKG_LIBS="$PKG_LIBS -lmbedtls -lmbedx509 -lmbedcrypto"
 fi
-if [ "$NANONEXT_ARM" ]; then
+
+# Detect -latomic linker flag for e.g. ARM architectures (Raspberry Pi etc.)
+echo "#include <stdint.h>
+uint64_t v;
+int main() {
+    return (int)__atomic_load_n(&v, __ATOMIC_ACQUIRE);
+}" | ${CC} -x c - -o /dev/null > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+  echo "adding -latomic linker flag"
   PKG_LIBS="$PKG_LIBS -latomic"
 fi
+
 PKG_CFLAGS=""
-LIB_VER="1.5.2"
+LIB_VER="169221d"
 SYS_LIB=0
 
 # Check for custom locations
@@ -22,16 +35,6 @@ if [ "$INCLUDE_DIR" ] || [ "$LIB_DIR" ]; then
   echo "found INCLUDE_DIR and/or LIB_DIR..."
   PKG_CFLAGS="-I$INCLUDE_DIR $PKG_CFLAGS"
   PKG_LIBS="-L$LIB_DIR $PKG_LIBS"
-
-elif [ -d "$HOME/vcpkg/installed/x64-linux/include/nng" ]; then
-  echo "found libnng vcpkg installation..."
-  PKG_CFLAGS="-I$HOME/vcpkg/installed/x64-linux/include $PKG_CFLAGS"
-  PKG_LIBS="-L$HOME/vcpkg/installed/x64-linux/lib $PKG_LIBS"
-  if [ -d "$HOME/vcpkg/installed/x64-linux/include/mbedtls" ]; then
-    echo "found mbedtls vcpkg installation... using TLS support"
-    PKG_LIBS="$PKG_LIBS -lmbedtls -lmbedx509 -lmbedcrypto"
-  fi
-  SYS_LIB=1
 
 elif [ -d "/usr/local/include/nng" ]; then
   echo "found system libnng installation..."
@@ -66,23 +69,27 @@ elif [ -d "/usr/local/opt/nng" ]; then
 else
   echo "prior system libnng installation not found"
   echo "preparing to download and build library from source..."
-  curl -L https://github.com/nanomsg/nng/archive/refs/tags/v$LIB_VER.tar.gz -o nng.tar.gz
+  curl -L https://api.github.com/repos/nanomsg/nng/tarball/$LIB_VER -o nng.tar.gz
   gzip -dc nng.tar.gz | tar -xf -
   rm -f nng.tar.gz
-  cd nng-$LIB_VER
+  cd nanomsg-nng-$LIB_VER
   mkdir build
   cd build
   which cmake
   if [ $? -ne 0 ]; then
     export PATH=$PATH:/Applications/CMake.app/Contents/bin
   fi
-  cmake -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS} -fPIC" -DNNG_ELIDE_DEPRECATED=1 -DNNG_TESTS=0 -DNNG_TOOLS=0 ..
-  make
+  if [ "$NANONEXT_TLS" ]; then
+    cmake -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS} -fPIC" -DNNG_ENABLE_TLS=1 -DNNG_ELIDE_DEPRECATED=1 -DNNG_TESTS=0 -DNNG_TOOLS=0 ..
+  else
+    cmake -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS} -fPIC" -DNNG_ELIDE_DEPRECATED=1 -DNNG_TESTS=0 -DNNG_TOOLS=0 ..
+  fi
+  cmake --build .
   cd ../..
   mkdir lib
-  mv -f nng-$LIB_VER/build/libnng.a lib
-  mv -f nng-$LIB_VER/include ./
-  rm -rf nng-$LIB_VER
+  mv -f nanomsg-nng-$LIB_VER/build/libnng.a lib
+  mv -f nanomsg-nng-$LIB_VER/include ./
+  rm -rf nanomsg-nng-$LIB_VER
   PKG_CFLAGS="-I`pwd`/include $PKG_CFLAGS"
   PKG_LIBS="-L`pwd`/lib $PKG_LIBS"
 
@@ -91,10 +98,6 @@ fi
 # For debugging
 # echo "Using PKG_CFLAGS=$PKG_CFLAGS"
 # echo "Using PKG_LIBS=$PKG_LIBS"
-
-# Find compiler
-CC=`${R_HOME}/bin/R CMD config CC`
-CFLAGS=`${R_HOME}/bin/R CMD config CFLAGS`
 
 # Test for libnng
 echo "#include $PKG_TEST_HEADER" | ${CC} ${PKG_CFLAGS} ${CFLAGS} -E -xc - >/dev/null 2>&1
@@ -106,11 +109,7 @@ if [ $? -ne 0 ]; then
     echo "Automatic download and/or build also failed. Try installing:"
     echo " * deb: libnng-dev (Debian, Ubuntu, etc.)"
     echo " * rpm: nng-devel (Fedora, CentOS etc.)"
-    echo " * arch: https://aur.archlinux.org/nng.git (Arch from AUR)"
     echo " * brew: nng (MacOS)"
-    echo "Alternatively:"
-    echo " * vcpkg: nng (Linux/MacOS, follow getting started instructions at"
-    echo "               https://vcpkg.io/ starting from your HOME directory)"
     echo "If 'libnng' is already installed but in a non-standard location, you"
     echo "may set INCLUDE_DIR and LIB_DIR manually via:"
     echo "R CMD INSTALL --configure-vars='INCLUDE_DIR=... LIB_DIR=...'"
@@ -119,23 +118,27 @@ if [ $? -ne 0 ]; then
   else
     echo "Attempt to use system libnng failed"
     echo "Preparing to download and build library from source..."
-    curl -L https://github.com/nanomsg/nng/archive/refs/tags/v$LIB_VER.tar.gz -o nng.tar.gz
+    curl -L https://api.github.com/repos/nanomsg/nng/tarball/$LIB_VER -o nng.tar.gz
     gzip -dc nng.tar.gz | tar -xf -
     rm -f nng.tar.gz
-    cd nng-$LIB_VER
+    cd nanomsg-nng-$LIB_VER
     mkdir build
     cd build
     which cmake
     if [ $? -ne 0 ]; then
       export PATH=$PATH:/Applications/CMake.app/Contents/bin
     fi
-    cmake -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS} -fPIC" -DNNG_ELIDE_DEPRECATED=1 -DNNG_TESTS=0 -DNNG_TOOLS=0 ..
-    make
+    if [ "$NANONEXT_TLS" ]; then
+      cmake -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS} -fPIC" -DNNG_ENABLE_TLS=1 -DNNG_ELIDE_DEPRECATED=1 -DNNG_TESTS=0 -DNNG_TOOLS=0 ..
+    else
+      cmake -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS} -fPIC" -DNNG_ELIDE_DEPRECATED=1 -DNNG_TESTS=0 -DNNG_TOOLS=0 ..
+    fi
+    cmake --build .
     cd ../..
     mkdir lib
-    mv -f nng-$LIB_VER/build/libnng.a lib
-    mv -f nng-$LIB_VER/include ./
-    rm -rf nng-$LIB_VER
+    mv -f nanomsg-nng-$LIB_VER/build/libnng.a lib
+    mv -f nanomsg-nng-$LIB_VER/include ./
+    rm -rf nanomsg-nng-$LIB_VER
     PKG_CFLAGS="-I`pwd`/include $PKG_CFLAGS"
     PKG_LIBS="-L`pwd`/lib $PKG_LIBS"
     # Test for libnng
@@ -146,11 +149,7 @@ if [ $? -ne 0 ]; then
       echo "Automatic download and/or build also failed. Try installing:"
       echo " * deb: libnng-dev (Debian, Ubuntu, etc.)"
       echo " * rpm: nng-devel (Fedora, CentOS etc.)"
-      echo " * arch: https://aur.archlinux.org/nng.git (Arch from AUR)"
       echo " * brew: nng (MacOS)"
-      echo "Alternatively:"
-      echo " * vcpkg: nng (Linux/MacOS, follow getting started instructions at"
-      echo "               https://vcpkg.io/ starting from your HOME directory)"
       echo "If 'libnng' is already installed but in a non-standard location, you"
       echo "may set INCLUDE_DIR and LIB_DIR manually via:"
       echo "R CMD INSTALL --configure-vars='INCLUDE_DIR=... LIB_DIR=...'"

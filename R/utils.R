@@ -8,10 +8,21 @@
 #'
 #' @section TLS Support:
 #'
-#'     The environment variable 'NANONEXT_TLS' may be set, e.g. by
-#'     \code{Sys.setenv(NANONEXT_TLS=1)}, prior to package installation to enable
-#'     TLS where the system NNG library has been built with TLS support (using
-#'     Mbed TLS). Note: this is not applicable to Windows systems.
+#'     Where system installations of 'libnng' and 'libmbedtls' development
+#'     headers are detected in the same location, it is assumed that NNG was
+#'     built with TLS support (using Mbed TLS) and TLS is configured appropriately.
+#'
+#'     Otherwise, the environment variable \code{Sys.setenv(NANONEXT_TLS=1)} may
+#'     be set prior to installation if:
+#'
+#'     - your system installations of 'libnng' (built with TLS support) and
+#'     'libmbedtls' are in different locations; or
+#'
+#'     - you have a system installation of 'libmbedtls' but not 'libnng' and want
+#'     nanonext to download and build a more recent version of 'libnng' than
+#'     available in system repositories against this.
+#'
+#'     Note: this is not applicable to Windows systems.
 #'
 #' @examples
 #' nng_version()
@@ -64,7 +75,54 @@ nng_version <- function() .Call(rnng_version)
 #'
 #' @export
 #'
-nng_error <- function(xc) .Call(rnng_strerror, as.integer(xc))
+nng_error <- function(xc) .Call(rnng_strerror, xc)
+
+#' Is Nano
+#'
+#' Is the object an object created by the nanonext package i.e. a nanoSocket,
+#'     nanoContext, nanoStream, nanoListener, nanoDialer or nano Object.
+#'
+#' @param x an object.
+#'
+#' @return Logical value TRUE or FALSE.
+#'
+#' @details Note: does not include Aio objects, for which there is a separate
+#'     function \code{\link{is_aio}}.
+#'
+#' @examples
+#' s <- socket()
+#' is_nano(s)
+#' n <- nano()
+#' is_nano(n)
+#'
+#' close(s)
+#' n$close()
+#'
+#' @export
+#'
+is_nano <- function(x) inherits(x, c("nano", "nanoObject"))
+
+#' Is Aio
+#'
+#' Is the object an Aio (sendAio or recvAio).
+#'
+#' @param x an object.
+#'
+#' @return Logical value TRUE or FALSE.
+#'
+#' @examples
+#' sock <- socket(listen = "inproc://isaio")
+#' r <- recv_aio(sock)
+#' s <- send_aio(sock, "test")
+#'
+#' is_aio(r)
+#' is_aio(s)
+#'
+#' close(sock)
+#'
+#' @export
+#'
+is_aio <- function(x) inherits(x, c("recvAio", "sendAio"))
 
 #' Is Nul Byte
 #'
@@ -162,9 +220,9 @@ is_error_value <- function(x) inherits(x, "errorValue")
 #'     generated, replacing the standard message. If non-null it is called
 #'     irrespective of the value of option warn.}
 #'
-#'     \item{warning.length} { - sets the truncation limit in bytes for error and warning
-#'     messages. A non-negative integer, with allowed values 100...8170, default
-#'     1000.}
+#'     \item{warning.length} { - sets the truncation limit in bytes for error
+#'     and warning messages. A non-negative integer, with allowed values 100...8170,
+#'     default 1000.}
 #'
 #'     \item{nwarnings} { - the limit for the number of warnings kept when warn = 0,
 #'     default 50. This will discard messages if called whilst they are being
@@ -176,36 +234,12 @@ is_error_value <- function(x) inherits(x, "errorValue")
 #'
 nano_init <- function(warn = c("immediate", "deferred", "error", "none")) {
 
-  warn <- match.arg2(warn, c("immediate", "deferred", "error", "none"))
-  warn <- switch(warn, 1L, 0L, 2L, -1L)
-  if (is.null(getOption("nanonext.original.warn"))) options(nanonext.original.warn = getOption("warn"))
+  warn <- switch(match.arg2(warn, c("immediate", "deferred", "error", "none")),
+                 1L, 0L, 2L, -1L)
+  if (is.null(getOption("nanonext.original.warn")))
+    options(nanonext.original.warn = getOption("warn"))
   options(warn = warn)
   invisible(warn)
-
-}
-
-#' Logging Level
-#'
-#' This function is deprecated.
-#'
-#' @param level specify a logging level. No longer used.
-#'
-#' @return Invisible NULL. If the function is called with no arguments,
-#'     the logical code of the logging level is returned instead.
-#'
-#' @details The environment variable 'NANONEXT_LOG' is checked automatically on
-#'     package load. If the variable is set incorrectly, the default level
-#'     of 'error' is used instead.
-#'
-#' @keywords internal
-#' @export
-#'
-logging <- function(level = c("keep", "check", "error", "info")) {
-
-  missing(level) && return(.logging.)
-  cat("nanonext logging is deprecated and this function can no longer be used\n",
-      "logging level can still be set via the environment variable NANONEXT_LOG\n",
-      "prior to package load for the time being\n", file = stderr())
 
 }
 
@@ -223,34 +257,11 @@ logging <- function(level = c("keep", "check", "error", "info")) {
 
 # nanonext - Non-exported functions --------------------------------------------
 
-encode <- function(data, mode) {
-  switch(mode,
-         serialize(object = data, connection = NULL),
-         if (is.raw(data)) data else writeBin(object = data, con = raw()))
-}
-
-decode <- function(con, mode) {
-  switch(mode,
-         unserialize(connection = con),
-         (r <- readBin(con = con, what = "character", n = length(con)))[r != ""],
-         readBin(con = con, what = "complex", n = length(con)),
-         readBin(con = con, what = "double", n = length(con)),
-         readBin(con = con, what = "integer", n = length(con)),
-         readBin(con = con, what = "logical", n = length(con)),
-         readBin(con = con, what = "numeric", n = length(con)),
-         con)
-}
-
 match.arg2 <- function(choice, choices) {
   identical(choice, choices) && return(1L)
   index <- pmatch(choice[1L], choices, nomatch = 0L, duplicates.ok = TRUE)
   index || stop(sprintf("'%s' should be one of %s",
                         deparse(substitute(choice)), paste(choices, collapse = ", ")))
   index
-}
-
-loginfo <- function(evt, pkey, pval, skey, sval) {
-  cat(sprintf("%s [ %s ] %s: %d | %s: %s\n",
-              format.POSIXct(Sys.time()), evt, pkey, pval, skey, sval), file = stdout())
 }
 

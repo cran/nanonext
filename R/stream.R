@@ -25,8 +25,10 @@
 #'     Specify only one of 'dial' or 'listen'. If both are specified, 'listen'
 #'     will be ignored.
 #'
-#'     TLS is automatically configured for dialing a secure websocket address
-#'     starting 'wss://' (where the NNG library has been built with TLS support).
+#' @section TLS Support:
+#'
+#'     Dialing a secure websocket address starting 'wss://' is supported if
+#'     \code{\link{nng_version}} shows 'TLS supported'.
 #'
 #' @examples
 #' # will succeed only if there is an open connection at the address:
@@ -36,7 +38,7 @@
 #'
 stream <- function(dial = NULL, listen = NULL, textframes = FALSE) {
 
-  textframes <- isTRUE(textframes)
+  textframes <- !missing(textframes) && isTRUE(textframes)
   if (missing(dial)) {
     if (missing(listen)) {
       stop("specify a URL for either 'dial' or 'listen'")
