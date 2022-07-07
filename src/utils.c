@@ -89,7 +89,30 @@ SEXP rnng_version(void) {
 }
 
 SEXP rnng_scm(void) {
+
   return R_MissingArg;
+
+}
+
+SEXP rnng_clock(void) {
+
+  double time = (double) nng_clock();
+  return Rf_ScalarReal(time);
+
+}
+
+SEXP rnng_sleep(SEXP msec) {
+
+  nng_msleep((nng_duration) Rf_asInteger(msec));
+  return R_NilValue;
+
+}
+
+SEXP rnng_random(void) {
+
+  double rnd = (double) nng_random();
+  return Rf_ScalarReal(rnd);
+
 }
 
 // ncurl - minimalist http client ----------------------------------------------
@@ -585,6 +608,23 @@ SEXP rnng_messenger(SEXP url) {
 
   UNPROTECT(3);
   return socket;
+
+}
+
+// device ----------------------------------------------------------------------
+
+SEXP rnng_device(SEXP s1, SEXP s2) {
+
+  if (R_ExternalPtrTag(s1) != nano_SocketSymbol)
+    error_return("'s1' is not a valid Socket");
+  if (R_ExternalPtrTag(s2) != nano_SocketSymbol)
+    error_return("'s2' is not a valid Socket");
+
+  int xc = nng_device(*(nng_socket *) R_ExternalPtrAddr(s1),
+                      *(nng_socket *) R_ExternalPtrAddr(s2));
+  if (xc)
+    return mk_error(xc);
+  return Rf_ScalarInteger(xc);
 
 }
 

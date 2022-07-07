@@ -93,6 +93,100 @@ nng_version <- function() .Call(rnng_version)
 #'
 nng_error <- function(xc) .Call(rnng_strerror, xc)
 
+#' Clock Utility
+#'
+#' Provides the number of elapsed milliseconds since an arbitrary reference time
+#'     in the past. The reference time will be the same for a given program, but
+#'     may differ between programs.
+#'
+#' @details A convenience function for building concurrent applications. The
+#'     resolution of the clock depends on the underlying system timing facilities
+#'     and may not be particularly fine-grained. This utility should however be
+#'     faster than using base \code{Sys.time()}.
+#'
+#' @return A double.
+#'
+#' @examples
+#' time <- mclock(); msleep(100); mclock() - time
+#'
+#' @export
+#'
+mclock <- function() {
+
+  .Call(rnng_clock)
+
+}
+
+#' Sleep Utility
+#'
+#' Sleep function. May block for longer than requested, with the actual wait
+#'     time determined by the capabilities of the underlying system.
+#'
+#' @param msec integer number of milliseconds to block the caller.
+#'
+#' @return Invisible NULL.
+#'
+#' @examples
+#' time <- mclock(); msleep(100); mclock() - time
+#'
+#' @export
+#'
+msleep <- function(msec) {
+
+  invisible(.Call(rnng_sleep, msec))
+
+}
+
+#' NNG Random Number Generator
+#'
+#' Strictly not for statistical analysis. Not reproducible as no ability to set
+#'     a seed value. Provides a random number suitable for system functions such
+#'     as cryptographic key generation. The value is obtained using
+#'     platform-specific strong cryptographic random number facilities where
+#'     available.
+#'
+#' @return A (positive) double.
+#'
+#' @examples
+#' random()
+#'
+#' @export
+#'
+random <- function() {
+
+  .Call(rnng_random)
+
+}
+
+#' Create Device
+#'
+#' Creates a device which is a socket forwarder or proxy. Provides for improved
+#'     horizontal scalability, reliability, and isolation.
+#'
+#' @param s1 a raw mode Socket.
+#' @param s2 a raw mode Socket.
+#'
+#' @return Invisibly, an integer exit code. If the device was successfully
+#'     created, this function does not return.
+#'
+#' @details Only raw mode sockets may be used with this function. Sockets s1 and
+#'     s2 must be compatible with each other, i.e. be opposite halves of a two
+#'     protocol pattern, or both the same protocol for a single protocol pattern.
+#'
+#' @section Usage:
+#'
+#'     Warning: this function is designed to be called in an isolated process
+#'     with the two sockets. Once called, it will block with no ability to
+#'     interrupt. Kill the process to terminate the device.
+#'
+#' @export
+#'
+device <- function(s1, s2) {
+
+  invisible(.Call(rnng_device, s1, s2))
+
+}
+
 #' Is Nano
 #'
 #' Is the object an object created by the nanonext package i.e. a nanoSocket,
