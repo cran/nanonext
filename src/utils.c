@@ -19,7 +19,7 @@
 #define NANONEXT_INTERNALS
 #define NANONEXT_PROTOCOLS
 #define NANONEXT_SUPPLEMENTALS
-#include <time.h>
+#define NANONEXT_TIME
 #include "nanonext.h"
 
 // finalizers ------------------------------------------------------------------
@@ -63,35 +63,8 @@ SEXP rnng_strerror(SEXP error) {
 
 }
 
-SEXP rnng_version(void) {
-
-  const char *ver;
-  char *tls;
-  nng_tls_config *cfg;
-  int xc;
-  SEXP version;
-
-  ver = nng_version();
-  xc = nng_tls_config_alloc(&cfg, 0);
-  if (xc) {
-    tls = "No TLS Support";
-  } else{
-    tls = "TLS supported";
-    nng_tls_config_free(cfg);
-  }
-  PROTECT(version = Rf_allocVector(STRSXP, 2));
-  SET_STRING_ELT(version, 0, Rf_mkChar(ver));
-  SET_STRING_ELT(version, 1, Rf_mkChar(tls));
-
-  UNPROTECT(1);
-  return version;
-
-}
-
 SEXP rnng_scm(void) {
-
   return R_MissingArg;
-
 }
 
 SEXP rnng_clock(void) {
@@ -116,18 +89,37 @@ SEXP rnng_sleep(SEXP msec) {
 
 }
 
-SEXP rnng_random(void) {
+SEXP rnng_random(SEXP n) {
 
-  double rnd = (double) nng_random();
-  return Rf_ScalarReal(rnd);
+  SEXP vec;
+  R_xlen_t vlen;
+
+  switch (TYPEOF(n)) {
+  case INTSXP:
+  case LGLSXP:
+    vlen = (R_xlen_t) INTEGER(n)[0];
+    break;
+  case REALSXP:
+    vlen = (R_xlen_t) Rf_asInteger(n);
+    break;
+  default:
+    error_return("'n' must be integer or coercible to integer");
+  }
+
+  vec = Rf_allocVector(REALSXP, vlen);
+  double *pvec = REAL(vec);
+  for (R_xlen_t i = 0; i < vlen; i++) {
+    pvec[i] = (double) nng_random();
+  }
+  return vec;
 
 }
 
 // ncurl - minimalist http client ----------------------------------------------
 
-SEXP rnng_ncurl(SEXP http, SEXP method, SEXP headers, SEXP data) {
+SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP data,
+                SEXP request, SEXP pem) {
 
-  const char *httr = CHAR(STRING_ELT(http, 0));
   nng_url *url;
   nng_http_client *client;
   nng_http_req *req;
@@ -137,29 +129,15 @@ SEXP rnng_ncurl(SEXP http, SEXP method, SEXP headers, SEXP data) {
   int xc;
   uint16_t code;
 
-  xc = nng_url_parse(&url, httr);
-  if (xc)
-    return mk_error(xc);
-  xc = nng_http_client_alloc(&client, url);
-  if (xc) {
-    nng_url_free(url);
-    return mk_error(xc);
-  }
-  xc = nng_http_req_alloc(&req, url);
-  if (xc) {
-    nng_http_client_free(client);
-    nng_url_free(url);
-    return mk_error(xc);
-  }
+  if ((xc = nng_url_parse(&url, CHAR(STRING_ELT(http, 0)))))
+    goto exitlevel1;
+  if ((xc = nng_http_client_alloc(&client, url)))
+    goto exitlevel2;
+  if ((xc = nng_http_req_alloc(&req, url)))
+    goto exitlevel3;
   if (method != R_NilValue) {
-    const char *met = CHAR(STRING_ELT(method, 0));
-    xc = nng_http_req_set_method(req, met);
-    if (xc) {
-      nng_http_req_free(req);
-      nng_http_client_free(client);
-      nng_url_free(url);
-      return mk_error(xc);
-    }
+    if ((xc = nng_http_req_set_method(req, CHAR(STRING_ELT(method, 0)))))
+      goto exitlevel4;
   }
   if (headers != R_NilValue) {
     const R_xlen_t hlen = Rf_xlength(headers);
@@ -167,28 +145,18 @@ SEXP rnng_ncurl(SEXP http, SEXP method, SEXP headers, SEXP data) {
     switch (TYPEOF(headers)) {
     case STRSXP:
       for (R_xlen_t i = 0; i < hlen; i++) {
-        const char *head = CHAR(STRING_ELT(headers, i));
-        const char *name = CHAR(STRING_ELT(names, i));
-        xc = nng_http_req_set_header(req, name, head);
-        if (xc) {
-          nng_http_req_free(req);
-          nng_http_client_free(client);
-          nng_url_free(url);
-          return mk_error(xc);
-        }
+        if ((xc = nng_http_req_set_header(req,
+                                          CHAR(STRING_ELT(names, i)),
+                                          CHAR(STRING_ELT(headers, i)))))
+          goto exitlevel4;
       }
       break;
     case VECSXP:
       for (R_xlen_t i = 0; i < hlen; i++) {
-        const char *head = CHAR(STRING_ELT(VECTOR_ELT(headers, i), 0));
-        const char *name = CHAR(STRING_ELT(names, i));
-        xc = nng_http_req_set_header(req, name, head);
-        if (xc) {
-          nng_http_req_free(req);
-          nng_http_client_free(client);
-          nng_url_free(url);
-          return mk_error(xc);
-        }
+        if ((xc = nng_http_req_set_header(req,
+                                          CHAR(STRING_ELT(names, i)),
+                                          CHAR(STRING_ELT(VECTOR_ELT(headers, i), 0)))))
+          goto exitlevel4;
       }
       break;
     }
@@ -196,75 +164,49 @@ SEXP rnng_ncurl(SEXP http, SEXP method, SEXP headers, SEXP data) {
   if (data != R_NilValue) {
     unsigned char *dp = RAW(data);
     const size_t dlen = Rf_xlength(data) - 1;
-    xc = nng_http_req_set_data(req, dp, dlen);
-    if (xc) {
-      nng_http_req_free(req);
-      nng_http_client_free(client);
-      nng_url_free(url);
-      return mk_error(xc);
-    }
-  }
-  xc = nng_http_res_alloc(&res);
-  if (xc) {
-    nng_http_req_free(req);
-    nng_http_client_free(client);
-    nng_url_free(url);
-    return mk_error(xc);
-  }
-  xc = nng_aio_alloc(&aio, NULL, NULL);
-  if (xc) {
-    nng_http_res_free(res);
-    nng_http_req_free(req);
-    nng_http_client_free(client);
-    nng_url_free(url);
-    return mk_error(xc);
+    if ((xc = nng_http_req_set_data(req, dp, dlen)))
+      goto exitlevel4;
   }
 
+  if ((xc = nng_http_res_alloc(&res)))
+    goto exitlevel4;
+
+  if ((xc = nng_aio_alloc(&aio, NULL, NULL)))
+    goto exitlevel5;
+
   if (!strcmp(url->u_scheme, "https")) {
-    xc = nng_tls_config_alloc(&cfg, 0);
-    if (xc) {
-      nng_aio_free(aio);
-      nng_http_res_free(res);
-      nng_http_req_free(req);
-      nng_http_client_free(client);
-      nng_url_free(url);
-      return mk_error(xc);
+    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_CLIENT)))
+      goto exitlevel6;
+
+    if (pem == R_NilValue) {
+      if ((xc = nng_tls_config_server_name(cfg, url->u_hostname)) ||
+          (xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_NONE)) ||
+          (xc = nng_http_client_set_tls(client, cfg)))
+        goto exitlevel7;
+    } else {
+      if ((xc = nng_tls_config_server_name(cfg, url->u_hostname)) ||
+          (xc = nng_tls_config_ca_file(cfg, CHAR(STRING_ELT(pem, 0)))) ||
+          (xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_REQUIRED)) ||
+          (xc = nng_http_client_set_tls(client, cfg)))
+        goto exitlevel7;
     }
-    if ((xc = nng_tls_config_auth_mode(cfg, 1)) ||
-        (xc = nng_http_client_set_tls(client, cfg))) {
-      nng_tls_config_free(cfg);
-      nng_aio_free(aio);
-      nng_http_res_free(res);
-      nng_http_req_free(req);
-      nng_http_client_free(client);
-      nng_url_free(url);
-      return mk_error(xc);
-    }
+
   }
 
   nng_http_client_transact(client, req, res, aio);
   nng_aio_wait(aio);
-  xc = nng_aio_result(aio);
-  if (xc) {
-    if (cfg != NULL)
-      nng_tls_config_free(cfg);
-    nng_aio_free(aio);
-    nng_http_res_free(res);
-    nng_http_req_free(req);
-    nng_http_client_free(client);
-    nng_url_free(url);
-    return mk_error(xc);
-  }
+  if ((xc = nng_aio_result(aio)))
+    goto exitlevel7;
+
+  if (cfg != NULL)
+    nng_tls_config_free(cfg);
   nng_aio_free(aio);
 
   code = nng_http_res_get_status(res);
   if (code != 200) {
     REprintf("HTTP Server Response: %d %s\n", code, nng_http_res_get_reason(res));
     if (code >= 300 && code < 400) {
-      const char *location = nng_http_res_get_header(res, "Location");
-      SEXP ret = Rf_mkString(location);
-      if (cfg != NULL)
-        nng_tls_config_free(cfg);
+      SEXP ret = Rf_mkString(nng_http_res_get_header(res, "Location"));
       nng_http_res_free(res);
       nng_http_req_free(req);
       nng_http_client_free(client);
@@ -275,26 +217,85 @@ SEXP rnng_ncurl(SEXP http, SEXP method, SEXP headers, SEXP data) {
 
   void *dat;
   size_t sz;
-  SEXP vec;
+  SEXP out, vec, cvec = R_NilValue, rvec = R_NilValue;
 
   nng_http_res_get_data(res, &dat, &sz);
 
+  const char *names[] = {"status", "headers", "raw", "data", ""};
+  PROTECT(out = Rf_mkNamed(VECSXP, names));
+
+  SET_VECTOR_ELT(out, 0, Rf_ScalarInteger(code));
+
+  if (request != R_NilValue) {
+    const R_xlen_t rlen = Rf_xlength(request);
+    PROTECT(rvec = Rf_allocVector(VECSXP, rlen));
+    SEXP rnames;
+
+    switch (TYPEOF(request)) {
+    case STRSXP:
+      for (R_xlen_t i = 0; i < rlen; i++) {
+        const char *r = nng_http_res_get_header(res, CHAR(STRING_ELT(request, i)));
+        SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
+      }
+      Rf_namesgets(rvec, request);
+      break;
+    case VECSXP:
+      PROTECT(rnames = Rf_allocVector(STRSXP, rlen));
+      for (R_xlen_t i = 0; i < rlen; i++) {
+        SEXP rname = STRING_ELT(VECTOR_ELT(request, i), 0);
+        SET_STRING_ELT(rnames, i, rname);
+        const char *r = nng_http_res_get_header(res, CHAR(rname));
+        SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
+      }
+      Rf_namesgets(rvec, rnames);
+      UNPROTECT(1);
+      break;
+    }
+    UNPROTECT(1);
+  }
+  SET_VECTOR_ELT(out, 1, rvec);
+
   vec = Rf_allocVector(RAWSXP, sz);
   memcpy(RAW(vec), dat, sz);
-  if (cfg != NULL)
-    nng_tls_config_free(cfg);
+  SET_VECTOR_ELT(out, 2, vec);
+
+  if (Rf_asLogical(convert)) {
+    SEXP expr;
+    PROTECT(expr = Rf_lang2(nano_RtcSymbol, vec));
+    cvec = R_tryEvalSilent(expr, R_BaseEnv, &xc);
+    UNPROTECT(1);
+  }
+  SET_VECTOR_ELT(out, 3, cvec);
+
   nng_http_res_free(res);
   nng_http_req_free(req);
   nng_http_client_free(client);
   nng_url_free(url);
 
-  return vec;
+  UNPROTECT(1);
+  return out;
+
+  exitlevel7:
+  if (cfg != NULL)
+    nng_tls_config_free(cfg);
+  exitlevel6:
+  nng_aio_free(aio);
+  exitlevel5:
+  nng_http_res_free(res);
+  exitlevel4:
+  nng_http_req_free(req);
+  exitlevel3:
+  nng_http_client_free(client);
+  exitlevel2:
+  nng_url_free(url);
+  exitlevel1:
+  return mk_error(xc);
 
 }
 
 // streams ---------------------------------------------------------------------
 
-SEXP rnng_stream_dial(SEXP url, SEXP textframes) {
+SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP pem) {
 
   const char *add = CHAR(STRING_ELT(url, 0));
   const int mod = LOGICAL(textframes)[0];
@@ -305,67 +306,54 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes) {
   int xc, frames = 0;
   SEXP sd, st, klass;
 
-  xc = nng_url_parse(&up, add);
-  if (xc)
-    return mk_error(xc);
+  if ((xc = nng_url_parse(&up, add)))
+    goto exitlevel1;
 
-  xc = nng_stream_dialer_alloc_url(&dp, up);
-  if (xc) {
-    nng_url_free(up);
-    return mk_error(xc);
-  }
+  if ((xc = nng_stream_dialer_alloc_url(&dp, up)))
+    goto exitlevel2;
 
   if (!strcmp(up->u_scheme, "ws") || !strcmp(up->u_scheme, "wss")) {
     if (mod &&
         ((xc = nng_stream_dialer_set_bool(dp, "ws:recv-text", 1)) ||
-        (xc = nng_stream_dialer_set_bool(dp, "ws:send-text", 1)))) {
-      nng_stream_dialer_free(dp);
-      nng_url_free(up);
-      return mk_error(xc);
-    }
+        (xc = nng_stream_dialer_set_bool(dp, "ws:send-text", 1))))
+      goto exitlevel3;
     frames = mod;
   }
 
   if (!strcmp(up->u_scheme, "wss")) {
-    xc = nng_tls_config_alloc(&cfg, 0);
-    if (xc) {
-      nng_stream_dialer_free(dp);
-      nng_url_free(up);
-      return mk_error(xc);
+
+    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_CLIENT)))
+      goto exitlevel3;
+
+    if (pem == R_NilValue) {
+      if ((xc = nng_tls_config_server_name(cfg, up->u_hostname)) ||
+          (xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_NONE)) ||
+          (xc = nng_stream_dialer_set_ptr(dp, NNG_OPT_TLS_CONFIG, cfg)))
+        goto exitlevel4;
+    } else {
+      if ((xc = nng_tls_config_server_name(cfg, up->u_hostname)) ||
+          (xc = nng_tls_config_ca_file(cfg, CHAR(STRING_ELT(pem, 0)))) ||
+          (xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_REQUIRED)) ||
+          (xc = nng_stream_dialer_set_ptr(dp, NNG_OPT_TLS_CONFIG, cfg)))
+        goto exitlevel4;
     }
-    if ((xc = nng_tls_config_auth_mode(cfg, 1)) ||
-        (xc = nng_stream_dialer_set_ptr(dp, "tls-config", cfg))) {
-      nng_tls_config_free(cfg);
-      nng_stream_dialer_free(dp);
-      nng_url_free(up);
-      return mk_error(xc);
-    }
+
   }
 
-  xc = nng_aio_alloc(&aiop, NULL, NULL);
-  if (xc) {
-    if (cfg != NULL)
-      nng_tls_config_free(cfg);
-    nng_stream_dialer_free(dp);
-    nng_url_free(up);
-    return mk_error(xc);
-  }
+  if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
+    goto exitlevel4;
+
   nng_stream_dialer_dial(dp, aiop);
   nng_aio_wait(aiop);
-  xc = nng_aio_result(aiop);
-  if (xc) {
-    if (cfg != NULL)
-      nng_tls_config_free(cfg);
-    nng_aio_free(aiop);
-    nng_stream_dialer_free(dp);
-    nng_url_free(up);
-    return mk_error(xc);
-  }
+  if ((xc = nng_aio_result(aiop)))
+    goto exitlevel5;
+
   nng_stream *stream;
   stream = nng_aio_get_output(aiop, 0);
+
+  nng_aio_free(aiop);
   if (cfg != NULL)
     nng_tls_config_free(cfg);
-  nng_aio_free(aiop);
   nng_url_free(up);
 
   PROTECT(sd = R_MakeExternalPtr(dp, nano_DialerSymbol, R_NilValue));
@@ -385,9 +373,21 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes) {
   UNPROTECT(3);
   return st;
 
+  exitlevel5:
+  nng_aio_free(aiop);
+  exitlevel4:
+  if (cfg != NULL)
+    nng_tls_config_free(cfg);
+  exitlevel3:
+  nng_stream_dialer_free(dp);
+  exitlevel2:
+  nng_url_free(up);
+  exitlevel1:
+  return mk_error(xc);
+
 }
 
-SEXP rnng_stream_listen(SEXP url, SEXP textframes) {
+SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP pem) {
 
   const char *add = CHAR(STRING_ELT(url, 0));
   const int mod = LOGICAL(textframes)[0];
@@ -398,76 +398,57 @@ SEXP rnng_stream_listen(SEXP url, SEXP textframes) {
   int xc, frames = 0;
   SEXP sl, st, klass;
 
-  xc = nng_url_parse(&up, add);
-  if (xc)
-    return mk_error(xc);
+  if ((xc = nng_url_parse(&up, add)))
+    goto exitlevel1;
 
-  xc = nng_stream_listener_alloc_url(&lp, up);
-  if (xc) {
-    nng_url_free(up);
-    return mk_error(xc);
-  }
+  if ((xc = nng_stream_listener_alloc_url(&lp, up)))
+    goto exitlevel2;
 
   if (!strcmp(up->u_scheme, "ws") || !strcmp(up->u_scheme, "wss")) {
     if (mod &&
         ((xc = nng_stream_listener_set_bool(lp, "ws:recv-text", 1)) ||
-        (xc = nng_stream_listener_set_bool(lp, "ws:send-text", 1)))) {
-      nng_stream_listener_free(lp);
-      nng_url_free(up);
-      return mk_error(xc);
-    }
+        (xc = nng_stream_listener_set_bool(lp, "ws:send-text", 1))))
+      goto exitlevel3;
     frames = mod;
   }
 
   if (!strcmp(up->u_scheme, "wss")) {
-    xc = nng_tls_config_alloc(&cfg, 1);
-    if (xc) {
-      nng_stream_listener_free(lp);
-      nng_url_free(up);
-      return mk_error(xc);
+
+    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_SERVER)))
+      goto exitlevel3;
+
+    if (pem == R_NilValue) {
+      if ((xc = nng_tls_config_server_name(cfg, up->u_hostname)) ||
+          (xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_NONE)) ||
+          (xc = nng_stream_listener_set_ptr(lp, "tls-config", cfg)))
+        goto exitlevel4;
+    } else {
+      if ((xc = nng_tls_config_server_name(cfg, up->u_hostname)) ||
+          (xc = nng_tls_config_ca_file(cfg, CHAR(STRING_ELT(pem, 0)))) ||
+          (xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_REQUIRED)) ||
+          (xc = nng_stream_listener_set_ptr(lp, "tls-config", cfg)))
+        goto exitlevel4;
     }
-    if ((xc = nng_tls_config_auth_mode(cfg, 1)) ||
-        (xc = nng_stream_listener_set_ptr(lp, "tls-config", cfg))) {
-      nng_tls_config_free(cfg);
-      nng_stream_listener_free(lp);
-      nng_url_free(up);
-      return mk_error(xc);
-    }
+
   }
 
-  xc = nng_stream_listener_listen(lp);
-  if (xc) {
-    if (cfg != NULL)
-      nng_tls_config_free(cfg);
-    nng_stream_listener_free(lp);
-    nng_url_free(up);
-    return mk_error(xc);
-  }
-  xc = nng_aio_alloc(&aiop, NULL, NULL);
-  if (xc) {
-    if (cfg != NULL)
-      nng_tls_config_free(cfg);
-    nng_stream_listener_free(lp);
-    nng_url_free(up);
-    return mk_error(xc);
-  }
+  if ((xc = nng_stream_listener_listen(lp)))
+    goto exitlevel4;
+
+  if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
+    goto exitlevel4;
+
   nng_stream_listener_accept(lp, aiop);
   nng_aio_wait(aiop);
-  xc = nng_aio_result(aiop);
-  if (xc) {
-    if (cfg != NULL)
-      nng_tls_config_free(cfg);
-    nng_aio_free(aiop);
-    nng_stream_listener_free(lp);
-    nng_url_free(up);
-    return mk_error(xc);
-  }
+  if ((xc = nng_aio_result(aiop)))
+    goto exitlevel5;
 
   nng_stream *stream;
   stream = nng_aio_get_output(aiop, 0);
+
+  nng_aio_free(aiop);
   if (cfg != NULL)
     nng_tls_config_free(cfg);
-  nng_aio_free(aiop);
   nng_url_free(up);
 
   PROTECT(sl = R_MakeExternalPtr(lp, nano_ListenerSymbol, R_NilValue));
@@ -486,6 +467,18 @@ SEXP rnng_stream_listen(SEXP url, SEXP textframes) {
 
   UNPROTECT(3);
   return st;
+
+  exitlevel5:
+  nng_aio_free(aiop);
+  exitlevel4:
+  if (cfg != NULL)
+    nng_tls_config_free(cfg);
+  exitlevel3:
+  nng_stream_listener_free(lp);
+  exitlevel2:
+  nng_url_free(up);
+  exitlevel1:
+  return mk_error(xc);
 
 }
 
@@ -518,7 +511,10 @@ static void thread_finalizer(SEXP xptr) {
 
 static void rnng_thread(void *arg) {
 
-  nng_socket *sock = (nng_socket *) arg;
+  SEXP list = (SEXP) arg;
+  SEXP socket = VECTOR_ELT(list, 0);
+  SEXP key = VECTOR_ELT(list, 1);
+  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   unsigned char *buf;
   size_t sz;
   time_t now;
@@ -543,6 +539,7 @@ static void rnng_thread(void *arg) {
                  tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
                  tms->tm_hour, tms->tm_min, tms->tm_sec);
         nng_free(buf, sz);
+        rnng_send(socket, key, Rf_ScalarLogical(0), Rf_ScalarLogical(0));
         continue;
       }
       if (!strcmp((char *) buf, ":d ")) {
@@ -568,11 +565,10 @@ SEXP rnng_messenger(SEXP url) {
 
   const char *up = CHAR(STRING_ELT(url, 0));
   nng_socket *sock = R_Calloc(1, nng_socket);
-  nng_thread *thr;
   void *dlp;
   uint8_t dialer = 0;
   int xc;
-  SEXP socket, con, xptr;
+  SEXP socket, con;
 
   xc = nng_pair0_open(sock);
   if (xc) {
@@ -608,13 +604,24 @@ SEXP rnng_messenger(SEXP url) {
     R_RegisterCFinalizerEx(con, listener_finalizer, TRUE);
   R_MakeWeakRef(socket, con, R_NilValue, TRUE);
 
-  nng_thread_create(&thr, rnng_thread, sock);
+  UNPROTECT(2);
+  return socket;
+
+}
+
+SEXP rnng_thread_create(SEXP list) {
+
+  SEXP socket = VECTOR_ELT(list, 0);
+  nng_thread *thr;
+  SEXP xptr;
+
+  nng_thread_create(&thr, rnng_thread, list);
 
   PROTECT(xptr = R_MakeExternalPtr(thr, R_NilValue, R_NilValue));
   R_RegisterCFinalizerEx(xptr, thread_finalizer, TRUE);
   R_MakeWeakRef(socket, xptr, R_NilValue, TRUE);
 
-  UNPROTECT(3);
+  UNPROTECT(1);
   return socket;
 
 }
@@ -644,7 +651,7 @@ SEXP rnng_matchwarn(SEXP warn) {
 
   const char *w = CHAR(STRING_ELT(warn, 0));
   size_t slen = strlen(w);
-  const char *i = "immediate", *d = "deferred", *e = "error", *n = "none";
+  const char i[] = "immediate", d[] = "deferred", e[] = "error", n[] = "none";
   int xc = 0;
 
   switch (slen) {

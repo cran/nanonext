@@ -31,6 +31,10 @@
 #'     (not all transports are supported).
 #' @param textframes [default FALSE] applicable to the websocket transport only,
 #'     enables sending and receiving of TEXT frames (ignored otherwise).
+#' @param pem (optional) applicable to secure websockets only. The path to a
+#'     file containing X.509 certificate(s) in PEM format, comprising the
+#'     certificate authority certificate chain (and revocation list if present).
+#'     If missing or NULL, certificates are not validated.
 #'
 #' @return A Stream (object of class 'nanoStream' and 'nano').
 #'
@@ -38,13 +42,11 @@
 #'     reliable in that data will not be delivered out of order, or with portions
 #'     missing.
 #'
+#'     Can be used to dial a (secure) websocket address starting 'ws://' or
+#'     'wss://'. It is often the case that 'textframes' needs to be set to TRUE.
+#'
 #'     Specify only one of 'dial' or 'listen'. If both are specified, 'listen'
 #'     will be ignored.
-#'
-#' @section TLS Support:
-#'
-#'     Dialing a secure websocket address starting 'wss://' is supported if
-#'     \code{\link{nng_version}} shows 'TLS supported'.
 #'
 #' @examples
 #' # will succeed only if there is an open connection at the address:
@@ -52,18 +54,23 @@
 #'
 #' @export
 #'
-stream <- function(dial = NULL, listen = NULL, textframes = FALSE) {
+stream <- function(dial = NULL, listen = NULL, textframes = FALSE, pem = NULL) {
 
-  textframes <- !missing(textframes) && isTRUE(textframes)
   if (missing(dial)) {
     if (missing(listen)) {
       stop("specify a URL for either 'dial' or 'listen'")
     } else {
-      .Call(rnng_stream_listen, listen, textframes)
+      .Call(rnng_stream_listen, listen, textframes, pem)
     }
   } else {
-    .Call(rnng_stream_dial, dial, textframes)
+    .Call(rnng_stream_dial, dial, textframes, pem)
   }
 
 }
+
+#' @rdname close
+#' @method close nanoStream
+#' @export
+#'
+close.nanoStream <- function(con, ...) invisible(.Call(rnng_stream_close, con))
 

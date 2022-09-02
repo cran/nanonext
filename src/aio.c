@@ -299,7 +299,7 @@ SEXP rnng_recv_aio(SEXP socket, SEXP timeout) {
     error_return("'con' is not a valid Socket");
 
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
-  const nng_duration dur = timeout == R_NilValue ? -2 : (nng_duration) Rf_asInteger(timeout);
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   nano_aio *raio = R_Calloc(1, nano_aio);
   int xc;
   SEXP aio;
@@ -330,7 +330,7 @@ SEXP rnng_ctx_recv_aio(SEXP context, SEXP timeout) {
     error_return("'con' is not a valid Context");
 
   nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(context);
-  const nng_duration dur = timeout == R_NilValue ? -2 : (nng_duration) Rf_asInteger(timeout);
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   nano_aio *raio = R_Calloc(1, nano_aio);
   int xc;
   SEXP aio;
@@ -361,7 +361,7 @@ SEXP rnng_stream_recv_aio(SEXP stream, SEXP bytes, SEXP timeout) {
     error_return("'con' is not a valid Stream");
 
   nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(stream);
-  const nng_duration dur = timeout == R_NilValue ? -2 : (nng_duration) Rf_asInteger(timeout);
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   const size_t xlen = (size_t) Rf_asInteger(bytes);
   nano_aio *iaio = R_Calloc(1, nano_aio);
   nng_iov *iov = R_Calloc(1, nng_iov);
@@ -401,15 +401,13 @@ SEXP rnng_stream_recv_aio(SEXP stream, SEXP bytes, SEXP timeout) {
 
 }
 
-// NNG_DURATION_INFINITE (-1) NNG_DURATION_DEFAULT (-2) NNG_DURATION_ZERO (0)
-
 SEXP rnng_send_aio(SEXP socket, SEXP data, SEXP timeout) {
 
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
     error_return("'con' is not a valid Socket");
 
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
-  const nng_duration dur = timeout == R_NilValue ? -2 : (nng_duration) Rf_asInteger(timeout);
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   nano_aio *saio = R_Calloc(1, nano_aio);
   nng_msg *msg;
   int xc;
@@ -422,19 +420,19 @@ SEXP rnng_send_aio(SEXP socket, SEXP data, SEXP timeout) {
   xc = nng_msg_alloc(&msg, 0);
   if (xc) {
     R_Free(saio);
-    return Rf_ScalarInteger(xc);
+    return mk_error(xc);
   }
   xc = nng_msg_append(msg, dp, xlen);
   if (xc) {
     nng_msg_free(msg);
     R_Free(saio);
-    return Rf_ScalarInteger(xc);
+    return mk_error(xc);
   }
   xc = nng_aio_alloc(&saio->aio, saio_complete, saio);
   if (xc) {
     nng_msg_free(msg);
     R_Free(saio);
-    return Rf_ScalarInteger(xc);
+    return mk_error(xc);
   }
 
   nng_aio_set_msg(saio->aio, msg);
@@ -455,7 +453,7 @@ SEXP rnng_ctx_send_aio(SEXP context, SEXP data, SEXP timeout) {
     error_return("'con' is not a valid Context");
 
   nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(context);
-  const nng_duration dur = timeout == R_NilValue ? -2 : (nng_duration) Rf_asInteger(timeout);
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   nano_aio *saio = R_Calloc(1, nano_aio);
   nng_msg *msg;
   int xc;
@@ -468,20 +466,20 @@ SEXP rnng_ctx_send_aio(SEXP context, SEXP data, SEXP timeout) {
   xc = nng_msg_alloc(&msg, 0);
   if (xc) {
     R_Free(saio);
-    return Rf_ScalarInteger(xc);
+    return mk_error(xc);
   }
 
   xc = nng_msg_append(msg, dp, xlen);
   if (xc) {
     nng_msg_free(msg);
     R_Free(saio);
-    return Rf_ScalarInteger(xc);
+    return mk_error(xc);
   }
   xc = nng_aio_alloc(&saio->aio, saio_complete, saio);
   if (xc) {
     nng_msg_free(msg);
     R_Free(saio);
-    return Rf_ScalarInteger(xc);
+    return mk_error(xc);
   }
 
   nng_aio_set_msg(saio->aio, msg);
@@ -502,7 +500,7 @@ SEXP rnng_stream_send_aio(SEXP stream, SEXP data, SEXP timeout) {
     error_return("'con' is not a valid Stream");
 
   nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(stream);
-  const nng_duration dur = timeout == R_NilValue ? -2 : (nng_duration) Rf_asInteger(timeout);
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   const int frames = *LOGICAL(Rf_getAttrib(stream, nano_TextframesSymbol));
   nano_aio *iaio = R_Calloc(1, nano_aio);
   nng_iov *iov = R_Calloc(1, nng_iov);
@@ -520,7 +518,7 @@ SEXP rnng_stream_send_aio(SEXP stream, SEXP data, SEXP timeout) {
   if (xc) {
     R_Free(iov);
     R_Free(iaio);
-    return Rf_ScalarInteger(xc);
+    return mk_error(xc);
   }
 
   xc = nng_aio_set_iov(iaio->aio, 1u, iov);
@@ -528,7 +526,7 @@ SEXP rnng_stream_send_aio(SEXP stream, SEXP data, SEXP timeout) {
     nng_aio_free(iaio->aio);
     R_Free(iov);
     R_Free(iaio);
-    return Rf_ScalarInteger(xc);
+    return mk_error(xc);
   }
 
   nng_aio_set_timeout(iaio->aio, dur);
@@ -544,7 +542,7 @@ SEXP rnng_stream_send_aio(SEXP stream, SEXP data, SEXP timeout) {
 
 // ncurl aio -------------------------------------------------------------------
 
-SEXP rnng_ncurl_aio(SEXP http, SEXP method, SEXP headers, SEXP data) {
+SEXP rnng_ncurl_aio(SEXP http, SEXP method, SEXP headers, SEXP data, SEXP pem) {
 
   const char *httr = CHAR(STRING_ELT(http, 0));
   nano_aio *haio = R_Calloc(1, nano_aio);
@@ -556,39 +554,19 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP method, SEXP headers, SEXP data) {
   haio->data = handle;
   handle->cfg = NULL;
 
-  xc = nng_url_parse(&handle->url, httr);
-  if (xc) {
-    R_Free(handle);
-    R_Free(haio);
-    return mk_error(xc);
-  }
-  xc = nng_http_client_alloc(&handle->cli, handle->url);
-  if (xc) {
-    nng_url_free(handle->url);
-    R_Free(handle);
-    R_Free(haio);
-    return mk_error(xc);
-  }
-  xc = nng_http_req_alloc(&handle->req, handle->url);
-  if (xc) {
-    nng_http_client_free(handle->cli);
-    nng_url_free(handle->url);
-    R_Free(handle);
-    R_Free(haio);
-    return mk_error(xc);
-  }
+  if ((xc = nng_url_parse(&handle->url, httr)))
+    goto exitlevel1;
+  if ((xc = nng_http_client_alloc(&handle->cli, handle->url)))
+    goto exitlevel2;
+  if ((xc = nng_http_req_alloc(&handle->req, handle->url)))
+    goto exitlevel3;
+
   if (method != R_NilValue) {
     const char *met = CHAR(STRING_ELT(method, 0));
-    xc = nng_http_req_set_method(handle->req, met);
-    if (xc) {
-      nng_http_req_free(handle->req);
-      nng_http_client_free(handle->cli);
-      nng_url_free(handle->url);
-      R_Free(handle);
-      R_Free(haio);
-      return mk_error(xc);
-    }
+    if ((xc = nng_http_req_set_method(handle->req, met)))
+      goto exitlevel4;
   }
+
   if (headers != R_NilValue) {
     R_xlen_t hlen = Rf_xlength(headers);
     SEXP names = Rf_getAttrib(headers, R_NamesSymbol);
@@ -597,92 +575,52 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP method, SEXP headers, SEXP data) {
       for (R_xlen_t i = 0; i < hlen; i++) {
         const char *head = CHAR(STRING_ELT(headers, i));
         const char *name = CHAR(STRING_ELT(names, i));
-        xc = nng_http_req_set_header(handle->req, name, head);
-        if (xc) {
-          nng_http_req_free(handle->req);
-          nng_http_client_free(handle->cli);
-          nng_url_free(handle->url);
-          R_Free(handle);
-          R_Free(haio);
-          return mk_error(xc);
-        }
+        if ((xc = nng_http_req_set_header(handle->req, name, head)))
+          goto exitlevel4;
       }
       break;
     case VECSXP:
       for (R_xlen_t i = 0; i < hlen; i++) {
         const char *head = CHAR(STRING_ELT(VECTOR_ELT(headers, i), 0));
         const char *name = CHAR(STRING_ELT(names, i));
-        xc = nng_http_req_set_header(handle->req, name, head);
-        if (xc) {
-          nng_http_req_free(handle->req);
-          nng_http_client_free(handle->cli);
-          nng_url_free(handle->url);
-          R_Free(handle);
-          R_Free(haio);
-          return mk_error(xc);
-        }
+        if ((xc = nng_http_req_set_header(handle->req, name, head)))
+          goto exitlevel4;
       }
       break;
     }
   }
+
   if (data != R_NilValue) {
     unsigned char *dp = RAW(data);
     const size_t dlen = Rf_xlength(data) - 1;
-    xc = nng_http_req_set_data(handle->req, dp, dlen);
-    if (xc) {
-      nng_http_req_free(handle->req);
-      nng_http_client_free(handle->cli);
-      nng_url_free(handle->url);
-      R_Free(handle);
-      R_Free(haio);
-      return mk_error(xc);
-    }
-  }
-  xc = nng_http_res_alloc(&handle->res);
-  if (xc) {
-    nng_http_req_free(handle->req);
-    nng_http_client_free(handle->cli);
-    nng_url_free(handle->url);
-    R_Free(handle);
-    R_Free(haio);
-    return mk_error(xc);
+    if ((xc = nng_http_req_set_data(handle->req, dp, dlen)))
+      goto exitlevel4;
   }
 
-  xc = nng_aio_alloc(&haio->aio, iaio_complete, haio);
-  if (xc) {
-    nng_http_res_free(handle->res);
-    nng_http_req_free(handle->req);
-    nng_http_client_free(handle->cli);
-    nng_url_free(handle->url);
-    R_Free(handle);
-    R_Free(haio);
-    return mk_error(xc);
-  }
+  if ((xc = nng_http_res_alloc(&handle->res)))
+    goto exitlevel4;
+
+  if ((xc = nng_aio_alloc(&haio->aio, iaio_complete, haio)))
+    goto exitlevel5;
 
   if (!strcmp(handle->url->u_scheme, "https")) {
-    xc = nng_tls_config_alloc(&handle->cfg, 0);
-    if (xc) {
-      nng_aio_free(haio->aio);
-      nng_http_res_free(handle->res);
-      nng_http_req_free(handle->req);
-      nng_http_client_free(handle->cli);
-      nng_url_free(handle->url);
-      R_Free(handle);
-      R_Free(haio);
-      return mk_error(xc);
+
+    if ((xc = nng_tls_config_alloc(&handle->cfg, NNG_TLS_MODE_CLIENT)))
+      goto exitlevel6;
+
+    if (pem == R_NilValue) {
+      if ((xc = nng_tls_config_server_name(handle->cfg, handle->url->u_hostname)) ||
+          (xc = nng_tls_config_auth_mode(handle->cfg, NNG_TLS_AUTH_MODE_NONE)) ||
+          (xc = nng_http_client_set_tls(handle->cli, handle->cfg)))
+        goto exitlevel7;
+    } else {
+      if ((xc = nng_tls_config_server_name(handle->cfg, handle->url->u_hostname)) ||
+          (xc = nng_tls_config_ca_file(handle->cfg, CHAR(STRING_ELT(pem, 0)))) ||
+          (xc = nng_tls_config_auth_mode(handle->cfg, NNG_TLS_AUTH_MODE_REQUIRED)) ||
+          (xc = nng_http_client_set_tls(handle->cli, handle->cfg)))
+        goto exitlevel7;
     }
-    if ((xc = nng_tls_config_auth_mode(handle->cfg, 1)) ||
-        (xc = nng_http_client_set_tls(handle->cli, handle->cfg))) {
-      nng_tls_config_free(handle->cfg);
-      nng_aio_free(haio->aio);
-      nng_http_res_free(handle->res);
-      nng_http_req_free(handle->req);
-      nng_http_client_free(handle->cli);
-      nng_url_free(handle->url);
-      R_Free(handle);
-      R_Free(haio);
-      return mk_error(xc);
-    }
+
   }
 
   nng_http_client_transact(handle->cli, handle->req, handle->res, haio->aio);
@@ -693,9 +631,26 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP method, SEXP headers, SEXP data) {
   UNPROTECT(1);
   return aio;
 
+  exitlevel7:
+  nng_tls_config_free(handle->cfg);
+  exitlevel6:
+  nng_aio_free(haio->aio);
+  exitlevel5:
+  nng_http_res_free(handle->res);
+  exitlevel4:
+  nng_http_req_free(handle->req);
+  exitlevel3:
+  nng_http_client_free(handle->cli);
+  exitlevel2:
+  nng_url_free(handle->url);
+  exitlevel1:
+  R_Free(handle);
+  R_Free(haio);
+  return mk_error(xc);
+
 }
 
-SEXP rnng_aio_http(SEXP aio) {
+SEXP rnng_aio_http(SEXP aio, SEXP convert, SEXP request) {
 
   if (R_ExternalPtrTag(aio) != nano_AioSymbol)
     error_return("object is not a valid Aio");
@@ -712,21 +667,73 @@ SEXP rnng_aio_http(SEXP aio) {
 
   nano_handle *handle = (nano_handle *) haio->data;
   uint16_t code = nng_http_res_get_status(handle->res);
+
   if (code != 200) {
     REprintf("HTTP Server Response: %d %s\n", code, nng_http_res_get_reason(handle->res));
-    if (code >= 300 && code < 400)
-      return Rf_mkString(nng_http_res_get_header(handle->res, "Location"));
+    if (code >= 300 && code < 400) {
+      SEXP out;
+      PROTECT(out = Rf_allocVector(VECSXP, 4));
+      SET_VECTOR_ELT(out, 0, Rf_ScalarInteger(code));
+      SET_VECTOR_ELT(out, 1, R_NilValue);
+      SET_VECTOR_ELT(out, 2, Rf_mkString(nng_http_res_get_header(handle->res, "Location")));
+      SET_VECTOR_ELT(out, 3, R_NilValue);
+      UNPROTECT(1);
+      return out;
+    }
   }
 
   void *dat;
   size_t sz;
-  SEXP vec;
+  SEXP out, vec, cvec = R_NilValue, rvec = R_NilValue;
+
+  PROTECT(out = Rf_allocVector(VECSXP, 4));
+  SET_VECTOR_ELT(out, 0, Rf_ScalarInteger(code));
+
+  if (request != R_NilValue) {
+    const R_xlen_t rlen = Rf_xlength(request);
+    PROTECT(rvec = Rf_allocVector(VECSXP, rlen));
+    SEXP rnames;
+
+    switch (TYPEOF(request)) {
+    case STRSXP:
+      for (R_xlen_t i = 0; i < rlen; i++) {
+        const char *r = nng_http_res_get_header(handle->res, CHAR(STRING_ELT(request, i)));
+        SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
+      }
+      Rf_namesgets(rvec, request);
+      break;
+    case VECSXP:
+      PROTECT(rnames = Rf_allocVector(STRSXP, rlen));
+      for (R_xlen_t i = 0; i < rlen; i++) {
+        SEXP rname = STRING_ELT(VECTOR_ELT(request, i), 0);
+        SET_STRING_ELT(rnames, i, rname);
+        const char *r = nng_http_res_get_header(handle->res, CHAR(rname));
+        SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
+      }
+      Rf_namesgets(rvec, rnames);
+      UNPROTECT(1);
+      break;
+    }
+    UNPROTECT(1);
+  }
+  SET_VECTOR_ELT(out, 1, rvec);
 
   nng_http_res_get_data(handle->res, &dat, &sz);
   vec = Rf_allocVector(RAWSXP, sz);
   memcpy(RAW(vec), dat, sz);
+  SET_VECTOR_ELT(out, 2, vec);
 
-  return vec;
+  if (Rf_asLogical(convert)) {
+    SEXP expr;
+    int xc;
+    PROTECT(expr = Rf_lang2(nano_RtcSymbol, vec));
+    cvec = R_tryEvalSilent(expr, R_BaseEnv, &xc);
+    UNPROTECT(1);
+  }
+  SET_VECTOR_ELT(out, 3, cvec);
+
+  UNPROTECT(1);
+  return out;
 
 }
 

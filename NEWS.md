@@ -1,3 +1,21 @@
+# nanonext 0.5.4
+
+#### New Features
+
+* Implements `sha224()`, `sha256()`, `sha384()` and `sha512()` series of fast, optimised cryptographic hash and HMAC generation functions using the 'Mbed TLS' library.
+* `ncurl()` and `stream()` gain the argmument 'pem' for optionally specifying a certificate authority certificate chain PEM file for authenticating secure sites.
+* `ncurl()` gains the argument 'request' for specifying response headers to return.
+* `ncurl()` now returns additional `$status` (response status code) and `$headers` (response headers) fields.
+* `messenger()` gains the argument 'auth' for authenticating communications based on a pre-shared key.
+* `random()` gains the argument 'n' for generating a vector of random numbers.
+
+#### Updates
+
+* 'libmbedtls' is now built from source upon install so the package always has TLS support and uses the latest v3.2.1 release. Windows binaries also updated to include TLS support.
+* `nng_version()` now returns the 'Mbed TLS' library version number.
+* `device()` gains a confirmation prompt when running interactively for more safety.
+* Fixes issue with `ncurl()` that caused a 26 cryptography error with certain secure sites using SNI.
+
 # nanonext 0.5.3
 
 #### Updates

@@ -10,7 +10,9 @@ ncurl(
   convert = TRUE,
   method = NULL,
   headers = NULL,
-  data = NULL
+  data = NULL,
+  request = NULL,
+  pem = NULL
 )
 }
 \arguments{
@@ -28,10 +30,22 @@ HTTP request headers e.g. \code{list(`Content-Type` = "text/plain")} or
 \code{c(Authorization = "Bearer APIKEY")}.}
 
 \item{data}{(optional) the request data to be submitted.}
+
+\item{request}{(optional) a character vector or list specifying the response
+headers to request e.g. \code{c("date", "server")} or \code{list("Date", "Server")}.
+These are case-insensitive and will return NULL if not present.}
+
+\item{pem}{(optional) applicable to secure HTTPS sites only. The path to a
+file containing X.509 certificate(s) in PEM format, comprising the
+certificate authority certificate chain (and revocation list if present).
+If missing or NULL, certificates are not validated.}
 }
 \value{
-Named list of 2 elements:
+Named list of 4 elements:
     \itemize{
+    \item{\code{$status}} {- integer HTTP repsonse status code (200 - OK).}
+    \item{\code{$headers}} {- named list of response headers supplied in
+    'request' or NULL if unspecified.}
     \item{\code{$raw}} {- raw vector of the received resource (use
     \code{\link{writeBin}} to save to a file).}
     \item{\code{$data}} {- converted character string (if \code{'convert' = TRUE}
@@ -39,7 +53,8 @@ Named list of 2 elements:
     can be used to further parse this as html, json, xml etc. if required.}
     }
 
-    Or else, if \code{async = TRUE}, a 'recvAio' (object of class 'recvAio').
+    Or else, if \code{async = TRUE}, an 'ncurlAio' (object of class 'ncurlAio'
+    and 'recvAio').
 }
 \description{
 nano cURL - a minimalist http(s) client.
@@ -56,15 +71,8 @@ nano cURL - a minimalist http(s) client.
     string at \code{$raw} and \code{$data} will be NULL.
 }
 
-\section{TLS Support}{
-
-
-    Connecting to secure https sites is supported if \code{\link{nng_version}}
-    shows 'TLS supported'.
-}
-
 \examples{
-ncurl("http://httpbin.org/get")
+ncurl("https://httpbin.org/get", request = c("date", "server"))
 ncurl("http://httpbin.org/put",,,"PUT", list(Authorization = "Bearer APIKEY"), "hello world")
 ncurl("http://httpbin.org/post",,,"POST", c(`Content-Type` = "application/json"),'{"k":"v"}')
 

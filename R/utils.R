@@ -18,27 +18,9 @@
 
 #' NNG Library Version
 #'
-#' Returns the version of 'libnng' used and whether TLS is supported.
+#' Returns the versions of the 'libnng' and 'libmbedtls' libraries used.
 #'
 #' @return A character vector of length 2.
-#'
-#' @section TLS Support:
-#'
-#'     Where system installations of 'libnng' and 'libmbedtls' development
-#'     headers are detected in the same location, it is assumed that NNG was
-#'     built with TLS support (using Mbed TLS) and TLS is configured appropriately.
-#'
-#'     Otherwise, the environment variable \code{Sys.setenv(NANONEXT_TLS=1)} may
-#'     be set prior to installation if:
-#'
-#'     - your system installations of 'libnng' (built with TLS support) and
-#'     'libmbedtls' are in different locations; or
-#'
-#'     - you have a system installation of 'libmbedtls' but not 'libnng' and want
-#'     nanonext to download and build a more recent version of 'libnng' than
-#'     available in system repositories against this.
-#'
-#'     Note: this is not applicable to Windows systems.
 #'
 #' @examples
 #' nng_version()
@@ -122,6 +104,9 @@ mclock <- function() .Call(rnng_clock)
 #'
 #' @return Invisible NULL.
 #'
+#' @details If 'msec' is non-integer, it will be coerced to integer. Non-numeric
+#'     input will be ignored and return immediately.
+#'
 #' @examples
 #' time <- mclock(); msleep(100); mclock() - time
 #'
@@ -131,20 +116,26 @@ msleep <- function(msec) invisible(.Call(rnng_sleep, msec))
 
 #' NNG Random Number Generator
 #'
-#' Strictly not for statistical analysis. Not reproducible as no ability to set
-#'     a seed value. Provides a random number suitable for system functions such
-#'     as cryptographic key generation. The value is obtained using
+#' Strictly not for statistical analysis. Not reproducible. No ability to set
+#'     a seed value. Provides random numbers suitable for system functions such
+#'     as cryptographic key generation. Random values are obtained using
 #'     platform-specific strong cryptographic random number facilities where
 #'     available.
 #'
-#' @return A (positive) double.
+#' @param n [default 1L] length of vector to return.
+#'
+#' @return A length 'n' vector of random positive doubles.
+#'
+#' @details If 'n' is non-integer, it will be coerced to integer; if a vector,
+#'     only the first element will be used.
 #'
 #' @examples
 #' random()
+#' random(n = 3L)
 #'
 #' @export
 #'
-random <- function() .Call(rnng_random)
+random <- function(n = 1L) .Call(rnng_random, n)
 
 #' Create Device
 #'
@@ -169,7 +160,18 @@ random <- function() .Call(rnng_random)
 #'
 #' @export
 #'
-device <- function(s1, s2) invisible(.Call(rnng_device, s1, s2))
+device <- function(s1, s2) {
+
+  inherits(s1, "nanoSocket") || stop("object '", deparse(substitute(s1)), "' is not a nanoSocket")
+  inherits(s2, "nanoSocket") || stop("object '", deparse(substitute(s2)), "' is not a nanoSocket")
+  if (interactive()) {
+    r <- readline(sprintf("Proceed to bind sockets '%s' and '%s'? (This action cannot be interrupted) [Y/n]: ",
+                  deparse(substitute(s1)), deparse(substitute(s2))))
+    if (r %in% c("n", "N")) return(invisible())
+  }
+  invisible(.Call(rnng_device, s1, s2))
+
+}
 
 #' Is Nano
 #'

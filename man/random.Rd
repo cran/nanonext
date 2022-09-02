@@ -4,19 +4,27 @@
 \alias{random}
 \title{NNG Random Number Generator}
 \usage{
-random()
+random(n = 1L)
+}
+\arguments{
+\item{n}{[default 1L] length of vector to return.}
 }
 \value{
-A (positive) double.
+A length 'n' vector of random positive doubles.
 }
 \description{
-Strictly not for statistical analysis. Not reproducible as no ability to set
-    a seed value. Provides a random number suitable for system functions such
-    as cryptographic key generation. The value is obtained using
+Strictly not for statistical analysis. Not reproducible. No ability to set
+    a seed value. Provides random numbers suitable for system functions such
+    as cryptographic key generation. Random values are obtained using
     platform-specific strong cryptographic random number facilities where
     available.
 }
+\details{
+If 'n' is non-integer, it will be coerced to integer; if a vector,
+    only the first element will be used.
+}
 \examples{
 random()
+random(n = 3L)
 
 }
