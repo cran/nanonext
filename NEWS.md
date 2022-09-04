@@ -1,3 +1,9 @@
+# nanonext 0.5.5
+
+#### Updates
+
+* Installation succeeds under Linux where library path uses 'lib64' instead of 'lib', and fails gracefully if 'cmake' is not found.
+
 # nanonext 0.5.4
 
 #### New Features

@@ -47,7 +47,8 @@ Web utilities:
 -   ncurl - (async) http(s) client
 -   stream - secure websockets client (and generic low-level socket
     interface)
--   messenger - console-based instant messaging
+-   messenger - console-based instant messaging with authentication
+-   sha\[224\|256\|384\|512\] - cryptographic hash and HMAC algorithms
 
 ### Table of Contents
 
@@ -60,8 +61,9 @@ Web utilities:
 7.  [Surveyor / Respondent Model](#surveyor-respondent-model)
 8.  [ncurl: (Async) HTTP Client](#ncurl-async-http-client)
 9.  [stream: Websocket Client](#stream-websocket-client)
-10. [Building from source](#building-from-source)
-11. [Links](#links)
+10. [Cryptographic Hashing](#cryptographic-hashing)
+11. [Building from Source](#building-from-source)
+12. [Links](#links)
 
 ### Installation
 
@@ -384,7 +386,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] 1.441 -2.63 -3.437 -0.364 -0.141 ...
+#>  num [1:100000000] -0.411 -1.236 -0.307 -0.339 0.984 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -543,11 +545,11 @@ ncurl("https://httpbin.org/headers")
 #>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
 #>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
 #>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 33 31 31 62 39 34 31 2d 36 34 63 35 38 33 38 63 32 65 30 64 66 64 37
-#> [101] 39 33 63 63 64 32 38 30 37 22 0a 20 20 7d 0a 7d 0a
+#>  [76] 2d 36 33 31 32 30 39 32 38 2d 36 33 33 36 36 61 64 63 32 32 66 33 62 35 63
+#> [101] 33 34 38 34 37 66 61 36 36 22 0a 20 20 7d 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6311b941-64c5838c2e0dfd793ccd2807\"\n  }\n}\n"
+#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63120928-63366adc22f3b5c34847fa66\"\n  }\n}\n"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
@@ -566,13 +568,13 @@ res
 
 call_aio(res)$headers
 #> $Date
-#> [1] "Fri, 02 Sep 2022 08:05:22 GMT"
+#> [1] "Fri, 02 Sep 2022 13:46:16 GMT"
 #> 
 #> $Server
 #> [1] "gunicorn/19.9.0"
 
 res$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6311b942-3e8b949a548bce0d1dc88ee7\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"213.86.169.34\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63120928-1caef5b315853c0a48ef0217\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"213.86.169.34\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -615,17 +617,47 @@ s |> send('{"action": "subscribe", "symbols": "EURUSD"}')
 #> [26] 73 79 6d 62 6f 6c 73 22 3a 20 22 45 55 52 55 53 44 22 7d 00
 
 s |> recv(keep.raw = FALSE)
-#> [1] "{\"s\":\"EURUSD\",\"a\":0.9986,\"b\":0.99853,\"dc\":\"0.3425\",\"dd\":\"0.0034\",\"ppms\":false,\"t\":1662105923000}"
+#> [1] "{\"s\":\"EURUSD\",\"a\":1.00066,\"b\":1.00059,\"dc\":\"0.5476\",\"dd\":\"0.0055\",\"ppms\":false,\"t\":1662126377000}"
 
 s |> recv(keep.raw = FALSE)
-#> [1] "{\"s\":\"EURUSD\",\"a\":0.99854,\"b\":0.99852,\"dc\":\"0.3365\",\"dd\":\"0.0034\",\"ppms\":false,\"t\":1662105923000}"
+#> [1] "{\"s\":\"EURUSD\",\"a\":1.00067,\"b\":1.0006,\"dc\":\"0.5486\",\"dd\":\"0.0055\",\"ppms\":false,\"t\":1662126378000}"
 
 close(s)
 ```
 
 [« Back to ToC](#table-of-contents)
 
-### Building from source
+### Cryptographic Hashing
+
+Functions performing hashing using the SHA-2 series of algorithms is
+included: `sha224()`, `sha256()`, `sha384()` and `sha512()`.
+
+These call the secure, optimized implementations from the ‘Mbed TLS’
+library and return a hash as a raw vector of class ‘nanoHash’. The
+default print method displays the hash value. For use in authentication,
+raw vectors can be compared directly.
+
+If a character string of the hash value is required, use
+`as.character()` on the ‘nanoHash’ object. A fast, optimised method is
+implemented.
+
+To generate an HMAC (hash-based message authentication code), simply
+supply the value ‘key’ to use as the secret key.
+
+``` r
+sha256("hello world!")
+#> 75 09 e5 bd a0 c7 62 d2 ba c7 f9 0d 75 8b 5b 22 63 fa 01 cc bc 54 2a b5 e3 df 16 3b e0 8e 6c a9
+
+as.character(sha256("hello world!"))
+#> [1] "7509e5bda0c762d2bac7f90d758b5b2263fa01ccbc542ab5e3df163be08e6ca9"
+
+sha256("hello world!", key = "MY_SECRET")
+#> d8 f0 e2 d3 68 ff 63 26 82 d5 5e 2c 1c cd 49 c1 5f 8a 6a 38 62 d8 eb 68 f1 90 6b 6e e6 58 89 0a
+```
+
+[« Back to ToC](#table-of-contents)
+
+### Building from Source
 
 #### Linux / Mac / Solaris
 
@@ -648,6 +680,8 @@ repositories are not new enough to support this version of nanonext.
 Pre-built ‘libnng’ v1.6.0 (722bf46) and ‘libmbedtls’ v3.2.1 libraries
 are downloaded automatically during the package installation process.
 
+[« Back to ToC](#table-of-contents)
+
 ### Links
 
 nanonext on CRAN: <https://cran.r-project.org/package=nanonext><br />
@@ -655,8 +689,6 @@ Package website: <https://shikokuchuo.net/nanonext/><br />
 
 NNG website: <https://nng.nanomsg.org/><br /> Mbed TLS website:
 <https://www.trustedfirmware.org/projects/mbed-tls/><br />
-
-[« Back to ToC](#table-of-contents)
 
 –
 
