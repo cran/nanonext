@@ -2,9 +2,6 @@
 % Please edit documentation in R/aio.R
 \name{recv_aio}
 \alias{recv_aio}
-\alias{recv_aio.nanoSocket}
-\alias{recv_aio.nanoContext}
-\alias{recv_aio.nanoStream}
 \title{Receive Async}
 \usage{
 recv_aio(
@@ -12,36 +9,8 @@ recv_aio(
   mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
     "raw"),
   timeout = NULL,
-  keep.raw = TRUE,
-  ...,
+  keep.raw = FALSE,
   n = 65536L
-)
-
-\method{recv_aio}{nanoSocket}(
-  con,
-  mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
-    "raw"),
-  timeout = NULL,
-  keep.raw = TRUE,
-  ...
-)
-
-\method{recv_aio}{nanoContext}(
-  con,
-  mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
-    "raw"),
-  timeout = NULL,
-  keep.raw = TRUE,
-  ...
-)
-
-\method{recv_aio}{nanoStream}(
-  con,
-  mode = c("character", "complex", "double", "integer", "logical", "numeric", "raw"),
-  timeout = NULL,
-  keep.raw = TRUE,
-  n = 65536L,
-  ...
 )
 }
 \arguments{
@@ -56,18 +25,15 @@ For Streams, 'serial' is not an option and the default is 'character'.}
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
 applies a socket-specific default, usually the same as no timeout.}
 
-\item{keep.raw}{[default TRUE] logical flag whether to keep the received raw
-vector (useful for verification e.g. via hashing). If FALSE, will return
-the converted data only.}
-
-\item{...}{currently unused.}
+\item{keep.raw}{[default FALSE] logical flag whether to keep and return the
+received raw vector along with the converted data.}
 
 \item{n}{[default 65536L] applicable to Streams only, the maximum number of
 bytes to receive. Can be an over-estimate, but note that a buffer of this
 size is reserved.}
 }
 \value{
-A 'recvAio' (object of class 'recvAio').
+A 'recvAio' (object of class 'recvAio') (invisibly).
 }
 \description{
 Receive data asynchronously over a connection (Socket, Context or Stream).
@@ -89,7 +55,7 @@ Async receive is always non-blocking and returns a 'recvAio'
     distiguishable from an integer message value). This can be verified using
     \code{\link{is_error_value}}.
 
-    If the raw data was successfully received but an error occurred in
+    If the raw message was successfully received but an error occurred in
     unserialisation or data conversion (for example if the incorrect mode was
     specified), the received raw vector will be stored at \code{$data} to
     allow for the data to be recovered.
@@ -99,18 +65,18 @@ s1 <- socket("pair", listen = "inproc://nanonext")
 s2 <- socket("pair", dial = "inproc://nanonext")
 
 res <- send_aio(s1, data.frame(a = 1, b = 2), timeout = 100)
-msg <- recv_aio(s2, timeout = 100, keep.raw = FALSE)
+msg <- recv_aio(s2, timeout = 100)
 msg
 msg$data
 
 res <- send_aio(s1, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
-msg <- recv_aio(s2, mode = "double", timeout = 100)
+msg <- recv_aio(s2, mode = "double", timeout = 100, keep.raw = TRUE)
 msg
 msg$raw
 msg$data
 
 res <- send_aio(s1, "example message", mode = "raw", timeout = 100)
-msg <- recv_aio(s2, mode = "character", timeout = 100)
+msg <- recv_aio(s2, mode = "character", timeout = 100, keep.raw = TRUE)
 call_aio(msg)
 msg$raw
 msg$data

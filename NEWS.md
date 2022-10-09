@@ -1,3 +1,33 @@
+# nanonext 0.6.0
+
+*The nanonext 0.6 series incorporates significant advances in performance and stability over previous releases*
+
+#### New Features
+
+* Implements `base64enc()` and `base64dec()` base64 encoding and decoding using the 'Mbed TLS' library.
+* `sha224()`, `sha256()`, `sha384()` and `sha512()` functions gain an argument 'convert' to control whether to return a raw vector or character string.
+* `ncurl()` gains the argument 'follow' (default FALSE) to control whether redirects are automatically followed.
+
+#### Updates
+
+*Please review the following potentially breaking changes, and only update when ready:*
+
+* `send()` now returns an integer exit code in all cases. The 'echo' argument has been replaced by '...', and specifying 'echo' no longer has any effect.
+* `recv()`, `recv_aio()` and `request()` now default to 'keep.raw' = FALSE to return only the sent object.
+* `ncurl()` argument 'request' renamed to 'response' for specifying response headers to return (to avoid confusion); new argument 'follow' (placed between 'convert' and 'method') controls whether redirects are followed, and there is no longer a user prompt in interactive environments.
+* `sha224()`, `sha256()`, `sha384()` and `sha512()` functions no longer return 'nanoHash' objects, but a raw vector or character string depending on the new argument 'convert'.
+
+*Other changes:*
+
+* `socket()` and `nano()` now accept non-missing NULL 'listen' and 'dial' arguments, allowing easier programmatic use.
+* Functions `send()`, `recv()`, `send_aio()`, `recv_aio()`, `setopt()`, `subscribe()`, `unsubscribe()` and `survey_time()` are no longer S3 generics for enhanced performance.
+* `messenger()` uses longer SHA-512 hash for authentication; fixes errors creating a connnection not being shown.
+* The source code of 'libnng' v1.6.0 pre-release (722bf46) and 'libmbedtls' v3.2.1 now comes bundled rather than downloaded - this is much more efficient as unused portions have been stripped out.
+* Detects and uses system installations of 'libnng' >= 1.6.0 pre-release 722bf46 and 'libmbedtls' >= 2 where available, only compiling from source when required.
+* R >= 4.2 on Windows now performs source compilation of the bundled 'libnng' and 'libmbedtls' using the rtools42 toolchain. Installation falls back to pre-compiled libraries for older R releases.
+* Supported R version amended to >= 2.5, when the current `new.env()` interface was implemented.
+* Internal performance enhancements.
+
 # nanonext 0.5.5
 
 #### Updates

@@ -8,10 +8,11 @@ ncurl(
   url,
   async = FALSE,
   convert = TRUE,
+  follow = FALSE,
   method = NULL,
   headers = NULL,
   data = NULL,
-  request = NULL,
+  response = NULL,
   pem = NULL
 )
 }
@@ -23,6 +24,9 @@ ncurl(
 \item{convert}{[default TRUE] logical value whether to attempt conversion of
 the received raw bytes to a character vector.}
 
+\item{follow}{[default FALSE] logical value whether to automatically follow
+redirects. See 'redirects' section below.}
+
 \item{method}{(optional) the HTTP method (defaults to 'GET' if not specified).}
 
 \item{headers}{(optional) a named list or character vector specifying the
@@ -31,8 +35,8 @@ HTTP request headers e.g. \code{list(`Content-Type` = "text/plain")} or
 
 \item{data}{(optional) the request data to be submitted.}
 
-\item{request}{(optional) a character vector or list specifying the response
-headers to request e.g. \code{c("date", "server")} or \code{list("Date", "Server")}.
+\item{response}{(optional) a character vector or list specifying the response
+headers to return e.g. \code{c("date", "server")} or \code{list("Date", "Server")}.
 These are case-insensitive and will return NULL if not present.}
 
 \item{pem}{(optional) applicable to secure HTTPS sites only. The path to a
@@ -45,7 +49,7 @@ Named list of 4 elements:
     \itemize{
     \item{\code{$status}} {- integer HTTP repsonse status code (200 - OK).}
     \item{\code{$headers}} {- named list of response headers supplied in
-    'request' or NULL if unspecified.}
+    'response' or NULL if unspecified.}
     \item{\code{$raw}} {- raw vector of the received resource (use
     \code{\link{writeBin}} to save to a file).}
     \item{\code{$data}} {- converted character string (if \code{'convert' = TRUE}
@@ -54,7 +58,7 @@ Named list of 4 elements:
     }
 
     Or else, if \code{async = TRUE}, an 'ncurlAio' (object of class 'ncurlAio'
-    and 'recvAio').
+    and 'recvAio') (invisibly).
 }
 \description{
 nano cURL - a minimalist http(s) client.
@@ -62,18 +66,16 @@ nano cURL - a minimalist http(s) client.
 \section{Redirects}{
 
 
-    In interactive sessions: will prompt upon receiving a redirect location
-    whether to follow or not (default: yes).
+    If redirects are not followed (the default), the redirect address is
+    returned as a character string.
 
-    In non-interactive sessions: redirects are never followed.
-
-    For async requests, the redirect address will be returned as a character
+    For async requests, the redirect address is returned as a character
     string at \code{$raw} and \code{$data} will be NULL.
 }
 
 \examples{
-ncurl("https://httpbin.org/get", request = c("date", "server"))
-ncurl("http://httpbin.org/put",,,"PUT", list(Authorization = "Bearer APIKEY"), "hello world")
-ncurl("http://httpbin.org/post",,,"POST", c(`Content-Type` = "application/json"),'{"k":"v"}')
+ncurl("https://httpbin.org/get", response = c("date", "server"))
+ncurl("http://httpbin.org/put",,,,"PUT", list(Authorization = "Bearer APIKEY"), "hello world")
+ncurl("http://httpbin.org/post",,,,"POST", c(`Content-Type` = "application/json"),'{"k":"v"}')
 
 }

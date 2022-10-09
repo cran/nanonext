@@ -2,46 +2,15 @@
 % Please edit documentation in R/sendrecv.R
 \name{recv}
 \alias{recv}
-\alias{recv.nanoSocket}
-\alias{recv.nanoContext}
-\alias{recv.nanoStream}
 \title{Receive}
 \usage{
 recv(
   con,
   mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
     "raw"),
-  block,
-  keep.raw = TRUE,
-  ...,
+  block = NULL,
+  keep.raw = FALSE,
   n = 65536L
-)
-
-\method{recv}{nanoSocket}(
-  con,
-  mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
-    "raw"),
-  block = FALSE,
-  keep.raw = TRUE,
-  ...
-)
-
-\method{recv}{nanoContext}(
-  con,
-  mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
-    "raw"),
-  block = TRUE,
-  keep.raw = TRUE,
-  ...
-)
-
-\method{recv}{nanoStream}(
-  con,
-  mode = c("character", "complex", "double", "integer", "logical", "numeric", "raw"),
-  block = TRUE,
-  keep.raw = TRUE,
-  n = 65536L,
-  ...
 )
 }
 \arguments{
@@ -53,25 +22,23 @@ The default 'serial' means a serialised R object, for the other modes,
 the raw vector received will be converted into the respective mode.
 For Streams, 'serial' is not an option and the default is 'character'.}
 
-\item{block}{logical TRUE to block until successful or FALSE to return
-immediately even if unsuccessful  (e.g. if no messages are available),
-or else an integer value specifying the maximum time to block in
-milliseconds, after which the operation will time out.}
+\item{block}{[default NULL] which applies the connection default (see section
+'Blocking' below). Specify logical TRUE to block until successful or FALSE
+to return immediately even if unsuccessful (e.g. if no connection is
+available), or else an integer value specifying the maximum time to block
+in milliseconds, after which the operation will time out.}
 
-\item{keep.raw}{[default TRUE] logical flag whether to keep the received raw
-vector (useful for verification e.g. via hashing). If FALSE, will return
-the converted data only.}
-
-\item{...}{currently unused.}
+\item{keep.raw}{[default FALSE] logical flag whether to keep and return the
+received raw vector along with the converted data.}
 
 \item{n}{[default 65536L] applicable to Streams only, the maximum number of
 bytes to receive. Can be an over-estimate, but note that a buffer of this
 size is reserved.}
 }
 \value{
-Named list of 2 elements: 'raw' containing the received raw vector
-    and 'data' containing the converted object, or else the converted object
-    if 'keep.raw' is set to FALSE.
+Depending on the value of 'keep.raw': if TRUE, a named list of 2
+    elements - \code{$raw} containing the received raw vector and \code{$data}
+    containing the converted data, or if FALSE, the converted data.
 }
 \description{
 Receive data over a connection (Socket, Context or Stream).
@@ -81,7 +48,7 @@ In case of an error, an integer 'errorValue' is returned (to be
     distiguishable from an integer message value). This can be verified using
     \code{\link{is_error_value}}.
 
-    If the raw data was successfully received but an error occurred in
+    If the raw message was successfully received but an error occurred in
     unserialisation or data conversion (for example if the incorrect mode was
     specified), the received raw vector will always be returned to allow for
     the data to be recovered.
@@ -106,14 +73,14 @@ s2 <- socket("pair", dial = "inproc://nanonext")
 send(s1, data.frame(a = 1, b = 2))
 res <- recv(s2)
 res
-send(s1, data.frame(a = 1, b = 2), echo = FALSE)
-recv(s2, keep.raw = FALSE)
+send(s1, data.frame(a = 1, b = 2))
+recv(s2, keep.raw = TRUE)
 
 send(s1, c(1.1, 2.2, 3.3), mode = "raw")
-res <- recv(s2, mode = "double", block = 100)
+res <- recv(s2, mode = "double", block = 100, keep.raw = TRUE)
 res
-send(s1, "example message", mode = "raw", echo = FALSE)
-recv(s2, mode = "character", keep.raw = FALSE)
+send(s1, "example message", mode = "raw")
+recv(s2, mode = "character")
 
 close(s1)
 close(s2)

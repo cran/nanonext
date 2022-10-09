@@ -79,10 +79,11 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #'     perfect reproducibility. Use 'raw' for sending vectors of any type (will be
 #'     converted to a raw byte vector for sending) - essential when interfacing
 #'     with external applications.
-#' @param recv_mode [default 'serial'] mode of vector to be received - one of 'serial',
-#'     'character', 'complex', 'double', 'integer', 'logical', 'numeric', or 'raw'.
-#'     The default 'serial' means a serialised R object, for the other modes,
-#'     the raw vector received will be converted into the respective mode.
+#' @param recv_mode [default 'serial'] mode of vector to be received - one of
+#'     'serial', 'character', 'complex', 'double', 'integer', 'logical',
+#'     'numeric', or 'raw'. The default 'serial' means a serialised R object, for
+#'     the other modes, the raw vector received will be converted into the
+#'     respective mode.
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout. Note
 #'     that this applies to receiving the request. The total elapsed time would
@@ -131,15 +132,12 @@ reply <- function(context,
                   timeout = NULL,
                   ...) {
 
-  res <- .Call(rnng_ctx_recv, context, recv_mode, timeout, FALSE)
-  is_error_value(res) && return(invisible(res))
-  on.exit(expr = send.nanoContext(context, as.raw(0L), mode = send_mode))
+  res <- recv(context, mode = recv_mode, block = timeout)
+  is_error_value(res) && return(res)
+  on.exit(expr = send(context, data = as.raw(0L), mode = send_mode))
   data <- execute(res, ...)
-  if (.Call(rnng_serial, send_mode))
-    data <- serialize(object = data, connection = NULL)
-  res <- .Call(rnng_ctx_send, context, data, timeout, FALSE)
   on.exit()
-  if (missing(res)) invisible(0L) else invisible(res)
+  send(context, data = data, mode = send_mode, block = timeout)
 
 }
 
@@ -156,7 +154,7 @@ reply <- function(context,
 #'     applies a socket-specific default, usually the same as no timeout. Note
 #'     that this applies to receiving the result.
 #'
-#' @return A 'recvAio' (object of class 'recvAio').
+#' @return A 'recvAio' (object of class 'recvAio') (invisibly).
 #'
 #' @details Sending the request and receiving the result are both performed async,
 #'     hence the function will return immediately with a 'recvAio' object. Access
@@ -196,56 +194,11 @@ request <- function(context,
                     recv_mode = c("serial", "character", "complex", "double",
                                   "integer", "logical", "numeric", "raw"),
                     timeout = NULL,
-                    keep.raw = TRUE) {
+                    keep.raw = FALSE) {
 
-  recv_mode <- .Call(rnng_matcharg, recv_mode)
-  if (.Call(rnng_serial, send_mode))
-    data <- serialize(object = data, connection = NULL)
-  res <- .Call(rnng_ctx_send_aio, context, data, NULL)
-  is.integer(res) && return(res)
-
-  aio <- .Call(rnng_ctx_recv_aio, context, timeout)
-  is_error_value(aio) && return(aio)
-
-  keep.raw <- missing(keep.raw) || isTRUE(keep.raw)
-  data <- raw <- NULL
-  unresolv <- TRUE
-  env <- new.env(hash = FALSE)
-  if (keep.raw) {
-    makeActiveBinding(sym = "raw", fun = function(x) {
-      if (unresolv) {
-        res <- .Call(rnng_aio_get_msg, aio, recv_mode, keep.raw)
-        missing(res) && return(.Call(rnng_aio_unresolv))
-        if (is_error_value(res)) {
-          data <<- raw <<- res
-        } else {
-          raw <<- .subset2(res, "raw")
-          data <<- .subset2(res, "data")
-        }
-        aio <<- env[["aio"]] <<- NULL
-        unresolv <<- FALSE
-      }
-      raw
-    }, env = env)
-  }
-  makeActiveBinding(sym = "data", fun = function(x) {
-    if (unresolv) {
-      res <- .Call(rnng_aio_get_msg, aio, recv_mode, keep.raw)
-      missing(res) && return(.Call(rnng_aio_unresolv))
-      if (is_error_value(res)) {
-        data <<- raw <<- res
-      } else if (keep.raw) {
-        raw <<- .subset2(res, "raw")
-        data <<- .subset2(res, "data")
-      } else {
-        data <<- res
-      }
-      aio <<- env[["aio"]] <<- NULL
-      unresolv <<- FALSE
-    }
-    data
-  }, env = env)
-  `class<-`(`[[<-`(`[[<-`(env, "keep.raw", keep.raw), "aio", aio), "recvAio")
+  result <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout,
+                  keep.raw, environment())
 
 }
+
 

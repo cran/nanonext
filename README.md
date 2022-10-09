@@ -28,27 +28,28 @@ spanning the globe.
 
 Implemented scalability protocols:
 
--   Bus (mesh networks)
--   Pair (two-way radio)
--   Push/Pull (one-way pipeline)
--   Publisher/Subscriber (topics & broadcast)
--   Request/Reply (RPC)
--   Surveyor/Respondent (voting & service discovery)
+- Bus (mesh networks)
+- Pair (two-way radio)
+- Push/Pull (one-way pipeline)
+- Publisher/Subscriber (topics & broadcast)
+- Request/Reply (RPC)
+- Surveyor/Respondent (voting & service discovery)
 
 Supported transports:
 
--   inproc (intra-process)
--   IPC (inter-process)
--   TCP (IPv4 or IPv6)
--   WebSocket
+- inproc (intra-process)
+- IPC (inter-process)
+- TCP (IPv4 or IPv6)
+- WebSocket
 
 Web utilities:
 
--   ncurl - (async) http(s) client
--   stream - secure websockets client (and generic low-level socket
-    interface)
--   messenger - console-based instant messaging with authentication
--   sha\[224\|256\|384\|512\] - cryptographic hash and HMAC algorithms
+- ncurl - (async) http(s) client
+- stream - secure websockets client (and generic low-level socket
+  interface)
+- messenger - console-based instant messaging with authentication
+- sha\[224\|256\|384\|512\] - cryptographic hash and HMAC algorithms
+- base64\[enc\|dec\] - base64 encoding and decoding
 
 ### Table of Contents
 
@@ -112,21 +113,12 @@ Send message from ‘nano1’:
 
 ``` r
 nano1$send("hello world!")
-#>  [1] 58 0a 00 00 00 03 00 04 02 01 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
-#> [26] 00 10 00 00 00 01 00 04 00 09 00 00 00 0c 68 65 6c 6c 6f 20 77 6f 72 6c 64
-#> [51] 21
 ```
 
 Receive message using ‘nano2’:
 
 ``` r
 nano2$recv()
-#> $raw
-#>  [1] 58 0a 00 00 00 03 00 04 02 01 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
-#> [26] 00 10 00 00 00 01 00 04 00 09 00 00 00 0c 68 65 6c 6c 6f 20 77 6f 72 6c 64
-#> [51] 21
-#> 
-#> $data
 #> [1] "hello world!"
 ```
 
@@ -153,21 +145,12 @@ Send message from ‘socket1’:
 
 ``` r
 send(socket1, "hello world!")
-#>  [1] 58 0a 00 00 00 03 00 04 02 01 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
-#> [26] 00 10 00 00 00 01 00 04 00 09 00 00 00 0c 68 65 6c 6c 6f 20 77 6f 72 6c 64
-#> [51] 21
 ```
 
 Receive message using ‘socket2’:
 
 ``` r
 recv(socket2)
-#> $raw
-#>  [1] 58 0a 00 00 00 03 00 04 02 01 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
-#> [26] 00 10 00 00 00 01 00 04 00 09 00 00 00 0c 68 65 6c 6c 6f 20 77 6f 72 6c 64
-#> [51] 21
-#> 
-#> $data
 #> [1] "hello world!"
 ```
 
@@ -184,13 +167,17 @@ between R and Python (NumPy), two of the most commonly-used languages
 for data science and machine learning.
 
 Using a messaging interface provides a clean and robust approach, light
-on resources with limited and identifiable points of failure. This is
-especially relevant when processing real-time data, as an example.
+on resources with limited and identifiable points of failure.
 
 This approach can also serve as an interface / pipe between different
 processes written in the same or different languages, running on the
 same computer or distributed across networks, and is an enabler of
 modular software design as espoused by the Unix philosophy.
+
+One solution it provides is that of processing real-time data where
+computation times exceed the data frequency - by dividing the
+computation into stages, this may be set up as a pipeline or ‘cascade’
+of processes, each connected using NNG sockets.
 
 Create socket in Python using the NNG binding ‘pynng’:
 
@@ -207,8 +194,6 @@ Create nano object in R using {nanonext}, then send a vector of
 library(nanonext)
 n <- nano("pair", dial = "ipc:///tmp/nanonext.socket")
 n$send(c(1.1, 2.2, 3.3, 4.4, 5.5), mode = "raw")
-#>  [1] 9a 99 99 99 99 99 f1 3f 9a 99 99 99 99 99 01 40 66 66 66 66 66 66 0a 40 9a
-#> [26] 99 99 99 99 99 11 40 00 00 00 00 00 00 16 40
 ```
 
 Receive in Python as a NumPy array of ‘floats’, and send back to R:
@@ -226,11 +211,6 @@ Receive in R, specifying the receive mode as ‘double’:
 
 ``` r
 n$recv(mode = "double")
-#> $raw
-#>  [1] 9a 99 99 99 99 99 f1 3f 9a 99 99 99 99 99 01 40 66 66 66 66 66 66 0a 40 9a
-#> [26] 99 99 99 99 99 11 40 00 00 00 00 00 00 16 40
-#> 
-#> $data
 #> [1] 1.1 2.2 3.3 4.4 5.5
 ```
 
@@ -255,7 +235,7 @@ complete.
 
 ``` r
 # an async receive is requested, but no messages are waiting (yet to be sent)
-msg <- recv_aio(s2)
+msg <- recv_aio(s2, keep.raw = TRUE)
 msg
 #> < recvAio >
 #>  - $data for message data
@@ -363,7 +343,7 @@ request and returns immediately with a `recvAio` object.
 library(nanonext)
 req <- socket("req", dial = "tcp://127.0.0.1:6546")
 ctxq <- context(req)
-aio <- request(ctxq, data = 1e8, recv_mode = "double", keep.raw = FALSE)
+aio <- request(ctxq, data = 1e8, recv_mode = "double")
 ```
 
 At this point, the client can run additional code concurrent with the
@@ -386,7 +366,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] -0.411 -1.236 -0.307 -0.339 0.984 ...
+#>  num [1:100000000] -0.202 -0.654 -0.632 -0.234 0.25 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -418,35 +398,34 @@ sub <- socket("sub", dial = "inproc://nanobroadcast")
 
 sub |> subscribe(topic = "examples")
 
-pub |> send(c("examples", "this is an example"), mode = "raw", echo = FALSE)
-sub |> recv(mode = "character", keep.raw = FALSE)
+pub |> send(c("examples", "this is an example"), mode = "raw")
+sub |> recv(mode = "character")
 #> [1] "examples"           "this is an example"
 
-pub |> send("examples at the start of a single text message", mode = "raw", echo = FALSE)
-sub |> recv(mode = "character", keep.raw = FALSE)
+pub |> send("examples at the start of a single text message", mode = "raw")
+sub |> recv(mode = "character")
 #> [1] "examples at the start of a single text message"
 
-pub |> send(c("other", "this other topic will not be received"), mode = "raw", echo = FALSE)
-sub |> recv(mode = "character", keep.raw = FALSE)
-#> Warning in recv.nanoSocket(sub, mode = "character", keep.raw = FALSE): 8 | Try
-#> again
+pub |> send(c("other", "this other topic will not be received"), mode = "raw")
+sub |> recv(mode = "character")
+#> Warning in recv(sub, mode = "character"): 8 | Try again
 #> 'errorValue' int 8
 
 # specify NULL to subscribe to ALL topics
 sub |> subscribe(topic = NULL)
-pub |> send(c("newTopic", "this is a new topic"), mode = "raw", echo = FALSE)
-sub |> recv("character", keep.raw = FALSE)
+pub |> send(c("newTopic", "this is a new topic"), mode = "raw")
+sub |> recv("character")
 #> [1] "newTopic"            "this is a new topic"
 
 sub |> unsubscribe(topic = NULL)
-pub |> send(c("newTopic", "this topic will now not be received"), mode = "raw", echo = FALSE)
-sub |> recv("character", keep.raw = FALSE)
-#> Warning in recv.nanoSocket(sub, "character", keep.raw = FALSE): 8 | Try again
+pub |> send(c("newTopic", "this topic will now not be received"), mode = "raw")
+sub |> recv("character")
+#> Warning in recv(sub, "character"): 8 | Try again
 #> 'errorValue' int 8
 
 # however the topics explicitly subscribed to are still received
-pub |> send(c("examples will still be received"), mode = "raw", echo = FALSE)
-sub |> recv(mode = "character", keep.raw = FALSE)
+pub |> send(c("examples will still be received"), mode = "raw")
+sub |> recv(mode = "character")
 #> [1] "examples will still be received"
 ```
 
@@ -456,8 +435,8 @@ and received.
 
 ``` r
 sub |> subscribe(topic = 1)
-pub |> send(c(1, 10, 10, 20), mode = "raw", echo = FALSE)
-sub |> recv(mode = "double", keep.raw = FALSE)
+pub |> send(c(1, 10, 10, 20), mode = "raw")
+sub |> recv(mode = "double")
 #> [1]  1 10 10 20
 
 close(pub)
@@ -485,19 +464,17 @@ res2 <- socket("respondent", dial = "inproc://nanoservice")
 sur |> survey_time(500)
 
 # sur sends a message and then requests 2 async receives
-sur |> send("service check", echo = FALSE)
+sur |> send("service check")
 aio1 <- sur |> recv_aio()
 aio2 <- sur |> recv_aio()
 
 # res1 receives the message and replies using an aio send function
-res1 |> recv(keep.raw = FALSE)
+res1 |> recv()
 #> [1] "service check"
 res1 |> send_aio("res1")
-#> < sendAio >
-#>  - $result for send result
 
 # res2 receives the message but fails to reply
-res2 |> recv(keep.raw = FALSE)
+res2 |> recv()
 #> [1] "service check"
 
 # checking the aio - only the first will have resolved
@@ -509,7 +486,7 @@ aio2$data
 # after the survey expires, the second resolves into a timeout error
 Sys.sleep(0.5)
 aio2$data
-#> Warning in (function (x) : 5 | Timed out
+#> Warning in (function (.) : 5 | Timed out
 #> 'errorValue' int 5
 
 close(sur)
@@ -545,36 +522,38 @@ ncurl("https://httpbin.org/headers")
 #>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
 #>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
 #>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 33 31 32 30 39 32 38 2d 36 33 33 36 36 61 64 63 32 32 66 33 62 35 63
-#> [101] 33 34 38 34 37 66 61 36 36 22 0a 20 20 7d 0a 7d 0a
+#>  [76] 2d 36 33 34 33 33 61 61 38 2d 31 39 64 63 35 32 36 30 35 31 64 36 66 31 61
+#> [101] 62 32 30 38 62 30 32 30 63 22 0a 20 20 7d 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63120928-63366adc22f3b5c34847fa66\"\n  }\n}\n"
+#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63433aa8-19dc526051d6f1ab208b020c\"\n  }\n}\n"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
 
 ``` r
-res <- ncurl("http://httpbin.org/post", async = TRUE, method = "POST",
+res <- ncurl("http://httpbin.org/post",
+             async = TRUE,
+             method = "POST",
              headers = c(`Content-Type` = "application/json", Authorization = "Bearer APIKEY"),
              data = '{"key": "value"}',
-             request = c("Date", "Server"))
+             response = c("Date", "Server"))
 res
 #> < ncurlAio >
 #>  - $status for response status code
-#>  - $headers for requested response headers
+#>  - $headers for response headers
 #>  - $raw for raw message
 #>  - $data for message data
 
 call_aio(res)$headers
 #> $Date
-#> [1] "Fri, 02 Sep 2022 13:46:16 GMT"
+#> [1] "Sun, 09 Oct 2022 21:18:32 GMT"
 #> 
 #> $Server
 #> [1] "gunicorn/19.9.0"
 
 res$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63120928-1caef5b315853c0a48ef0217\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"213.86.169.34\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63433aa8-4f3d6da80076713f4a359c49\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"213.205.242.66\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -609,18 +588,16 @@ Sockets. This affords a great deal of flexibility in ingesting and
 processing streaming data.
 
 ``` r
-s |> recv(keep.raw = FALSE)
+s |> recv()
 #> [1] "{\"status_code\":200,\"message\":\"Authorized\"}"
 
 s |> send('{"action": "subscribe", "symbols": "EURUSD"}')
-#>  [1] 7b 22 61 63 74 69 6f 6e 22 3a 20 22 73 75 62 73 63 72 69 62 65 22 2c 20 22
-#> [26] 73 79 6d 62 6f 6c 73 22 3a 20 22 45 55 52 55 53 44 22 7d 00
 
-s |> recv(keep.raw = FALSE)
-#> [1] "{\"s\":\"EURUSD\",\"a\":1.00066,\"b\":1.00059,\"dc\":\"0.5476\",\"dd\":\"0.0055\",\"ppms\":false,\"t\":1662126377000}"
+s |> recv()
+#> [1] "{\"s\":\"EURUSD\",\"a\":0.97372,\"b\":0.9735,\"dc\":\"-0.0698\",\"dd\":\"-0.0007\",\"ppms\":true,\"t\":1665350345000}"
 
-s |> recv(keep.raw = FALSE)
-#> [1] "{\"s\":\"EURUSD\",\"a\":1.00067,\"b\":1.0006,\"dc\":\"0.5486\",\"dd\":\"0.0055\",\"ppms\":false,\"t\":1662126378000}"
+s |> recv()
+#> [1] "{\"s\":\"EURUSD\",\"a\":0.97371,\"b\":0.97351,\"dc\":\"-0.0709\",\"dd\":\"-0.0007\",\"ppms\":true,\"t\":1665350349000}"
 
 close(s)
 ```
@@ -633,26 +610,34 @@ Functions performing hashing using the SHA-2 series of algorithms is
 included: `sha224()`, `sha256()`, `sha384()` and `sha512()`.
 
 These call the secure, optimized implementations from the ‘Mbed TLS’
-library and return a hash as a raw vector of class ‘nanoHash’. The
-default print method displays the hash value. For use in authentication,
-raw vectors can be compared directly.
-
-If a character string of the hash value is required, use
-`as.character()` on the ‘nanoHash’ object. A fast, optimised method is
-implemented.
+library and return a hash either directly as a raw vector or converted
+to a character string. For use in authentication, raw vectors can be
+compared directly for the highest performance.
 
 To generate an HMAC (hash-based message authentication code), simply
 supply the value ‘key’ to use as the secret key.
 
 ``` r
 sha256("hello world!")
-#> 75 09 e5 bd a0 c7 62 d2 ba c7 f9 0d 75 8b 5b 22 63 fa 01 cc bc 54 2a b5 e3 df 16 3b e0 8e 6c a9
-
-as.character(sha256("hello world!"))
 #> [1] "7509e5bda0c762d2bac7f90d758b5b2263fa01ccbc542ab5e3df163be08e6ca9"
 
+sha256("hello world!", convert = FALSE)
+#>  [1] 75 09 e5 bd a0 c7 62 d2 ba c7 f9 0d 75 8b 5b 22 63 fa 01 cc bc 54 2a b5 e3
+#> [26] df 16 3b e0 8e 6c a9
+
 sha256("hello world!", key = "MY_SECRET")
-#> d8 f0 e2 d3 68 ff 63 26 82 d5 5e 2c 1c cd 49 c1 5f 8a 6a 38 62 d8 eb 68 f1 90 6b 6e e6 58 89 0a
+#> [1] "d8f0e2d368ff632682d55e2c1ccd49c15f8a6a3862d8eb68f1906b6ee658890a"
+```
+
+Optimised functions for base64 encoding and decoding from the ‘Mbed TLS’
+library are also provided:
+
+``` r
+base64enc("hello world!")
+#> [1] "aGVsbG8gd29ybGQh"
+
+base64dec(base64enc("hello world!"))
+#> [1] "hello world!"
 ```
 
 [« Back to ToC](#table-of-contents)
@@ -661,24 +646,35 @@ sha256("hello world!", key = "MY_SECRET")
 
 #### Linux / Mac / Solaris
 
-Installation from source requires ‘cmake’.
+Installation from source requires ‘libnng’ \>= v1.6.0 and ‘libmbedtls’
+\>= 2 - suitable installations are automatically detected - or else
+‘cmake’ to compile ‘libnng’ v1.6.0 pre-release (722bf46) and
+‘libmbedtls’ v3.2.1 included within the package sources.
 
-A pre-release version of ‘libnng’ v1.6.0 (722bf46) and the latest
-release of ‘libmbedtls’ v3.2.1 are downloaded and built automatically
-during package installation.
+Note: ‘libnng’ v1.6.0 is not yet available in system repositories;
+‘libmbedtls’ is available as libmbedtls-dev (deb) or libmbedtls-devel
+(rpm).
 
-Setting `Sys.setenv(NANONEXT_SYS=1)` will cause installation to attempt
-use of a system ‘libnng’ and ‘libmbedtls’ installed in `/usr/local`
-instead. This allows use of custom builds of ‘libnng’ (722bf46 or newer)
-and ‘libmbedtls’ (v3 or newer).
+The ‘INCLUDE_DIR’ and ‘LIB_DIR’ environment variables may be set prior
+to package installation to specify a custom location for ‘libmbedtls’ or
+‘libnng’ other than the standard filesystem locations.
 
-System libraries are not used by default as versions currently in system
-repositories are not new enough to support this version of nanonext.
+Package installation will automatically build the libraries if required.
+
+*Additional requirements for Solaris: (i) the ‘xz’ package - available
+on OpenCSW, and (ii) a more recent version of ‘cmake’ than that
+available on OpenCSW - see the ‘cmake’ website for the latest source
+file which can be built with just a C compiler.*
 
 #### Windows
 
-Pre-built ‘libnng’ v1.6.0 (722bf46) and ‘libmbedtls’ v3.2.1 libraries
-are downloaded automatically during the package installation process.
+For R \>= 4.2 using the ‘rtools42’ toolchain, ‘libnng’ v1.6.0 (722bf46)
+and ‘libmbedtls’ v3.2.1 will be automatically compiled from the package
+sources during installation.
+
+For previous R versions, pre-compiled ‘libnng’ v1.6.0 (722bf46) and
+‘libmbedtls’ v3.2.1 libraries are downloaded and used for installation
+instead.
 
 [« Back to ToC](#table-of-contents)
 

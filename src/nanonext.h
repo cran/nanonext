@@ -47,6 +47,7 @@
 #endif
 
 #ifdef NANONEXT_TLS
+#include <mbedtls/base64.h>
 #include <mbedtls/md.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
@@ -57,12 +58,16 @@
 #define STRICT_R_HEADERS
 #include <R.h>
 #include <Rinternals.h>
+#include <Rversion.h>
 #include <R_ext/Visibility.h>
 
 #ifdef NANONEXT_INTERNALS
 extern SEXP mk_error(const int);
 extern SEXP nano_decode(unsigned char *, size_t, const int, const int);
 extern SEXP nano_encode(SEXP);
+extern SEXP nano_encodes(SEXP, SEXP);
+extern int nano_matcharg(SEXP);
+extern int nano_matchargs(SEXP);
 extern SEXP rawOneString(unsigned char *, R_xlen_t, R_xlen_t *);
 extern void socket_finalizer(SEXP);
 extern void dialer_finalizer(SEXP);
@@ -71,78 +76,78 @@ extern void listener_finalizer(SEXP);
 
 extern SEXP nano_AioSymbol;
 extern SEXP nano_ContextSymbol;
-extern SEXP nano_CtrSymbol;
 extern SEXP nano_DataSymbol;
 extern SEXP nano_DialerSymbol;
+extern SEXP nano_DotcallSymbol;
+extern SEXP nano_HeadersSymbol;
 extern SEXP nano_IdSymbol;
 extern SEXP nano_ListenerSymbol;
+extern SEXP nano_NewEnvSymbol;
 extern SEXP nano_ProtocolSymbol;
+extern SEXP nano_RawSymbol;
+extern SEXP nano_ResponseSymbol;
 extern SEXP nano_ResultSymbol;
+extern SEXP nano_RnngHttpSymbol;
 extern SEXP nano_RtcSymbol;
 extern SEXP nano_SerialSymbol;
 extern SEXP nano_SocketSymbol;
 extern SEXP nano_StateSymbol;
+extern SEXP nano_StatusSymbol;
 extern SEXP nano_StreamSymbol;
 extern SEXP nano_TextframesSymbol;
 extern SEXP nano_UnserSymbol;
 extern SEXP nano_UrlSymbol;
 
+extern SEXP nano_aioFormals;
+extern SEXP nano_aioFunctions;
+extern SEXP nano_error;
+extern SEXP nano_ncurlAio;
+extern SEXP nano_recvAio;
+extern SEXP nano_sendAio;
+extern SEXP nano_success;
+extern SEXP nano_unresolved;
+
 extern SEXP rnng_aio_call(SEXP);
-extern SEXP rnng_aio_get_msg(SEXP, SEXP, SEXP);
+extern SEXP rnng_aio_get_msgdata(SEXP);
+extern SEXP rnng_aio_get_msgraw(SEXP);
 extern SEXP rnng_aio_http(SEXP, SEXP, SEXP);
 extern SEXP rnng_aio_result(SEXP);
 extern SEXP rnng_aio_stop(SEXP);
-extern SEXP rnng_aio_stream_in(SEXP, SEXP, SEXP);
-extern SEXP rnng_aio_unresolv(void);
+extern SEXP rnng_base64dec(SEXP, SEXP);
+extern SEXP rnng_base64enc(SEXP, SEXP);
 extern SEXP rnng_clock(void);
 extern SEXP rnng_close(SEXP);
 extern SEXP rnng_ctx_close(SEXP);
 extern SEXP rnng_ctx_open(SEXP);
-extern SEXP rnng_ctx_recv(SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_ctx_recv_aio(SEXP, SEXP);
-extern SEXP rnng_ctx_send(SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_ctx_send_aio(SEXP, SEXP, SEXP);
-extern SEXP rnng_ctx_set(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_device(SEXP, SEXP);
 extern SEXP rnng_dial(SEXP, SEXP);
 extern SEXP rnng_dialer_close(SEXP);
 extern SEXP rnng_dialer_create(SEXP, SEXP);
-extern SEXP rnng_dialer_set(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_dialer_start(SEXP, SEXP);
 extern SEXP rnng_listen(SEXP, SEXP);
 extern SEXP rnng_listener_close(SEXP);
 extern SEXP rnng_listener_create(SEXP, SEXP);
-extern SEXP rnng_listener_set(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_listener_start(SEXP);
-extern SEXP rnng_matcharg(SEXP);
-extern SEXP rnng_matchargs(SEXP);
 extern SEXP rnng_matchwarn(SEXP);
 extern SEXP rnng_messenger(SEXP);
 extern SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_protocol_open(SEXP, SEXP);
 extern SEXP rnng_random(SEXP);
-extern SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_recv_aio(SEXP, SEXP);
-extern SEXP rnng_scm(void);
-extern SEXP rnng_scm2(void);
-extern SEXP rnng_serial(SEXP);
+extern SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_send_aio(SEXP, SEXP, SEXP);
-extern SEXP rnng_sha224(SEXP, SEXP);
-extern SEXP rnng_sha256(SEXP, SEXP);
-extern SEXP rnng_sha384(SEXP, SEXP);
-extern SEXP rnng_sha512(SEXP, SEXP);
+extern SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_set_opt(SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_sha224(SEXP, SEXP, SEXP);
+extern SEXP rnng_sha256(SEXP, SEXP, SEXP);
+extern SEXP rnng_sha384(SEXP, SEXP, SEXP);
+extern SEXP rnng_sha512(SEXP, SEXP, SEXP);
 extern SEXP rnng_sleep(SEXP);
-extern SEXP rnng_socket_set(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_stream_close(SEXP);
 extern SEXP rnng_stream_dial(SEXP, SEXP, SEXP);
 extern SEXP rnng_stream_listen(SEXP, SEXP, SEXP);
-extern SEXP rnng_stream_recv(SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_stream_recv_aio(SEXP, SEXP, SEXP);
-extern SEXP rnng_stream_send(SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_stream_send_aio(SEXP, SEXP, SEXP);
-extern SEXP rnng_stream_set(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_strerror(SEXP);
 extern SEXP rnng_thread_create(SEXP);
 extern SEXP rnng_unresolved(SEXP);

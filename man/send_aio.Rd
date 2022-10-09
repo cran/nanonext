@@ -2,18 +2,9 @@
 % Please edit documentation in R/aio.R
 \name{send_aio}
 \alias{send_aio}
-\alias{send_aio.nanoSocket}
-\alias{send_aio.nanoContext}
-\alias{send_aio.nanoStream}
 \title{Send Async}
 \usage{
 send_aio(con, data, mode = c("serial", "raw"), timeout = NULL)
-
-\method{send_aio}{nanoSocket}(con, data, mode = c("serial", "raw"), timeout = NULL)
-
-\method{send_aio}{nanoContext}(con, data, mode = c("serial", "raw"), timeout = NULL)
-
-\method{send_aio}{nanoStream}(con, data, mode = "raw", timeout = NULL)
 }
 \arguments{
 \item{con}{a Socket, Context or Stream.}
@@ -22,7 +13,7 @@ send_aio(con, data, mode = c("serial", "raw"), timeout = NULL)
 
 \item{mode}{[default 'serial'] for sending serialised R objects, or 'raw' for
 sending vectors of any type (converted to a raw byte vector for sending).
-For Streams, 'raw' is the only option and any other value is ignored. Use
+For Streams, 'raw' is the only option and this argument is ignored. Use
 'serial' for perfect reproducibility within R, although 'raw' must be used
 when interfacing with external applications that do not understand R
 serialisation.}
@@ -31,7 +22,7 @@ serialisation.}
 applies a socket-specific default, usually the same as no timeout.}
 }
 \value{
-A 'sendAio' (object of class 'sendAio').
+A 'sendAio' (object of class 'sendAio') (invisibly).
 }
 \description{
 Send data asynchronously over a connection (Socket, Context or Stream).

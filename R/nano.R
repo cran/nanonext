@@ -73,14 +73,14 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
                  listen = NULL,
                  autostart = TRUE) {
 
-  protocol <- match.arg(protocol)
   nano <- `class<-`(new.env(hash = FALSE), "nanoObject")
-  socket <- socket(protocol)
+  socket <- .Call(rnng_protocol_open, protocol, FALSE)
+  is.integer(socket) && return(socket)
   makeActiveBinding(sym = "socket", fun = function(x) socket, env = nano)
 
-  if (!missing(dial)) {
+  if (length(dial)) {
     dial(nano, url = dial, autostart = autostart)
-    if(!isTRUE(autostart)) {
+    if (!autostart) {
       nano[["dialer_start"]] <- function(async = TRUE) {
         rm("dialer_start", envir = nano)
         start(.subset2(nano, "dialer")[[1L]], async = async)
@@ -88,9 +88,9 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
     }
   }
 
-  if (!missing(listen)) {
+  if (length(listen)) {
     listen(nano, url = listen, autostart = autostart)
-    if(!isTRUE(autostart)) {
+    if (!autostart) {
       nano[["listener_start"]] <- function() {
         rm("listener_start", envir = nano)
         start(.subset2(nano, "listener")[[1L]])
@@ -110,40 +110,38 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
   nano[["recv"]] <- function(mode = c("serial", "character", "complex", "double",
                                       "integer", "logical", "numeric", "raw"),
                              block = FALSE,
-                             keep.raw = TRUE) recv.nanoSocket(socket,
-                                                              mode = mode,
-                                                              block = block,
-                                                              keep.raw = keep.raw)
+                             keep.raw = FALSE) recv(socket,
+                                                    mode = mode,
+                                                    block = block,
+                                                    keep.raw = keep.raw)
   nano[["recv_aio"]] <- function(mode = c("serial", "character", "complex", "double",
                                           "integer", "logical", "numeric", "raw"),
                                  timeout = NULL,
-                                 keep.raw = TRUE) recv_aio.nanoSocket(socket,
-                                                                      mode = mode,
-                                                                      timeout = timeout,
-                                                                      keep.raw = keep.raw)
+                                 keep.raw = FALSE) recv_aio(socket,
+                                                            mode = mode,
+                                                            timeout = timeout,
+                                                            keep.raw = keep.raw)
   nano[["send"]] <- function(data,
                              mode = c("serial", "raw"),
-                             block = FALSE,
-                             echo = TRUE) send.nanoSocket(socket,
-                                                          data = data,
-                                                          mode = mode,
-                                                          block = block,
-                                                          echo = echo)
+                             block = FALSE) send(socket,
+                                                 data = data,
+                                                 mode = mode,
+                                                 block = block)
   nano[["send_aio"]] <- function(data,
                                  mode = c("serial", "raw"),
-                                 timeout = NULL) send_aio.nanoSocket(socket,
-                                                                     data = data,
-                                                                     mode = mode,
-                                                                     timeout = timeout)
+                                 timeout = NULL) send_aio(socket,
+                                                          data = data,
+                                                          mode = mode,
+                                                          timeout = timeout)
   nano[["socket_setopt"]] <- function(type = c("bool", "int", "ms", "size",
                                                "string", "uint64"),
                                       opt,
-                                      value) setopt.nanoSocket(socket,
-                                                               type = type,
-                                                               opt = opt,
-                                                               value = value)
+                                      value) setopt(socket,
+                                                    type = type,
+                                                    opt = opt,
+                                                    value = value)
 
-  switch(protocol,
+  switch(attr(socket, "protocol"),
          req =,
          rep = {
            nano[["context"]] <- function() context(socket)
@@ -175,12 +173,12 @@ print.nanoObject <- function(x, ...) {
   cat("< nano object >\n - socket id:", attr(.subset2(x, "socket"), "id"),
       "\n - state:", attr(.subset2(x, "socket"), "state"),
       "\n - protocol:", attr(.subset2(x, "socket"), "protocol"), "\n", file = stdout())
-      if (!is.null(.subset2(x, "listener")))
-        cat(" - listener:", unlist(lapply(.subset2(x, "listener"), attr, "url")),
-            sep = "\n    ", file = stdout())
-      if (!is.null(.subset2(x, "dialer")))
-        cat(" - dialer:", unlist(lapply(.subset2(x, "dialer"), attr, "url")),
-            sep = "\n    ", file = stdout())
+  if (length(.subset2(x, "listener")))
+    cat(" - listener:", unlist(lapply(.subset2(x, "listener"), attr, "url")),
+        sep = "\n    ", file = stdout())
+  if (length(.subset2(x, "dialer")))
+    cat(" - dialer:", unlist(lapply(.subset2(x, "dialer"), attr, "url")),
+        sep = "\n    ", file = stdout())
   invisible(x)
 
 }
@@ -192,10 +190,10 @@ print.nanoSocket <- function(x, ...) {
   cat("< nanoSocket >\n - id:", attr(x, "id"),
       "\n - state:", attr(x, "state"),
       "\n - protocol:", attr(x, "protocol"), "\n", file = stdout())
-  if (!is.null(attr(x, "listener")))
+  if (length(attr(x, "listener")))
     cat(" - listener:", unlist(lapply(attr(x, "listener"), attr, "url")),
         sep = "\n    ", file = stdout())
-  if (!is.null(attr(x, "dialer")))
+  if (length(attr(x, "dialer")))
     cat(" - dialer:", unlist(lapply(attr(x, "dialer"), attr, "url")),
         sep = "\n    ", file = stdout())
   invisible(x)
@@ -243,7 +241,7 @@ print.nanoListener <- function(x, ...) {
 print.nanoStream <- function(x, ...) {
 
   cat("< nanoStream >\n - type:",
-      if (is.null(attr(x, "dialer"))) "listener" else "dialer",
+      if (length(attr(x, "dialer"))) "dialer" else "listener",
       "\n - url:", attr(x, "url"),
       "\n - textframes:", attr(x, "textframes"), "\n", file = stdout())
   invisible(x)
@@ -255,7 +253,7 @@ print.nanoStream <- function(x, ...) {
 print.recvAio <- function(x, ...) {
 
   cat("< recvAio >\n - $data for message data\n",
-      if (.subset2(x, "keep.raw")) "- $raw for raw message\n", file = stdout())
+      if (.subset2(x, "state")) "- $raw for raw message\n", file = stdout())
   invisible(x)
 
 }
@@ -273,7 +271,7 @@ print.sendAio <- function(x, ...) {
 #'
 print.ncurlAio <- function(x, ...) {
 
-  cat("< ncurlAio >\n - $status for response status code\n - $headers for requested response headers\n - $raw for raw message\n - $data for message data\n", file = stdout())
+  cat("< ncurlAio >\n - $status for response status code\n - $headers for response headers\n - $raw for raw message\n - $data for message data\n", file = stdout())
   invisible(x)
 
 }
@@ -331,7 +329,7 @@ print.errorValue <- function(x, ...) {
 
 #' @export
 #'
-.DollarNames.recvAio <- function(x, pattern = "") grep(pattern, c("data", if (.subset2(x, "keep.raw")) "raw"),
+.DollarNames.recvAio <- function(x, pattern = "") grep(pattern, c("data", if (length(.subset2(x, "raw"))) "raw"),
                                                        value = TRUE, fixed = TRUE)
 
 #' @export
@@ -343,3 +341,4 @@ print.errorValue <- function(x, ...) {
 #'
 .DollarNames.ncurlAio <- function(x, pattern = "") grep(pattern, c("status", "headers", "raw", "data"),
                                                         value = TRUE, fixed = TRUE)
+

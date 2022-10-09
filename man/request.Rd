@@ -11,7 +11,7 @@ request(
   recv_mode = c("serial", "character", "complex", "double", "integer", "logical",
     "numeric", "raw"),
   timeout = NULL,
-  keep.raw = TRUE
+  keep.raw = FALSE
 )
 }
 \arguments{
@@ -25,21 +25,21 @@ perfect reproducibility. Use 'raw' for sending vectors of any type (will be
 converted to a raw byte vector for sending) - essential when interfacing
 with external applications.}
 
-\item{recv_mode}{[default 'serial'] mode of vector to be received - one of 'serial',
-'character', 'complex', 'double', 'integer', 'logical', 'numeric', or 'raw'.
-The default 'serial' means a serialised R object, for the other modes,
-the raw vector received will be converted into the respective mode.}
+\item{recv_mode}{[default 'serial'] mode of vector to be received - one of
+'serial', 'character', 'complex', 'double', 'integer', 'logical',
+'numeric', or 'raw'. The default 'serial' means a serialised R object, for
+the other modes, the raw vector received will be converted into the
+respective mode.}
 
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
 applies a socket-specific default, usually the same as no timeout. Note
 that this applies to receiving the result.}
 
-\item{keep.raw}{[default TRUE] logical flag whether to keep the received raw
-vector (useful for verification e.g. via hashing). If FALSE, will return
-the converted data only.}
+\item{keep.raw}{[default FALSE] logical flag whether to keep and return the
+received raw vector along with the converted data.}
 }
 \value{
-A 'recvAio' (object of class 'recvAio').
+A 'recvAio' (object of class 'recvAio') (invisibly).
 }
 \description{
 Implements a caller/client for the req node of the req/rep protocol. Sends

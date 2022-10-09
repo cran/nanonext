@@ -17,7 +17,6 @@
 // nanonext - C level - Core Functions -----------------------------------------
 
 #define NANONEXT_INTERNALS
-#define NANONEXT_PROTOCOLS
 #include "nanonext.h"
 
 // internals -------------------------------------------------------------------
@@ -26,41 +25,10 @@ SEXP mk_error(const int xc) {
 
   SEXP err;
   PROTECT(err = Rf_ScalarInteger(xc));
-  Rf_classgets(err, Rf_mkString("errorValue"));
+  Rf_classgets(err, nano_error);
   Rf_warning("%d | %s", xc, nng_strerror(xc));
   UNPROTECT(1);
   return err;
-
-}
-
-SEXP rnng_serial(SEXP mode) {
-
-  if (TYPEOF(mode) == INTSXP) {
-    switch (INTEGER(mode)[0]) {
-    case 1: return Rf_ScalarLogical(1);
-    default: return Rf_ScalarLogical(0);
-    }
-  }
-
-  const char *mod = CHAR(STRING_ELT(mode, 0));
-  size_t slen = strlen(mod);
-  const char s[] = "serial", r[] = "raw";
-  int xc = 0;
-
-  switch (slen) {
-  case 1:
-  case 2:
-  case 3:
-    if (!strncmp(r, mod, slen)) { xc = 0; break; }
-  case 4:
-  case 5:
-  case 6:
-    if (!strncmp(s, mod, slen)) { xc = 1; break; }
-  default:
-      error_return("'mode' should be one of serial, raw");
-  }
-
-  return Rf_ScalarLogical(xc);
 
 }
 
@@ -71,7 +39,7 @@ SEXP nano_encode(SEXP object) {
   SEXP out;
 
   if (!Rf_isVectorAtomic(object))
-    error_return("'data' is not an atomic vector type");
+    Rf_error("'data' is not an atomic vector type");
   if (TYPEOF(object) == STRSXP) {
     const char *s;
     unsigned char *buf;
@@ -113,9 +81,45 @@ SEXP nano_encode(SEXP object) {
       out = object;
       break;
     default:
-      error_return("vector type for 'data' is unimplemented");
+      Rf_error("vector type for 'data' is unimplemented");
     }
   }
+
+  return out;
+
+}
+
+SEXP nano_encodes(SEXP data, SEXP mode) {
+
+  int xc = 0;
+  if (TYPEOF(mode) == INTSXP) {
+    xc = INTEGER(mode)[0] == 1 ? 1 : 0;
+  } else {
+    const char *mod = CHAR(STRING_ELT(mode, 0));
+    size_t slen = strlen(mod);
+    const char s[] = "serial", r[] = "raw";
+
+    switch (slen) {
+    case 1:
+    case 2:
+    case 3:
+      if (!strncmp(r, mod, slen)) { xc = 0; break; }
+    case 4:
+    case 5:
+    case 6:
+      if (!strncmp(s, mod, slen)) { xc = 1; break; }
+    default:
+      Rf_error("'mode' should be one of serial, raw");
+    }
+  }
+
+  if (xc == 0)
+    return nano_encode(data);
+
+  SEXP expr, out;
+  PROTECT(expr = Rf_lang3(nano_SerialSymbol, data, R_NilValue));
+  out = Rf_eval(expr, R_BaseEnv);
+  UNPROTECT(1);
 
   return out;
 
@@ -147,9 +151,10 @@ SEXP rawOneString(unsigned char *bytes, R_xlen_t nbytes, R_xlen_t *np) {
 
 }
 
-SEXP rnng_matcharg(SEXP mode) {
+int nano_matcharg(SEXP mode) {
 
-  if (TYPEOF(mode) == INTSXP) return mode;
+  if (TYPEOF(mode) == INTSXP)
+    return INTEGER(mode)[0];
 
   const char *mod = CHAR(STRING_ELT(mode, 0));
   size_t slen = strlen(mod);
@@ -172,24 +177,31 @@ SEXP rnng_matcharg(SEXP mode) {
     if (!strncmp(n, mod, slen)) { xc = 7; break; }
     if (!strncmp(l, mod, slen)) { xc = 6; break; }
     if (slen == 1)
-      error_return("'mode' should be one of serial, character, complex, double, integer, logical, numeric, raw");
+      Rf_error("'mode' should be one of serial, character, complex, double, integer, logical, numeric, raw");
     if (!strncmp(co, mod, slen)) { xc = 3; break; }
   case 8:
   case 9:
     if (!strncmp(ch, mod, slen)) { xc = 2; break; }
   default:
-    error_return("'mode' should be one of serial, character, complex, double, integer, logical, numeric, raw");
+    Rf_error("'mode' should be one of serial, character, complex, double, integer, logical, numeric, raw");
   }
 
-  return Rf_ScalarInteger(xc);
+  return xc;
 
 }
 
-SEXP rnng_matchargs(SEXP mode) {
+int nano_matchargs(SEXP mode) {
 
-  if (TYPEOF(mode) == INTSXP) return mode;
+  if (TYPEOF(mode) == INTSXP)
+    return INTEGER(mode)[0];
 
-  const char *mod = CHAR(STRING_ELT(mode, 0));
+  const char *mod;
+  if (Rf_xlength(mode) == 8) {
+    mod = CHAR(STRING_ELT(mode, 1));
+  } else {
+    mod = CHAR(STRING_ELT(mode, 0));
+  }
+
   size_t slen = strlen(mod);
   const char ch[] = "character", co[] = "complex", d[] = "double",
     i[] = "integer", l[] = "logical", n[] = "numeric", r[] = "raw";
@@ -209,16 +221,16 @@ SEXP rnng_matchargs(SEXP mode) {
     if (!strncmp(n, mod, slen)) { xc = 7; break; }
     if (!strncmp(l, mod, slen)) { xc = 6; break; }
     if (slen == 1)
-      error_return("'mode' should be one of character, complex, double, integer, logical, numeric, raw");
+      Rf_error("'mode' should be one of character, complex, double, integer, logical, numeric, raw");
     if (!strncmp(co, mod, slen)) { xc = 3; break; }
   case 8:
   case 9:
     if (!strncmp(ch, mod, slen)) { xc = 2; break; }
   default:
-      error_return("'mode' should be one of character, complex, double, integer, logical, numeric, raw");
+    Rf_error("'mode' should be one of character, complex, double, integer, logical, numeric, raw");
   }
 
-  return Rf_ScalarInteger(xc);
+  return xc;
 
 }
 
@@ -339,17 +351,39 @@ SEXP nano_decode(unsigned char *buf, size_t sz, const int mod, const int kpr) {
 
 }
 
-// finalizers ------------------------------------------------------------------
+static int matchtype(SEXP type) {
 
-void socket_finalizer(SEXP xptr) {
+  if (TYPEOF(type) == INTSXP) return INTEGER(type)[0];
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
-  nng_socket *xp = (nng_socket *) R_ExternalPtrAddr(xptr);
-  nng_close(*xp);
-  R_Free(xp);
+  const char *typ = CHAR(STRING_ELT(type, 0));
+  size_t slen = strlen(typ);
+  const char *b = "bool", *i = "int", *m = "ms", *si = "size", *st = "string", *u = "uint64";
+  int xc = 0;
+
+  switch (slen) {
+  case 1:
+    if (!strcmp("s", typ))
+      Rf_error("'type' should be one of bool, int, ms, size, string, uint64");
+  case 2:
+    if (!strncmp(m, typ, slen)) { xc = 3; break; }
+  case 3:
+    if (!strncmp(i, typ, slen)) { xc = 2; break; }
+  case 4:
+    if (!strncmp(b, typ, slen)) { xc = 1; break; }
+    if (!strncmp(si, typ, slen)) { xc = 4; break; }
+  case 5:
+  case 6:
+    if (!strncmp(st, typ, slen)) { xc = 5; break; }
+    if (!strncmp(u, typ, slen)) { xc = 6; break; }
+  default:
+      Rf_error("'type' should be one of bool, int, ms, size, string, uint64");
+  }
+
+  return xc;
 
 }
+
+// finalizers ------------------------------------------------------------------
 
 void dialer_finalizer(SEXP xptr) {
 
@@ -371,7 +405,7 @@ void listener_finalizer(SEXP xptr) {
 
 }
 
-void context_finalizer(SEXP xptr) {
+static void context_finalizer(SEXP xptr) {
 
   if (R_ExternalPtrAddr(xptr) == NULL)
     return;
@@ -381,136 +415,12 @@ void context_finalizer(SEXP xptr) {
 
 }
 
-// sockets ---------------------------------------------------------------------
-
-SEXP rnng_protocol_open(SEXP protocol, SEXP raw) {
-
-  const char *pro = CHAR(STRING_ELT(protocol, 0));
-  const int rw = LOGICAL(raw)[0];
-
-  size_t slen = strlen(pro);
-  const char bus[] = "bus", pair[] = "pair", push[] = "push", pull[] = "pull",
-    pub[] = "pub", sub[] = "sub", req[] = "req", rep[] = "rep", sur[] = "surveyor",
-    res[] = "respondent";
-
-  nng_socket *sock;
-  const char *pname;
-  int xc = -1;
-  SEXP socket, klass;
-
-  sock = R_Calloc(1, nng_socket);
-
-  switch (slen) {
-  case 1:
-  case 2:
-  case 3:
-    if (!strncmp(bus, pro, slen)) {
-      pname = bus;
-      xc = rw ? nng_bus0_open_raw(sock) : nng_bus0_open(sock);
-      break;
-    }
-    if (slen > 2) {
-      if (!strncmp(pub, pro, slen)) {
-        pname = pub;
-        xc = rw ? nng_pub0_open_raw(sock) : nng_pub0_open(sock);
-        break;
-      }
-      if (!strncmp(sub, pro, slen)) {
-        pname = sub;
-        xc = rw ? nng_sub0_open_raw(sock) : nng_sub0_open(sock);
-        break;
-      }
-      if (!strncmp(req, pro, slen)) {
-        pname = req;
-        xc = rw ? nng_req0_open_raw(sock) : nng_req0_open(sock);
-        break;
-      }
-      if (!strncmp(rep, pro, slen)) {
-        pname = rep;
-        xc = rw ? nng_rep0_open_raw(sock) : nng_rep0_open(sock);
-        break;
-      }
-    }
-  case 4:
-    if (slen > 1) {
-      if (!strncmp(pair, pro, slen)) {
-        pname = pair;
-        xc = rw ? nng_pair0_open_raw(sock) : nng_pair0_open(sock);
-        break;
-      }
-      if (slen > 2) {
-        if (!strncmp(push, pro, slen)) {
-          pname = push;
-          xc = rw ? nng_push0_open_raw(sock) : nng_push0_open(sock);
-          break;
-        }
-        if (!strncmp(pull, pro, slen)) {
-          pname = pull;
-          xc = rw ? nng_pull0_open_raw(sock) : nng_pull0_open(sock);
-          break;
-        }
-      }
-    }
-  case 5:
-  case 6:
-  case 7:
-  case 8:
-    if (slen > 2 && !strncmp(sur, pro, slen)) {
-      pname = sur;
-      xc = rw ? nng_surveyor0_open_raw(sock) : nng_surveyor0_open(sock);
-      break;
-    }
-  case 9:
-  case 10:
-    if (slen > 2 && !strncmp(res, pro, slen)) {
-      pname = res;
-      xc = rw ? nng_respondent0_open_raw(sock) : nng_respondent0_open(sock);
-      break;
-    }
-  default:
-      error_return("'protocol' should be one of bus, pair, push, pull, pub, sub, req, rep, surveyor, respondent");
-  }
-
-  if (xc) {
-    R_Free(sock);
-    return mk_error(xc);
-  }
-
-  PROTECT(socket = R_MakeExternalPtr(sock, nano_SocketSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(socket, socket_finalizer, TRUE);
-
-  PROTECT(klass = Rf_allocVector(STRSXP, 2));
-  SET_STRING_ELT(klass, 0, Rf_mkChar("nanoSocket"));
-  SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
-  Rf_classgets(socket, klass);
-  Rf_setAttrib(socket, nano_IdSymbol, Rf_ScalarInteger((int) sock->id));
-  Rf_setAttrib(socket, nano_StateSymbol, Rf_mkString("opened"));
-  Rf_setAttrib(socket, nano_ProtocolSymbol, Rf_mkString(pname));
-
-  UNPROTECT(2);
-  return socket;
-
-}
-
-SEXP rnng_close(SEXP socket) {
-
-  if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    error_return("'socket' is not a valid Socket");
-  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
-  int xc = nng_close(*sock);
-  if (xc)
-    return mk_error(xc);
-  Rf_setAttrib(socket, nano_StateSymbol, Rf_mkString("closed"));
-  return Rf_ScalarInteger(0);
-
-}
-
 // contexts --------------------------------------------------------------------
 
 SEXP rnng_ctx_open(SEXP socket) {
 
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    error_return("'socket' is not a valid Socket");
+    Rf_error("'socket' is not a valid Socket");
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   nng_ctx *ctxp = R_Calloc(1, nng_ctx);
   SEXP context, klass;
@@ -541,13 +451,15 @@ SEXP rnng_ctx_open(SEXP socket) {
 SEXP rnng_ctx_close(SEXP context) {
 
   if (R_ExternalPtrTag(context) != nano_ContextSymbol)
-    error_return("'context' is not a valid Context");
+    Rf_error("'context' is not a valid Context");
   nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(context);
   int xc = nng_ctx_close(*ctxp);
+
   if (xc)
     return mk_error(xc);
+
   Rf_setAttrib(context, nano_StateSymbol, Rf_mkString("closed"));
-  return Rf_ScalarInteger(0);
+  return nano_success;
 
 }
 
@@ -558,7 +470,7 @@ SEXP rnng_dial(SEXP socket, SEXP url) {
   if (TYPEOF(socket) == ENVSXP)
     socket = Rf_findVarInFrame(socket, nano_SocketSymbol);
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    error_return("'socket' is not a valid Socket");
+    Rf_error("'socket' is not a valid Socket");
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   const char *up = CHAR(STRING_ELT(url, 0));
   nng_dialer *dp = R_Calloc(1, nng_dialer);
@@ -593,7 +505,7 @@ SEXP rnng_dialer_create(SEXP socket, SEXP url) {
   if (TYPEOF(socket) == ENVSXP)
     socket = Rf_findVarInFrame(socket, nano_SocketSymbol);
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    error_return("'socket' is not a valid Socket");
+    Rf_error("'socket' is not a valid Socket");
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   const char *up = CHAR(STRING_ELT(url, 0));
   nng_dialer *dp = R_Calloc(1, nng_dialer);
@@ -628,7 +540,7 @@ SEXP rnng_listen(SEXP socket, SEXP url) {
   if (TYPEOF(socket) == ENVSXP)
     socket = Rf_findVarInFrame(socket, nano_SocketSymbol);
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    error_return("'socket' is not a valid Socket");
+    Rf_error("'socket' is not a valid Socket");
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   const char *up = CHAR(STRING_ELT(url, 0));
   nng_listener *lp = R_Calloc(1, nng_listener);
@@ -663,7 +575,7 @@ SEXP rnng_listener_create(SEXP socket, SEXP url) {
   if (TYPEOF(socket) == ENVSXP)
     socket = Rf_findVarInFrame(socket, nano_SocketSymbol);
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    error_return("'socket' is not a valid Socket");
+    Rf_error("'socket' is not a valid Socket");
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   const char *up = CHAR(STRING_ELT(url, 0));
   nng_listener *lp = R_Calloc(1, nng_listener);
@@ -696,359 +608,524 @@ SEXP rnng_listener_create(SEXP socket, SEXP url) {
 SEXP rnng_dialer_start(SEXP dialer, SEXP async) {
 
   if (R_ExternalPtrTag(dialer) != nano_DialerSymbol)
-    error_return("'dialer' is not a valid Dialer");
+    Rf_error("'dialer' is not a valid Dialer");
   nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(dialer);
   const Rboolean asy = Rf_asLogical(async);
   int flags = asy == 0 ? 0 : NNG_FLAG_NONBLOCK;
   int xc = nng_dialer_start(*dial, flags);
+
   if (xc)
     return mk_error(xc);
+
   Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString("started"));
-  return Rf_ScalarInteger(0);
+  return nano_success;
 
 }
 
 SEXP rnng_listener_start(SEXP listener) {
 
   if (R_ExternalPtrTag(listener) != nano_ListenerSymbol)
-    error_return("'listener' is not a valid Listener");
+    Rf_error("'listener' is not a valid Listener");
   nng_listener *list = (nng_listener *) R_ExternalPtrAddr(listener);
   int xc = nng_listener_start(*list, 0);
+
   if (xc)
     return mk_error(xc);
+
   Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString("started"));
-  return Rf_ScalarInteger(0);
+  return nano_success;
 
 }
 
 SEXP rnng_dialer_close(SEXP dialer) {
 
   if (R_ExternalPtrTag(dialer) != nano_DialerSymbol)
-    error_return("'dialer' is not a valid Dialer");
+    Rf_error("'dialer' is not a valid Dialer");
   nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(dialer);
   int xc = nng_dialer_close(*dial);
+
   if (xc)
     return mk_error(xc);
+
   Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString("closed"));
-  return Rf_ScalarInteger(0);
+  return nano_success;
 
 }
 
 SEXP rnng_listener_close(SEXP listener) {
 
   if (R_ExternalPtrTag(listener) != nano_ListenerSymbol)
-    error_return("'listener' is not a valid listener");
+    Rf_error("'listener' is not a valid listener");
   nng_listener *list = (nng_listener *) R_ExternalPtrAddr(listener);
   int xc = nng_listener_close(*list);
+
   if (xc)
     return mk_error(xc);
+
   Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString("closed"));
-  return Rf_ScalarInteger(0);
+  return nano_success;
 
 }
 
 // send and recv ---------------------------------------------------------------
 
-SEXP rnng_send(SEXP socket, SEXP data, SEXP block, SEXP echo) {
+SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
 
-  if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    error_return("'con' is not a valid Socket");
-  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
-
-  const nng_duration blk = (nng_duration) Rf_asInteger(block);
-  const int ech = LOGICAL(echo)[0];
+  SEXP enc;
+  R_xlen_t xlen;
+  unsigned char *dp;
   int xc;
-  nng_msg *msgp;
-  nng_aio *aiop;
 
-  SEXP enc = nano_encode(data);
-  const R_xlen_t xlen = Rf_xlength(enc);
-  unsigned char *dp = RAW(enc);
+  SEXP ptrtag = R_ExternalPtrTag(con);
+  if (ptrtag == nano_SocketSymbol) {
 
-  if (TYPEOF(block) == LGLSXP) {
+    nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
+    nng_msg *msgp;
+    nng_aio *aiop;
 
-    xc = blk ? nng_send(*sock, dp, xlen, 0) : nng_send(*sock, dp, xlen, NNG_FLAG_NONBLOCK);
+    if (block == R_NilValue) {
 
-  } else {
+      enc = nano_encodes(data, mode);
+      xlen = Rf_xlength(enc);
+      dp = RAW(enc);
+      xc = nng_send(*sock, dp, xlen, NNG_FLAG_NONBLOCK);
 
-    xc = nng_msg_alloc(&msgp, 0);
-    if (xc)
+    } else if (TYPEOF(block) == LGLSXP) {
+
+      const int blk = LOGICAL(block)[0];
+      enc = nano_encodes(data, mode);
+      xlen = Rf_xlength(enc);
+      dp = RAW(enc);
+      xc = blk ? nng_send(*sock, dp, xlen, 0) : nng_send(*sock, dp, xlen, NNG_FLAG_NONBLOCK);
+
+    } else {
+
+      nng_duration dur = (nng_duration) Rf_asInteger(block);
+      enc = nano_encodes(data, mode);
+      xlen = Rf_xlength(enc);
+      dp = RAW(enc);
+
+      if ((xc = nng_msg_alloc(&msgp, 0)))
+        return mk_error(xc);
+      if ((xc = nng_msg_append(msgp, dp, xlen)) ||
+          (xc = nng_aio_alloc(&aiop, NULL, NULL))) {
+        nng_msg_free(msgp);
+        return mk_error(xc);
+      }
+
+      nng_aio_set_msg(aiop, msgp);
+      nng_aio_set_timeout(aiop, dur);
+      nng_send_aio(*sock, aiop);
+      nng_aio_wait(aiop);
+      xc = nng_aio_result(aiop);
+      nng_aio_free(aiop);
+
+    }
+
+  } else if (ptrtag == nano_ContextSymbol) {
+
+    nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
+    nng_duration dur;
+    nng_msg *msgp;
+    nng_aio *aiop;
+
+    if (block == R_NilValue) {
+      dur = NNG_DURATION_DEFAULT;
+    } else if (TYPEOF(block) == LGLSXP) {
+      dur = LOGICAL(block)[0] ? NNG_DURATION_DEFAULT : 0;
+    } else {
+      dur = (nng_duration) Rf_asInteger(block);
+    }
+    enc = nano_encodes(data, mode);
+    xlen = Rf_xlength(enc);
+    dp = RAW(enc);
+
+    if ((xc = nng_msg_alloc(&msgp, 0)))
       return mk_error(xc);
     if ((xc = nng_msg_append(msgp, dp, xlen)) ||
         (xc = nng_aio_alloc(&aiop, NULL, NULL))) {
       nng_msg_free(msgp);
       return mk_error(xc);
     }
+
     nng_aio_set_msg(aiop, msgp);
-    nng_aio_set_timeout(aiop, blk);
-    nng_send_aio(*sock, aiop);
+    nng_aio_set_timeout(aiop, dur);
+    nng_ctx_send(*ctxp, aiop);
     nng_aio_wait(aiop);
     xc = nng_aio_result(aiop);
     nng_aio_free(aiop);
 
+  } else if (ptrtag == nano_StreamSymbol) {
+
+    nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(con);
+    nng_duration dur;
+    nng_iov iov;
+    nng_aio *aiop;
+
+    if (block == R_NilValue) {
+      dur = NNG_DURATION_DEFAULT;
+    } else if (TYPEOF(block) == LGLSXP) {
+      dur = LOGICAL(block)[0] ? NNG_DURATION_DEFAULT : 0;
+    } else {
+      dur = (nng_duration) Rf_asInteger(block);
+    }
+    enc = nano_encode(data);
+    xlen = Rf_xlength(enc);
+    dp = RAW(enc);
+
+    const int frames = LOGICAL(Rf_getAttrib(con, nano_TextframesSymbol))[0];
+    iov.iov_len = frames == 1 ? xlen - 1 : xlen;
+    iov.iov_buf = dp;
+
+    if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
+      return mk_error(xc);
+
+    if ((xc = nng_aio_set_iov(aiop, 1, &iov))) {
+      nng_aio_free(aiop);
+      return mk_error(xc);
+    }
+
+    nng_aio_set_timeout(aiop, dur);
+    nng_stream_send(sp, aiop);
+    nng_aio_wait(aiop);
+    xc = nng_aio_result(aiop);
+    nng_aio_free(aiop);
+
+  } else {
+    Rf_error("'con' is not a valid Socket, Context or Stream");
   }
 
   if (xc)
     return mk_error(xc);
 
-  if (ech)
-    return enc;
-  else
-    return R_MissingArg;
+  return nano_success;
 
 }
 
-SEXP rnng_recv(SEXP socket, SEXP mode, SEXP block, SEXP keep) {
+SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP keep, SEXP bytes) {
 
-  if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    error_return("'con' is not a valid Socket");
-  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
-
-  mode = rnng_matcharg(mode);
-  const int mod = INTEGER(mode)[0], kpr = LOGICAL(keep)[0];
   int xc;
   unsigned char *buf;
   size_t sz;
-  nng_aio *aiop;
   SEXP res;
 
-  if (TYPEOF(block) == LGLSXP) {
-    const int blk = LOGICAL(block)[0];
-    xc = blk ? nng_recv(*sock, &buf, &sz, NNG_FLAG_ALLOC): nng_recv(*sock, &buf, &sz, NNG_FLAG_ALLOC + NNG_FLAG_NONBLOCK);
-    if (xc)
-      return mk_error(xc);
-    res = nano_decode(buf, sz, mod, kpr);
-    nng_free(buf, sz);
+  SEXP ptrtag = R_ExternalPtrTag(con);
+  if (ptrtag == nano_SocketSymbol) {
 
-  } else {
-    nng_duration blk = (nng_duration) Rf_asInteger(block);
-    xc = nng_aio_alloc(&aiop, NULL, NULL);
-    if (xc)
+    nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
+    const int mod = nano_matcharg(mode), kpr = LOGICAL(keep)[0];
+    nng_aio *aiop;
+
+    if (block == R_NilValue) {
+
+      xc = nng_recv(*sock, &buf, &sz, NNG_FLAG_ALLOC + NNG_FLAG_NONBLOCK);
+      if (xc)
+        return mk_error(xc);
+      res = nano_decode(buf, sz, mod, kpr);
+      nng_free(buf, sz);
+
+    } else if (TYPEOF(block) == LGLSXP) {
+
+      const int blk = LOGICAL(block)[0];
+      xc = blk ? nng_recv(*sock, &buf, &sz, NNG_FLAG_ALLOC): nng_recv(*sock, &buf, &sz, NNG_FLAG_ALLOC + NNG_FLAG_NONBLOCK);
+      if (xc)
+        return mk_error(xc);
+      res = nano_decode(buf, sz, mod, kpr);
+      nng_free(buf, sz);
+
+    } else {
+      nng_duration dur = (nng_duration) Rf_asInteger(block);
+      if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
+        return mk_error(xc);
+      nng_aio_set_timeout(aiop, dur);
+      nng_recv_aio(*sock, aiop);
+      nng_aio_wait(aiop);
+      if ((xc = nng_aio_result(aiop))) {
+        nng_aio_free(aiop);
+        return mk_error(xc);
+      }
+      nng_msg *msgp = nng_aio_get_msg(aiop);
+      nng_aio_free(aiop);
+      buf = nng_msg_body(msgp);
+      sz = nng_msg_len(msgp);
+      res = nano_decode(buf, sz, mod, kpr);
+      nng_msg_free(msgp);
+    }
+
+  } else if (ptrtag == nano_ContextSymbol) {
+
+    nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
+    const int mod = nano_matcharg(mode), kpr = LOGICAL(keep)[0];
+    nng_aio *aiop;
+    nng_duration dur;
+
+    if (block == R_NilValue) {
+      dur = NNG_DURATION_DEFAULT;
+    } else if (TYPEOF(block) == LGLSXP) {
+      dur = LOGICAL(block)[0] ? NNG_DURATION_DEFAULT : 0;
+    } else {
+      dur = (nng_duration) Rf_asInteger(block);
+    }
+
+    if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
       return mk_error(xc);
-    nng_aio_set_timeout(aiop, blk);
-    nng_recv_aio(*sock, aiop);
+    nng_aio_set_timeout(aiop, dur);
+    nng_ctx_recv(*ctxp, aiop);
+
     nng_aio_wait(aiop);
-    xc = nng_aio_result(aiop);
-    if (xc) {
+    if ((xc = nng_aio_result(aiop))) {
       nng_aio_free(aiop);
       return mk_error(xc);
     }
+
     nng_msg *msgp = nng_aio_get_msg(aiop);
+    nng_aio_free(aiop);
     buf = nng_msg_body(msgp);
     sz = nng_msg_len(msgp);
     res = nano_decode(buf, sz, mod, kpr);
     nng_msg_free(msgp);
+
+  } else if (ptrtag == nano_StreamSymbol) {
+
+    nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(con);
+    const int mod = nano_matchargs(mode), kpr = LOGICAL(keep)[0];
+    const size_t xlen = (size_t) Rf_asInteger(bytes);
+    nng_duration dur;
+    nng_iov iov;
+    nng_aio *aiop;
+
+    if (block == R_NilValue) {
+      dur = NNG_DURATION_DEFAULT;
+    } else if (TYPEOF(block) == LGLSXP) {
+      dur = LOGICAL(block)[0] ? NNG_DURATION_DEFAULT : 0;
+    } else {
+      dur = (nng_duration) Rf_asInteger(block);
+    }
+
+    iov.iov_len = xlen;
+    iov.iov_buf = R_Calloc(xlen, unsigned char);
+
+    if ((xc = nng_aio_alloc(&aiop, NULL, NULL))) {
+      R_Free(iov.iov_buf);
+      return mk_error(xc);
+    }
+
+    if ((xc = nng_aio_set_iov(aiop, 1, &iov))) {
+      nng_aio_free(aiop);
+      R_Free(iov.iov_buf);
+      return mk_error(xc);
+    }
+
+    nng_aio_set_timeout(aiop, dur);
+    nng_stream_recv(sp, aiop);
+
+    nng_aio_wait(aiop);
+    if ((xc = nng_aio_result(aiop))) {
+      nng_aio_free(aiop);
+      R_Free(iov.iov_buf);
+      return mk_error(xc);
+    }
+
+    buf = iov.iov_buf;
+    sz = nng_aio_count(aiop);
     nng_aio_free(aiop);
+    res = nano_decode(buf, sz, mod, kpr);
+    R_Free(iov.iov_buf);
+
+  } else {
+    Rf_error("'con' is not a valid Socket, Context or Stream");
   }
 
   return res;
 
 }
 
-SEXP rnng_ctx_send(SEXP context, SEXP data, SEXP timeout, SEXP echo) {
+// set options -----------------------------------------------------------------
 
-  if (R_ExternalPtrTag(context) != nano_ContextSymbol)
-    error_return("'con' is not a valid Context");
-  nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(context);
+SEXP rnng_set_opt(SEXP object, SEXP type, SEXP opt, SEXP value) {
 
-  const int ech = LOGICAL(echo)[0];
-  nng_duration dur;
+  if (TYPEOF(object) != EXTPTRSXP)
+    Rf_error("'object' is not a valid Socket, Context, Stream, Listener or Dialer");
+
+  const char *op = CHAR(STRING_ELT(opt, 0));
+  const int typ = matchtype(type);
   int xc;
-  nng_msg *msgp;
-  nng_aio *aiop;
 
-  if (TYPEOF(timeout) == LGLSXP) {
-    const int blk = LOGICAL(timeout)[0];
-    dur = blk ? NNG_DURATION_DEFAULT : 0;
+  if (R_ExternalPtrTag(object) == nano_SocketSymbol) {
+
+    nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(object);
+
+    switch (typ) {
+    case 0:
+      if (value == R_NilValue) {
+        xc = nng_socket_set(*sock, op, NULL, 0);
+      } else {
+        SEXP enc = nano_encode(value);
+        size_t sz = TYPEOF(value) == STRSXP ? Rf_xlength(enc) - 1 : Rf_xlength(enc);
+        xc = nng_socket_set(*sock, op, RAW(enc), sz);
+      }
+      break;
+    case 1:
+      xc = nng_socket_set_bool(*sock, op, (bool) Rf_asInteger(value));
+      break;
+    case 2:
+      xc = nng_socket_set_int(*sock, op, Rf_asInteger(value));
+      break;
+    case 3:
+      xc = nng_socket_set_ms(*sock, op, (nng_duration) Rf_asInteger(value));
+      break;
+    case 4:
+      xc = nng_socket_set_size(*sock, op, (size_t) Rf_asInteger(value));
+      break;
+    case 5:
+      if (value != R_NilValue)
+        xc = nng_socket_set_string(*sock, op, CHAR(STRING_ELT(value, 0)));
+      else
+        xc = nng_socket_set_string(*sock, op, NULL);
+      break;
+    case 6:
+      xc = nng_socket_set_uint64(*sock, op, (uint64_t) Rf_asInteger(value));
+      break;
+    default:
+      xc = -1;
+    }
+
+  } else if (R_ExternalPtrTag(object) == nano_ContextSymbol) {
+
+    nng_ctx *ctx = (nng_ctx *) R_ExternalPtrAddr(object);
+
+    switch (typ) {
+    case 0:
+      if (value == R_NilValue) {
+        xc = nng_ctx_set(*ctx, op, NULL, 0);
+      } else {
+        SEXP enc = nano_encode(value);
+        xc = nng_ctx_set(*ctx, op, RAW(enc), Rf_xlength(enc));
+      }
+      break;
+    case 1:
+      xc = nng_ctx_set_bool(*ctx, op, (bool) Rf_asInteger(value));
+      break;
+    case 2:
+      xc = nng_ctx_set_int(*ctx, op, Rf_asInteger(value));
+      break;
+    case 3:
+      xc = nng_ctx_set_ms(*ctx, op, (nng_duration) Rf_asInteger(value));
+      break;
+    case 4:
+      xc = nng_ctx_set_size(*ctx, op, (size_t) Rf_asInteger(value));
+      break;
+    case 5:
+      if (value != R_NilValue)
+        xc = nng_ctx_set_string(*ctx, op, CHAR(STRING_ELT(value, 0)));
+      else
+        xc = nng_ctx_set_string(*ctx, op, NULL);
+      break;
+    case 6:
+      xc = nng_ctx_set_uint64(*ctx, op, (uint64_t) Rf_asInteger(value));
+      break;
+    default:
+      xc = -1;
+    }
+
+  } else if (R_ExternalPtrTag(object) == nano_StreamSymbol) {
+
+    nng_stream *st = (nng_stream *) R_ExternalPtrAddr(object);
+
+    switch (typ) {
+    case 1:
+      xc = nng_stream_set_bool(st, op, (bool) Rf_asInteger(value));
+      break;
+    case 2:
+      xc = nng_stream_set_int(st, op, Rf_asInteger(value));
+      break;
+    case 3:
+      xc = nng_stream_set_ms(st, op, (nng_duration) Rf_asInteger(value));
+      break;
+    case 4:
+      xc = nng_stream_set_size(st, op, (size_t) Rf_asInteger(value));
+      break;
+    case 5:
+      if (value != R_NilValue)
+        xc = nng_stream_set_string(st, op, CHAR(STRING_ELT(value, 0)));
+      else
+        xc = nng_stream_set_string(st, op, NULL);
+      break;
+    case 6:
+      xc = nng_stream_set_uint64(st, op, (uint64_t) Rf_asInteger(value));
+      break;
+    default:
+      xc = -1;
+    }
+
+  } else if (R_ExternalPtrTag(object) == nano_ListenerSymbol) {
+
+    nng_listener *list = (nng_listener *) R_ExternalPtrAddr(object);
+
+    switch (typ) {
+    case 1:
+      xc = nng_listener_set_bool(*list, op, (bool) Rf_asInteger(value));
+      break;
+    case 2:
+      xc = nng_listener_set_int(*list, op, Rf_asInteger(value));
+      break;
+    case 3:
+      xc = nng_listener_set_ms(*list, op, (nng_duration) Rf_asInteger(value));
+      break;
+    case 4:
+      xc = nng_listener_set_size(*list, op, (size_t) Rf_asInteger(value));
+      break;
+    case 5:
+      if (value != R_NilValue)
+        xc = nng_listener_set_string(*list, op, CHAR(STRING_ELT(value, 0)));
+      else
+        xc = nng_listener_set_string(*list, op, NULL);
+      break;
+    case 6:
+      xc = nng_listener_set_uint64(*list, op, (uint64_t) Rf_asInteger(value));
+      break;
+    default:
+      xc = -1;
+    }
+
+  } else if (R_ExternalPtrTag(object) == nano_DialerSymbol) {
+
+    nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(object);
+
+    switch (typ) {
+    case 1:
+      xc = nng_dialer_set_bool(*dial, op, (bool) Rf_asInteger(value));
+      break;
+    case 2:
+      xc = nng_dialer_set_int(*dial, op, Rf_asInteger(value));
+      break;
+    case 3:
+      xc = nng_dialer_set_ms(*dial, op, (nng_duration) Rf_asInteger(value));
+      break;
+    case 4:
+      xc = nng_dialer_set_size(*dial, op, (size_t) Rf_asInteger(value));
+      break;
+    case 5:
+      if (value != R_NilValue)
+        xc = nng_dialer_set_string(*dial, op, CHAR(STRING_ELT(value, 0)));
+      else
+        xc = nng_dialer_set_string(*dial, op, NULL);
+      break;
+    case 6:
+      xc = nng_dialer_set_uint64(*dial, op, (uint64_t) Rf_asInteger(value));
+      break;
+    default:
+      xc = -1;
+    }
+
   } else {
-    dur = (nng_duration) Rf_asInteger(timeout);
+    Rf_error("'object' is not a valid Socket, Context, Stream, Listener or Dialer");
   }
-  SEXP enc = nano_encode(data);
-  const R_xlen_t xlen = Rf_xlength(enc);
-  unsigned char *dp = RAW(enc);
-
-  xc = nng_msg_alloc(&msgp, 0);
-  if (xc)
-    return mk_error(xc);
-  if ((xc = nng_msg_append(msgp, dp, xlen)) ||
-      (xc = nng_aio_alloc(&aiop, NULL, NULL))) {
-    nng_msg_free(msgp);
-    return mk_error(xc);
-  }
-  nng_aio_set_msg(aiop, msgp);
-  nng_aio_set_timeout(aiop, dur);
-  nng_ctx_send(*ctxp, aiop);
-
-  nng_aio_wait(aiop);
-  xc = nng_aio_result(aiop);
-  nng_aio_free(aiop);
-  if (xc)
-    return mk_error(xc);
-
-  if (ech)
-    return enc;
-  else
-    return R_MissingArg;
-
-}
-
-SEXP rnng_ctx_recv(SEXP context, SEXP mode, SEXP timeout, SEXP keep) {
-
-  if (R_ExternalPtrTag(context) != nano_ContextSymbol)
-    error_return("'con' is not a valid Context");
-  nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(context);
-  nng_aio *aiop;
-  nng_duration dur;
-
-  mode = rnng_matcharg(mode);
-  const int mod = INTEGER(mode)[0], kpr = LOGICAL(keep)[0];
-  int xc;
-  unsigned char *buf;
-  size_t sz;
-  SEXP res;
-
-  if (TYPEOF(timeout) == LGLSXP) {
-    const int blk = LOGICAL(timeout)[0];
-    dur = blk ? NNG_DURATION_DEFAULT : 0;
-  } else {
-    dur = (nng_duration) Rf_asInteger(timeout);
-  }
-
-  xc = nng_aio_alloc(&aiop, NULL, NULL);
-  if (xc)
-    return mk_error(xc);
-  nng_aio_set_timeout(aiop, dur);
-  nng_ctx_recv(*ctxp, aiop);
-
-  nng_aio_wait(aiop);
-  xc = nng_aio_result(aiop);
-  if (xc) {
-    nng_aio_free(aiop);
-    return mk_error(xc);
-  }
-
-  nng_msg *msgp = nng_aio_get_msg(aiop);
-  buf = nng_msg_body(msgp);
-  sz = nng_msg_len(msgp);
-  res = nano_decode(buf, sz, mod, kpr);
-  nng_msg_free(msgp);
-  nng_aio_free(aiop);
-
-  return res;
-
-}
-
-SEXP rnng_stream_send(SEXP stream, SEXP data, SEXP timeout, SEXP echo) {
-
-  if (R_ExternalPtrTag(stream) != nano_StreamSymbol)
-    error_return("'con' is not a valid Stream");
-  nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(stream);
-
-  const int ech = LOGICAL(echo)[0];
-  nng_duration dur;
-  int xc;
-  nng_iov iov;
-  nng_aio *aiop;
-
-  if (TYPEOF(timeout) == LGLSXP) {
-    const int blk = LOGICAL(timeout)[0];
-    dur = blk ? NNG_DURATION_DEFAULT : 0;
-  } else {
-    dur = (nng_duration) Rf_asInteger(timeout);
-  }
-  SEXP enc = nano_encode(data);
-  const R_xlen_t xlen = Rf_xlength(enc);
-  unsigned char *dp = RAW(enc);
-
-  const int frames = LOGICAL(Rf_getAttrib(stream, nano_TextframesSymbol))[0];
-  iov.iov_len = frames == 1 ? xlen - 1 : xlen;
-  iov.iov_buf = dp;
-
-  xc = nng_aio_alloc(&aiop, NULL, NULL);
-  if (xc)
-    return mk_error(xc);
-
-  xc = nng_aio_set_iov(aiop, 1, &iov);
-  if (xc) {
-    nng_aio_free(aiop);
-    return mk_error(xc);
-  }
-
-  nng_aio_set_timeout(aiop, dur);
-  nng_stream_send(sp, aiop);
-
-  nng_aio_wait(aiop);
-  xc = nng_aio_result(aiop);
-  nng_aio_free(aiop);
 
   if (xc)
     return mk_error(xc);
 
-  if (ech)
-    return enc;
-  else
-    return R_MissingArg;
-
-}
-
-SEXP rnng_stream_recv(SEXP stream, SEXP mode, SEXP timeout, SEXP keep, SEXP bytes) {
-
-  if (R_ExternalPtrTag(stream) != nano_StreamSymbol)
-    error_return("'con' is not a valid Stream");
-  nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(stream);
-
-  mode = rnng_matchargs(mode);
-  const int mod = INTEGER(mode)[0], kpr = LOGICAL(keep)[0];
-  const size_t xlen = (size_t) Rf_asInteger(bytes);
-  nng_duration dur;
-  int xc;
-  unsigned char *buf;
-  size_t sz;
-  nng_iov iov;
-  nng_aio *aiop;
-  SEXP res;
-
-  if (TYPEOF(timeout) == LGLSXP) {
-    const int blk = LOGICAL(timeout)[0];
-    dur = blk ? NNG_DURATION_DEFAULT : 0;
-  } else {
-    dur = (nng_duration) Rf_asInteger(timeout);
-  }
-
-  iov.iov_len = xlen;
-  iov.iov_buf = R_Calloc(xlen, unsigned char);
-
-  xc = nng_aio_alloc(&aiop, NULL, NULL);
-  if (xc) {
-    R_Free(iov.iov_buf);
-    return mk_error(xc);
-  }
-
-  xc = nng_aio_set_iov(aiop, 1, &iov);
-  if (xc) {
-    nng_aio_free(aiop);
-    R_Free(iov.iov_buf);
-    return mk_error(xc);
-  }
-
-  nng_aio_set_timeout(aiop, dur);
-  nng_stream_recv(sp, aiop);
-
-  nng_aio_wait(aiop);
-  xc = nng_aio_result(aiop);
-  if (xc) {
-    nng_aio_free(aiop);
-    R_Free(iov.iov_buf);
-    return mk_error(xc);
-  }
-
-  buf = iov.iov_buf;
-  sz = nng_aio_count(aiop);
-  res = nano_decode(buf, sz, mod, kpr);
-  nng_aio_free(aiop);
-  R_Free(iov.iov_buf);
-
-  return res;
+  return nano_success;
 
 }
 
