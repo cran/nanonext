@@ -23,15 +23,19 @@ Additional arguments can also be passed in through '...'.}
 
 \item{recv_mode}{[default 'serial'] mode of vector to be received - one of
 'serial', 'character', 'complex', 'double', 'integer', 'logical',
-'numeric', or 'raw'. The default 'serial' means a serialised R object, for
-the other modes, the raw vector received will be converted into the
-respective mode.}
+'numeric', or 'raw'. The default 'serial' means a serialised R object,
+for the other modes, the raw vector received will be converted into the
+respective mode. Alternatively, for performance, specify an integer
+position in the vector of choices e.g. 1L for 'serial', 2L for 'character'
+etc.}
 
 \item{send_mode}{[default 'serial'] whether data will be sent serialized or
 as a raw vector. Use 'serial' for sending and receiving within R to ensure
 perfect reproducibility. Use 'raw' for sending vectors of any type (will be
 converted to a raw byte vector for sending) - essential when interfacing
-with external applications.}
+with external applications. Alternatively, for performance, specify an
+integer position in the vector of choices i.e. 1L for 'serial' or 2L for
+'raw'.}
 
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
 applies a socket-specific default, usually the same as no timeout. Note
@@ -43,7 +47,7 @@ become unavailable since sending the request).}
 \item{...}{additional arguments passed to the function specified by 'execute'.}
 }
 \value{
-Invisibly, an integer exit code (zero on success).
+Integer exit code (zero on success).
 }
 \description{
 Implements an executor/server for the rep node of the req/rep protocol. Awaits
@@ -68,13 +72,13 @@ rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
 ctxq <- context(req)
 ctxp <- context(rep)
 
-send(ctxq, 2022, block = 100, echo = FALSE)
+send(ctxq, 2022, block = 100)
 reply(ctxp, execute = function(x) x + 1, send_mode = "raw", timeout = 100)
-recv(ctxq, mode = "double", block = 100, keep.raw = FALSE)
+recv(ctxq, mode = "double", block = 100)
 
-send(ctxq, 100, mode = "raw", block = 100, echo = FALSE)
+send(ctxq, 100, mode = "raw", block = 100)
 reply(ctxp, recv_mode = "double", execute = log, base = 10, timeout = 100)
-recv(ctxq, block = 100, keep.raw = FALSE)
+recv(ctxq, block = 100)
 
 close(req)
 close(rep)

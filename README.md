@@ -10,6 +10,7 @@ status](https://www.r-pkg.org/badges/version/nanonext?color=112d4e)](https://CRA
 [![nanonext status
 badge](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https://shikokuchuo.r-universe.dev)
 [![R-CMD-check](https://github.com/shikokuchuo/nanonext/workflows/R-CMD-check/badge.svg)](https://github.com/shikokuchuo/nanonext/actions)
+[![codecov](https://codecov.io/gh/shikokuchuo/nanonext/branch/main/graph/badge.svg)](https://app.codecov.io/gh/shikokuchuo/nanonext)
 <!-- badges: end -->
 
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a
@@ -82,45 +83,8 @@ install.packages("nanonext", repos = "https://shikokuchuo.r-universe.dev")
 
 ### Interfaces
 
-Call `nano_init()` after package load to set global options such as
-causing warnings to print immediately as they occur.
-
-{nanonext} offers 2 equivalent interfaces: an object-oriented interface,
-and a functional interface.
-
-#### Object-oriented Interface
-
-The primary object in the object-oriented interface is the nano object.
-Use `nano()` to create a nano object which encapsulates a Socket and
-Dialer/Listener. Methods such as `$send()` or `$recv()` can then be
-accessed directly from the object.
-
-*Example using Request/Reply (REQ/REP) protocol with inproc transport:*
-<br /> (The inproc transport uses zero-copy where possible for a much
-faster solution than alternatives)
-
-Create nano objects:
-
-``` r
-library(nanonext)
-nano_init()
-
-nano1 <- nano("req", listen = "inproc://nanonext")
-nano2 <- nano("rep", dial = "inproc://nanonext")
-```
-
-Send message from ‘nano1’:
-
-``` r
-nano1$send("hello world!")
-```
-
-Receive message using ‘nano2’:
-
-``` r
-nano2$recv()
-#> [1] "hello world!"
-```
+{nanonext} offers 2 equivalent interfaces: a functional interface, and
+an object-oriented interface.
 
 #### Functional Interface
 
@@ -129,28 +93,62 @@ The primary object in the functional interface is the Socket. Use
 socket is then passed as the first argument of subsequent actions such
 as `send()` or `recv()`.
 
-*Example using Pipeline (Push/Pull) protocol with TCP/IP transport:*
+*Example using Request/Reply (REQ/REP) protocol with inproc transport:*
+<br /> (The inproc transport uses zero-copy where possible for a much
+faster solution than alternatives)
 
 Create sockets:
 
 ``` r
 library(nanonext)
-nano_init()
 
-socket1 <- socket("push", listen = "tcp://127.0.0.1:5555")
-socket2 <- socket("pull", dial = "tcp://127.0.0.1:5555")
+socket1 <- socket("req", listen = "inproc://nanonext")
+socket2 <- socket("rep", dial = "inproc://nanonext")
 ```
 
 Send message from ‘socket1’:
 
 ``` r
 send(socket1, "hello world!")
+#> [1] 0
 ```
 
 Receive message using ‘socket2’:
 
 ``` r
 recv(socket2)
+#> [1] "hello world!"
+```
+
+#### Object-oriented Interface
+
+The primary object in the object-oriented interface is the nano object.
+Use `nano()` to create a nano object which encapsulates a Socket and
+Dialer/Listener. Methods such as `$send()` or `$recv()` can then be
+accessed directly from the object.
+
+*Example using Pipeline (Push/Pull) protocol with TCP/IP transport:*
+
+Create nano objects:
+
+``` r
+library(nanonext)
+
+nano1 <- nano("push", listen = "tcp://127.0.0.1:5555")
+nano2 <- nano("pull", dial = "tcp://127.0.0.1:5555")
+```
+
+Send message from ‘nano1’:
+
+``` r
+nano1$send("hello world!")
+#> [1] 0
+```
+
+Receive message using ‘nano2’:
+
+``` r
+nano2$recv()
 #> [1] "hello world!"
 ```
 
@@ -194,6 +192,7 @@ Create nano object in R using {nanonext}, then send a vector of
 library(nanonext)
 n <- nano("pair", dial = "ipc:///tmp/nanonext.socket")
 n$send(c(1.1, 2.2, 3.3, 4.4, 5.5), mode = "raw")
+#> [1] 0
 ```
 
 Receive in Python as a NumPy array of ‘floats’, and send back to R:
@@ -238,8 +237,8 @@ complete.
 msg <- recv_aio(s2, keep.raw = TRUE)
 msg
 #> < recvAio >
-#>  - $data for message data
 #>  - $raw for raw message
+#>  - $data for message data
 msg$data
 #> 'unresolved' logi NA
 ```
@@ -253,11 +252,11 @@ res
 #>  - $result for send result
 res$result
 #> [1] 0
-
-# an exit code of 0 denotes a successful send
-# note: the send is successful as long as the message has been accepted by the socket for sending
-# the message itself may still be buffered within the system
 ```
+
+*Note: a return value of 0 denotes a successful send, meaning that the
+message has been accepted by the socket for sending; the message itself
+may still be buffered within the system.*
 
 For a ‘recvAio’ object, the message is stored at `$data`, and the raw
 message at `$raw` (if kept).
@@ -268,7 +267,7 @@ msg$data
 #>   a b
 #> 1 1 2
 msg$raw
-#>   [1] 58 0a 00 00 00 03 00 04 02 01 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>   [1] 58 0a 00 00 00 03 00 04 02 02 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
 #>  [26] 03 13 00 00 00 02 00 00 00 0e 00 00 00 01 3f f0 00 00 00 00 00 00 00 00 00
 #>  [51] 0e 00 00 00 01 40 00 00 00 00 00 00 00 00 00 04 02 00 00 00 01 00 04 00 09
 #>  [76] 00 00 00 05 6e 61 6d 65 73 00 00 00 10 00 00 00 02 00 04 00 09 00 00 00 01
@@ -333,7 +332,7 @@ function, in this case `rnorm()`, before sending back the result.
 library(nanonext)
 rep <- socket("rep", listen = "tcp://127.0.0.1:6546")
 ctxp <- context(rep)
-reply(ctxp, execute = rnorm, send_mode = "raw")
+r <- reply(ctxp, execute = rnorm, send_mode = "raw")
 ```
 
 \[C\] Client process: `request()` performs an async send and receive
@@ -366,7 +365,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] -0.202 -0.654 -0.632 -0.234 0.25 ...
+#>  num [1:100000000] -0.994 -1.507 -0.857 -0.88 -0.294 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -399,32 +398,36 @@ sub <- socket("sub", dial = "inproc://nanobroadcast")
 sub |> subscribe(topic = "examples")
 
 pub |> send(c("examples", "this is an example"), mode = "raw")
+#> [1] 0
 sub |> recv(mode = "character")
 #> [1] "examples"           "this is an example"
 
 pub |> send("examples at the start of a single text message", mode = "raw")
+#> [1] 0
 sub |> recv(mode = "character")
 #> [1] "examples at the start of a single text message"
 
 pub |> send(c("other", "this other topic will not be received"), mode = "raw")
+#> [1] 0
 sub |> recv(mode = "character")
-#> Warning in recv(sub, mode = "character"): 8 | Try again
-#> 'errorValue' int 8
+#> 'errorValue' int 8 | Try again
 
 # specify NULL to subscribe to ALL topics
 sub |> subscribe(topic = NULL)
 pub |> send(c("newTopic", "this is a new topic"), mode = "raw")
+#> [1] 0
 sub |> recv("character")
 #> [1] "newTopic"            "this is a new topic"
 
 sub |> unsubscribe(topic = NULL)
 pub |> send(c("newTopic", "this topic will now not be received"), mode = "raw")
+#> [1] 0
 sub |> recv("character")
-#> Warning in recv(sub, "character"): 8 | Try again
-#> 'errorValue' int 8
+#> 'errorValue' int 8 | Try again
 
 # however the topics explicitly subscribed to are still received
 pub |> send(c("examples will still be received"), mode = "raw")
+#> [1] 0
 sub |> recv(mode = "character")
 #> [1] "examples will still be received"
 ```
@@ -436,6 +439,7 @@ and received.
 ``` r
 sub |> subscribe(topic = 1)
 pub |> send(c(1, 10, 10, 20), mode = "raw")
+#> [1] 0
 sub |> recv(mode = "double")
 #> [1]  1 10 10 20
 
@@ -465,6 +469,7 @@ sur |> survey_time(500)
 
 # sur sends a message and then requests 2 async receives
 sur |> send("service check")
+#> [1] 0
 aio1 <- sur |> recv_aio()
 aio2 <- sur |> recv_aio()
 
@@ -486,8 +491,7 @@ aio2$data
 # after the survey expires, the second resolves into a timeout error
 Sys.sleep(0.5)
 aio2$data
-#> Warning in (function (.) : 5 | Timed out
-#> 'errorValue' int 5
+#> 'errorValue' int 5 | Timed out
 
 close(sur)
 close(res1)
@@ -522,11 +526,11 @@ ncurl("https://httpbin.org/headers")
 #>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
 #>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
 #>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 33 34 33 33 61 61 38 2d 31 39 64 63 35 32 36 30 35 31 64 36 66 31 61
-#> [101] 62 32 30 38 62 30 32 30 63 22 0a 20 20 7d 0a 7d 0a
+#>  [76] 2d 36 33 36 38 64 33 39 34 2d 36 30 39 61 32 32 61 35 33 36 35 63 31 31 62
+#> [101] 36 34 38 35 30 65 64 34 65 22 0a 20 20 7d 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63433aa8-19dc526051d6f1ab208b020c\"\n  }\n}\n"
+#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6368d394-609a22a5365c11b64850ed4e\"\n  }\n}\n"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
@@ -547,13 +551,13 @@ res
 
 call_aio(res)$headers
 #> $Date
-#> [1] "Sun, 09 Oct 2022 21:18:32 GMT"
+#> [1] "Mon, 07 Nov 2022 09:44:52 GMT"
 #> 
 #> $Server
 #> [1] "gunicorn/19.9.0"
 
 res$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63433aa8-4f3d6da80076713f4a359c49\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"213.205.242.66\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6368d394-3a93bcc6609ccb4b6f98b635\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"79.173.129.2\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -577,8 +581,8 @@ s <- stream(dial = "wss://ws.eodhistoricaldata.com/ws/forex?api_token=OeAFFmMliF
             textframes = TRUE)
 s
 #> < nanoStream >
-#>  - type: dialer 
-#>  - url: wss://ws.eodhistoricaldata.com/ws/forex?api_token=OeAFFmMliFG5orCUuwAKQ8l4WWFQ67YX 
+#>  - type: dialer
+#>  - url: wss://ws.eodhistoricaldata.com/ws/forex?api_token=OeAFFmMliFG5orCUuwAKQ8l4WWFQ67YX
 #>  - textframes: TRUE
 ```
 
@@ -592,12 +596,13 @@ s |> recv()
 #> [1] "{\"status_code\":200,\"message\":\"Authorized\"}"
 
 s |> send('{"action": "subscribe", "symbols": "EURUSD"}')
+#> [1] 0
 
 s |> recv()
-#> [1] "{\"s\":\"EURUSD\",\"a\":0.97372,\"b\":0.9735,\"dc\":\"-0.0698\",\"dd\":\"-0.0007\",\"ppms\":true,\"t\":1665350345000}"
+#> [1] "{\"s\":\"EURUSD\",\"a\":0.99892,\"b\":0.99885,\"dc\":\"0.6117\",\"dd\":\"0.0061\",\"ppms\":false,\"t\":1667814293000}"
 
 s |> recv()
-#> [1] "{\"s\":\"EURUSD\",\"a\":0.97371,\"b\":0.97351,\"dc\":\"-0.0709\",\"dd\":\"-0.0007\",\"ppms\":true,\"t\":1665350349000}"
+#> [1] "{\"s\":\"EURUSD\",\"a\":0.99891,\"b\":0.99884,\"dc\":\"0.6107\",\"dd\":\"0.0061\",\"ppms\":false,\"t\":1667814293000}"
 
 close(s)
 ```
@@ -648,7 +653,7 @@ base64dec(base64enc("hello world!"))
 
 Installation from source requires ‘libnng’ \>= v1.6.0 and ‘libmbedtls’
 \>= 2 - suitable installations are automatically detected - or else
-‘cmake’ to compile ‘libnng’ v1.6.0 pre-release (722bf46) and
+‘cmake’ to compile ‘libnng’ v1.6.0 pre-release (5385b78) and
 ‘libmbedtls’ v3.2.1 included within the package sources.
 
 Note: ‘libnng’ v1.6.0 is not yet available in system repositories;
@@ -668,11 +673,11 @@ file which can be built with just a C compiler.*
 
 #### Windows
 
-For R \>= 4.2 using the ‘rtools42’ toolchain, ‘libnng’ v1.6.0 (722bf46)
+For R \>= 4.2 using the ‘rtools42’ toolchain, ‘libnng’ v1.6.0 (5385b78)
 and ‘libmbedtls’ v3.2.1 will be automatically compiled from the package
 sources during installation.
 
-For previous R versions, pre-compiled ‘libnng’ v1.6.0 (722bf46) and
+For previous R versions, pre-compiled ‘libnng’ v1.6.0 (5385b78) and
 ‘libmbedtls’ v3.2.1 libraries are downloaded and used for installation
 instead.
 

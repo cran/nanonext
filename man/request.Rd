@@ -23,20 +23,25 @@ request(
 as a raw vector. Use 'serial' for sending and receiving within R to ensure
 perfect reproducibility. Use 'raw' for sending vectors of any type (will be
 converted to a raw byte vector for sending) - essential when interfacing
-with external applications.}
+with external applications. Alternatively, for performance, specify an
+integer position in the vector of choices i.e. 1L for 'serial' or 2L for
+'raw'.}
 
 \item{recv_mode}{[default 'serial'] mode of vector to be received - one of
 'serial', 'character', 'complex', 'double', 'integer', 'logical',
-'numeric', or 'raw'. The default 'serial' means a serialised R object, for
-the other modes, the raw vector received will be converted into the
-respective mode.}
+'numeric', or 'raw'. The default 'serial' means a serialised R object,
+for the other modes, the raw vector received will be converted into the
+respective mode. Alternatively, for performance, specify an integer
+position in the vector of choices e.g. 1L for 'serial', 2L for 'character'
+etc.}
 
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
 applies a socket-specific default, usually the same as no timeout. Note
 that this applies to receiving the result.}
 
 \item{keep.raw}{[default FALSE] logical flag whether to keep and return the
-received raw vector along with the converted data.}
+received raw vector along with the converted data. Supplying a non-logical
+value will error.}
 }
 \value{
 A 'recvAio' (object of class 'recvAio') (invisibly).
@@ -72,7 +77,7 @@ ctxp <- context(rep)
 # works if req and rep are running in parallel in different processes
 reply(ctxp, execute = function(x) x + 1, timeout = 10)
 aio <- request(ctxq, data = 2022, timeout = 10)
-call_aio(aio)
+call_aio(aio)$data
 
 close(req)
 close(rep)

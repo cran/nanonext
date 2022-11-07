@@ -31,6 +31,7 @@
 #'     (not all transports are supported).
 #' @param textframes [default FALSE] applicable to the websocket transport only,
 #'     enables sending and receiving of TEXT frames (ignored otherwise).
+#'     Supplying a non-logical value will error.
 #' @param pem (optional) applicable to secure websockets only. The path to a
 #'     file containing X.509 certificate(s) in PEM format, comprising the
 #'     certificate authority certificate chain (and revocation list if present).
@@ -50,23 +51,17 @@
 #'
 #' @examples
 #' # will succeed only if there is an open connection at the address:
-#' s <- stream(dial = "tcp://127.0.0.1:5555")
+#' s <- tryCatch(stream(dial = "tcp://127.0.0.1:5555"), error = identity)
+#' s
 #'
 #' @export
 #'
-stream <- function(dial = NULL, listen = NULL, textframes = FALSE, pem = NULL) {
-
-  if (missing(dial)) {
-    if (missing(listen)) {
-      stop("specify a URL for either 'dial' or 'listen'")
-    } else {
-      .Call(rnng_stream_listen, listen, textframes, pem)
-    }
-  } else {
-    .Call(rnng_stream_dial, dial, textframes, pem)
-  }
-
-}
+stream <- function(dial = NULL, listen = NULL, textframes = FALSE, pem = NULL)
+  if (length(dial))
+    .Call(rnng_stream_dial, dial, textframes, pem) else
+      if (length(listen))
+        .Call(rnng_stream_listen, listen, textframes, pem) else
+          stop("specify a URL for either 'dial' or 'listen'")
 
 #' @rdname close
 #' @method close nanoStream

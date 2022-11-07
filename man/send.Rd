@@ -4,7 +4,7 @@
 \alias{send}
 \title{Send}
 \usage{
-send(con, data, mode = c("serial", "raw"), block = NULL, ...)
+send(con, data, mode = c("serial", "raw"), block = NULL)
 }
 \arguments{
 \item{con}{a Socket, Context or Stream.}
@@ -16,18 +16,17 @@ sending vectors of any type (converted to a raw byte vector for sending).
 For Streams, 'raw' is the only option and this argument is ignored. Use
 'serial' for perfect reproducibility within R, although 'raw' must be used
 when interfacing with external applications that do not understand R
-serialisation.}
+serialisation. Alternatively, for performance, specify an integer position
+in the vector of choices i.e. 1L for 'serial' or 2L for 'raw'.}
 
 \item{block}{[default NULL] which applies the connection default (see section
 'Blocking' below). Specify logical TRUE to block until successful or FALSE
 to return immediately even if unsuccessful (e.g. if no connection is
 available), or else an integer value specifying the maximum time to block
 in milliseconds, after which the operation will time out.}
-
-\item{...}{not used.}
 }
 \value{
-Invisibly, an integer exit code (zero on success).
+Integer exit code (zero on success).
 }
 \description{
 Send data over a connection (Socket, Context or Stream).

@@ -27,21 +27,18 @@
 #'
 #' @section Usage notes:
 #'
-#'     Call \code{\link{nano_init}} after package load to set global options
-#'     such as causing warnings to print immediately as they occur.
+#'     \{nanonext\} offers 2 equivalent interfaces: a functional interface, and
+#'     an object-oriented interface.
 #'
-#'     \{nanonext\} offers 2 equivalent interfaces: an object-oriented interface,
-#'     and a functional interface.
+#'     The primary object in the functional interface is the Socket. Use
+#'     \code{\link{socket}} to create a socket and dial or listen at an address.
+#'     The socket is then passed as the first argument of subsequent actions
+#'     such as \code{send()} or \code{recv()}.
 #'
 #'     The primary object in the object-oriented interface is the nano object.
 #'     Use \code{\link{nano}} to create a nano object which encapsulates a Socket
 #'     and Dialer/Listener. Methods such as \code{$send()} or \code{$recv()} can
 #'     then be accessed directly from the object.
-#'
-#'     The primary object in the functional interface is the Socket. Use
-#'     \code{\link{socket}} to create a socket, and optionally dial or listen at
-#'     an address. The socket is then passed as the first argument of subsequent
-#'     actions such as \code{send()} or \code{recv()}.
 #'
 #' @section Documentation:
 #'
@@ -49,7 +46,7 @@
 #'
 #'     Guide to the supported transports for dialers and listeners: \link{transports}
 #'
-#'     Options that can be set using \code{setopt()}: \link{options}
+#'     Options that can be set using \code{setopt()}: \link{opts}
 #'
 #' @section Conceptual overview:
 #'
@@ -98,10 +95,4 @@
 #' @name nanonext-package
 #'
 NULL
-
-.onUnload <- function(libpath) {
-  if (length(warn <- getOption("nanonext.original.warn")))
-    options(warn = warn, nanonext.original.warn = NULL)
-  invisible()
-}
 

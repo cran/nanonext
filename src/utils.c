@@ -122,49 +122,16 @@ SEXP rnng_device(SEXP s1, SEXP s2) {
   const int xc = nng_device(*(nng_socket *) R_ExternalPtrAddr(s1),
                             *(nng_socket *) R_ExternalPtrAddr(s2));
   if (xc)
-    return mk_error(xc);
+    ERROR_OUT(xc);
 
-  return nano_success;
-
-}
-
-// nano_init -------------------------------------------------------------------
-
-SEXP rnng_matchwarn(SEXP warn) {
-
-  if (TYPEOF(warn) == INTSXP) return warn;
-
-  const char *w = CHAR(STRING_ELT(warn, 0));
-  size_t slen = strlen(w);
-  const char i[] = "immediate", d[] = "deferred", e[] = "error", n[] = "none";
-  int xc = 0;
-
-  switch (slen) {
-  case 1:
-  case 2:
-  case 3:
-  case 4:
-    if (!strncmp(n, w, slen)) { xc = -1; break; }
-  case 5:
-    if (!strncmp(e, w, slen)) { xc = 2; break; }
-  case 6:
-  case 7:
-  case 8:
-    if (!strncmp(d, w, slen)) { xc = 0; break; }
-  case 9:
-    if (!strncmp(i, w, slen)) { xc = 1; break; }
-  default:
-      Rf_error("'warn' should be one of immediate, deferred, error, none");
-  }
-
-  return Rf_ScalarInteger(xc);
+  return R_NilValue;
 
 }
 
 // ncurl - minimalist http client ----------------------------------------------
 
-SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP data,
-                SEXP response, SEXP pem) {
+SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
+                SEXP data, SEXP response, SEXP pem) {
 
   nng_url *url;
   nng_http_client *client;
@@ -208,9 +175,9 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP data,
     }
   }
   if (data != R_NilValue) {
-    data = nano_encode(data);
-    unsigned char *dp = RAW(data);
-    const size_t dlen = Rf_xlength(data) - 1;
+    SEXP enc = nano_encode(data);
+    unsigned char *dp = RAW(enc);
+    const size_t dlen = Rf_xlength(enc) - 1;
     if ((xc = nng_http_req_set_data(req, dp, dlen)))
       goto exitlevel4;
   }
@@ -250,27 +217,16 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP data,
   nng_aio_free(aio);
 
   code = nng_http_res_get_status(res);
-  if (code != 200) {
-    REprintf("HTTP Server Response: %d %s\n", code, nng_http_res_get_reason(res));
-    if (code >= 300 && code < 400) {
-      SEXP ret;
-      PROTECT(ret = Rf_mkString(nng_http_res_get_header(res, "Location")));
-      nng_http_res_free(res);
-      nng_http_req_free(req);
-      nng_http_client_free(client);
-      nng_url_free(url);
-      UNPROTECT(1);
-      return ret;
-    }
-  }
 
+  if (code >= 300 && code < 400 && LOGICAL(follow)[0])
+    return rnng_ncurl(Rf_mkString(nng_http_res_get_header(res, "Location")),
+                      convert, follow, method, headers, data, response, pem);
+
+  SEXP out, vec, cvec = R_NilValue, rvec = R_NilValue;
   void *dat;
   size_t sz;
-  SEXP out, vec, cvec = R_NilValue, rvec = R_NilValue;
-
-  nng_http_res_get_data(res, &dat, &sz);
-
   const char *names[] = {"status", "headers", "raw", "data", ""};
+
   PROTECT(out = Rf_mkNamed(VECSXP, names));
 
   SET_VECTOR_ELT(out, 0, Rf_ScalarInteger(code));
@@ -303,11 +259,14 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP data,
   }
   SET_VECTOR_ELT(out, 1, rvec);
 
+  nng_http_res_get_data(res, &dat, &sz);
   vec = Rf_allocVector(RAWSXP, sz);
   memcpy(RAW(vec), dat, sz);
   SET_VECTOR_ELT(out, 2, vec);
 
-  if (Rf_asLogical(convert)) {
+  if (code >= 300 && code < 400) {
+    cvec = Rf_mkString(nng_http_res_get_header(res, "Location"));
+  } else if (LOGICAL(convert)[0]) {
     SEXP expr;
     PROTECT(expr = Rf_lang2(nano_RtcSymbol, vec));
     cvec = R_tryEvalSilent(expr, R_BaseEnv, &xc);
@@ -337,7 +296,7 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP data,
   exitlevel2:
   nng_url_free(url);
   exitlevel1:
-  return mk_error(xc);
+  return mk_error_ncurl(xc);
 
 }
 
@@ -346,7 +305,6 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP data,
 SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP pem) {
 
   const char *add = CHAR(STRING_ELT(url, 0));
-  const int mod = LOGICAL(textframes)[0];
   nng_url *up;
   nng_tls_config *cfg = NULL;
   nng_stream_dialer *dp;
@@ -361,11 +319,11 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP pem) {
     goto exitlevel2;
 
   if (!strcmp(up->u_scheme, "ws") || !strcmp(up->u_scheme, "wss")) {
-    if (mod &&
+    frames = LOGICAL(textframes)[0];
+    if (frames &&
         ((xc = nng_stream_dialer_set_bool(dp, "ws:recv-text", 1)) ||
         (xc = nng_stream_dialer_set_bool(dp, "ws:send-text", 1))))
       goto exitlevel3;
-    frames = mod;
   }
 
   if (!strcmp(up->u_scheme, "wss")) {
@@ -431,14 +389,13 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP pem) {
   exitlevel2:
   nng_url_free(up);
   exitlevel1:
-  return mk_error(xc);
+  ERROR_OUT(xc);
 
 }
 
 SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP pem) {
 
   const char *add = CHAR(STRING_ELT(url, 0));
-  const int mod = LOGICAL(textframes)[0];
   nng_url *up;
   nng_tls_config *cfg = NULL;
   nng_stream_listener *lp;
@@ -453,11 +410,11 @@ SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP pem) {
     goto exitlevel2;
 
   if (!strcmp(up->u_scheme, "ws") || !strcmp(up->u_scheme, "wss")) {
-    if (mod &&
+    frames = LOGICAL(textframes)[0];
+    if (frames &&
         ((xc = nng_stream_listener_set_bool(lp, "ws:recv-text", 1)) ||
         (xc = nng_stream_listener_set_bool(lp, "ws:send-text", 1))))
       goto exitlevel3;
-    frames = mod;
   }
 
   if (!strcmp(up->u_scheme, "wss")) {
@@ -526,22 +483,97 @@ SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP pem) {
   exitlevel2:
   nng_url_free(up);
   exitlevel1:
-  return mk_error(xc);
+  ERROR_OUT(xc);
 
 }
 
 SEXP rnng_stream_close(SEXP stream) {
 
   if (R_ExternalPtrTag(stream) != nano_StreamSymbol)
-    Rf_error("'stream' is not a valid stream");
+    Rf_error("'stream' is not a valid Stream");
   if (R_ExternalPtrAddr(stream) == NULL)
-    Rf_error("'stream' is not an active stream");
+    Rf_error("'stream' is not an active Stream");
   nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(stream);
   nng_stream_free(sp);
   R_ClearExternalPtr(stream);
   SET_ATTRIB(stream, R_NilValue);
+  SET_OBJECT(stream, 0);
 
   return nano_success;
+
+}
+
+SEXP rnng_status_code(SEXP x) {
+
+  char *code;
+  switch (Rf_asInteger(x)) {
+  case 100: code = "Continue"; break;
+  case 101: code = "Switching Protocols"; break;
+  case 102: code = "Processing"; break;
+  case 103: code = "Early Hints"; break;
+  case 200: code = "OK"; break;
+  case 201: code = "Created"; break;
+  case 202: code = "Accepted"; break;
+  case 203: code = "Non-Authoritative Information"; break;
+  case 204: code = "No Content"; break;
+  case 205: code = "Reset Content"; break;
+  case 206: code = "Partial Content"; break;
+  case 207: code = "Multi-Status"; break;
+  case 208: code = "Already Reported"; break;
+  case 226: code = "IM Used"; break;
+  case 300: code = "Multiple Choices"; break;
+  case 301: code = "Moved Permanently"; break;
+  case 302: code = "Found"; break;
+  case 303: code = "See Other"; break;
+  case 304: code = "Not Modified"; break;
+  case 305: code = "Use Proxy"; break;
+  case 306: code = "Switch Proxy"; break;
+  case 307: code = "Temporary Redirect"; break;
+  case 308: code = "Permanent Redirect"; break;
+  case 400: code = "Bad Request"; break;
+  case 401: code = "Unauthorized"; break;
+  case 402: code = "Payment Required"; break;
+  case 403: code = "Forbidden"; break;
+  case 404: code = "Not Found"; break;
+  case 405: code = "Method Not Allowed"; break;
+  case 406: code = "Not Acceptable"; break;
+  case 407: code = "Proxy Authentication Required"; break;
+  case 408: code = "Request Timeout"; break;
+  case 409: code = "Conflict"; break;
+  case 410: code = "Gone"; break;
+  case 411: code = "Length Required"; break;
+  case 412: code = "Precondition Failed"; break;
+  case 413: code = "Payload Too Large"; break;
+  case 414: code = "URI Too Long"; break;
+  case 415: code = "Unsupported Media Type"; break;
+  case 416: code = "Range Not Satisfiable"; break;
+  case 417: code = "Expectation Failed"; break;
+  case 418: code = "I'm a teapot"; break;
+  case 421: code = "Misdirected Request"; break;
+  case 422: code = "Unprocessable Entity"; break;
+  case 423: code = "Locked"; break;
+  case 424: code = "Failed Dependency"; break;
+  case 425: code = "Too Early"; break;
+  case 426: code = "Upgrade Required"; break;
+  case 428: code = "Precondition Required"; break;
+  case 429: code = "Too Many Requests"; break;
+  case 431: code = "Request Header Fields Too Large"; break;
+  case 451: code = "Unavailable For Legal Reasons"; break;
+  case 500: code = "Internal Server Error"; break;
+  case 501: code = "Not Implemented"; break;
+  case 502: code = "Bad Gateway"; break;
+  case 503: code = "Service Unavailable"; break;
+  case 504: code = "Gateway Timeout"; break;
+  case 505: code = "HTTP Version Not Supported"; break;
+  case 506: code = "Variant Also Negotiates"; break;
+  case 507: code = "Insufficient Storage"; break;
+  case 508: code = "Loop Detected"; break;
+  case 510: code = "Not Extended"; break;
+  case 511: code = "Network Authentication Required"; break;
+  default: code = "Non-standard Response"; break;
+  }
+
+  return Rf_mkString(code);
 
 }
 

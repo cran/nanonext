@@ -25,7 +25,6 @@
 SEXP rnng_version(void) {
 
   SEXP version;
-
   PROTECT(version = Rf_allocVector(STRSXP, 2));
   SET_STRING_ELT(version, 0, Rf_mkChar(nng_version()));
   SET_STRING_ELT(version, 1, Rf_mkChar(MBEDTLS_VERSION_STRING_FULL));
@@ -65,18 +64,16 @@ static nano_hash nano_anytoraw(SEXP x) {
       hash.buf = RAW(hash.vec);
       memcpy(hash.buf, CHAR(STRING_ELT(x, 0)), hash.sz);
     } else {
-      SEXP expr;
-      PROTECT(expr = Rf_lang3(nano_SerialSymbol, x, R_NilValue));
-      hash.vec = Rf_eval(expr, R_BaseEnv);
+      PROTECT(hash.vec = Rf_lang3(nano_SerialSymbol, x, R_NilValue));
+      hash.vec = Rf_eval(hash.vec, R_BaseEnv);
       UNPROTECT(1);
       hash.buf = RAW(hash.vec);
       hash.sz = Rf_xlength(hash.vec);
     }
     break;
-  default: ;
-    SEXP expr;
-    PROTECT(expr = Rf_lang3(nano_SerialSymbol, x, R_NilValue));
-    hash.vec = Rf_eval(expr, R_BaseEnv);
+  default:
+    PROTECT(hash.vec = Rf_lang3(nano_SerialSymbol, x, R_NilValue));
+    hash.vec = Rf_eval(hash.vec, R_BaseEnv);
     UNPROTECT(1);
     hash.buf = RAW(hash.vec);
     hash.sz = Rf_xlength(hash.vec);
@@ -142,7 +139,7 @@ SEXP rnng_sha224(SEXP x, SEXP key, SEXP convert) {
   if (xc)
     Rf_error("error generating hash");
 
-  if (Rf_asLogical(convert)) {
+  if (LOGICAL(convert)[0]) {
 
     SEXP vec;
     PROTECT(vec = Rf_allocVector(RAWSXP, SHA224_KEY_SIZE));
@@ -190,7 +187,7 @@ SEXP rnng_sha256(SEXP x, SEXP key, SEXP convert) {
   if (xc)
     Rf_error("error generating hash");
 
-  if (Rf_asLogical(convert)) {
+  if (LOGICAL(convert)[0]) {
 
     SEXP vec;
     PROTECT(vec = Rf_allocVector(RAWSXP, SHA256_KEY_SIZE));
@@ -242,7 +239,7 @@ SEXP rnng_sha384(SEXP x, SEXP key, SEXP convert) {
   if (xc)
     Rf_error("error generating hash");
 
-  if (Rf_asLogical(convert)) {
+  if (LOGICAL(convert)[0]) {
 
     SEXP vec;
     PROTECT(vec = Rf_allocVector(RAWSXP, SHA384_KEY_SIZE));
@@ -290,7 +287,7 @@ SEXP rnng_sha512(SEXP x, SEXP key, SEXP convert) {
   if (xc)
     Rf_error("error generating hash");
 
-  if (Rf_asLogical(convert)) {
+  if (LOGICAL(convert)[0]) {
 
     SEXP vec;
     PROTECT(vec = Rf_allocVector(RAWSXP, SHA512_KEY_SIZE));
@@ -314,7 +311,7 @@ SEXP rnng_sha512(SEXP x, SEXP key, SEXP convert) {
 SEXP rnng_base64enc(SEXP x, SEXP convert) {
 
   SEXP out;
-  int xc = 0;
+  int xc;
   size_t olen;
 
   nano_hash hash = nano_anytoraw(x);
@@ -322,11 +319,10 @@ SEXP rnng_base64enc(SEXP x, SEXP convert) {
   xc = mbedtls_base64_encode(NULL, 0, &olen, hash.buf, hash.sz);
   unsigned char output[olen];
   xc = mbedtls_base64_encode(output, olen, &olen, hash.buf, hash.sz);
-
   if (xc)
-    Rf_error("invalid input");
+    Rf_error("write buffer insufficient");
 
-  if (Rf_asLogical(convert)) {
+  if (LOGICAL(convert)[0]) {
 
     SEXP vec;
     PROTECT(vec = Rf_allocVector(RAWSXP, olen));
@@ -348,19 +344,20 @@ SEXP rnng_base64enc(SEXP x, SEXP convert) {
 SEXP rnng_base64dec(SEXP x, SEXP convert) {
 
   SEXP out;
-  int xc = 0;
+  int xc;
   size_t olen;
 
   nano_hash hash = nano_anytoraw(x);
 
   xc = mbedtls_base64_decode(NULL, 0, &olen, hash.buf, hash.sz);
+  if (xc == MBEDTLS_ERR_BASE64_INVALID_CHARACTER)
+    Rf_error("input is not valid base64");
   unsigned char output[olen];
   xc = mbedtls_base64_decode(output, olen, &olen, hash.buf, hash.sz);
-
   if (xc)
-    Rf_error("invalid input");
+    Rf_error("write buffer insufficient");
 
-  if (Rf_asLogical(convert)) {
+  if (LOGICAL(convert)[0]) {
 
     SEXP vec;
     vec = PROTECT(Rf_allocVector(RAWSXP, olen));

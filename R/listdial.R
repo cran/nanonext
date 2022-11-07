@@ -20,28 +20,23 @@
 #'
 #' Creates a new Dialer and binds it to a Socket.
 #'
-#' @param socket a Socket or nano object.
+#' @param socket a Socket.
 #' @param url [default 'inproc://nanonext'] a URL to dial, specifying the
 #'     transport and address as a character string e.g. 'inproc://anyvalue' or
 #'     'tcp://127.0.0.1:5555' (see \link{transports}).
 #' @param autostart [default TRUE] whether to start the dialer. Set to FALSE if
-#'     you wish to set configuration options on the dialer as it is not
-#'     generally possible to change these once started.
+#'     setting configuration options on the dialer as it is not generally
+#'     possible to change these once started. Supplying a non-logical value will
+#'     error.
 #'
 #' @return Invisibly, an integer exit code (zero on success). A new Dialer
 #'     (object of class 'nanoDialer' and 'nano') is created and bound to the
-#'     Socket or nano object if successful.
+#'     Socket if successful.
 #'
 #' @details To view all Dialers bound to a socket use \code{$dialer} on the
 #'     socket, which returns a list of Dialer objects. To access any individual
 #'     Dialer (e.g. to set options on it), index into the list e.g.
 #'     \code{$dialer[[1]]} to return the first Dialer.
-#'
-#'     This function may be used to bind a new Dialer to a Socket, or else a
-#'     nano object. If called on a nano object, the dialer is attached to the
-#'     object rather than the socket for ease of access, e.g. \code{$dialer[[1]]}
-#'     rather than \code{$socket$dialer[[1]]}, but is otherwise equivalent to
-#'     calling \code{dial()} on the object's socket directly.
 #'
 #'     A Dialer is an external pointer to a dialer object, which creates a
 #'     single outgoing connection at a time. If the connection is broken, or
@@ -76,70 +71,39 @@
 #' close(socket)
 #'
 #' nano <- nano("bus")
-#' dial(nano, url = "tcp://127.0.0.1:6546", autostart = FALSE)
+#' nano$dial(url = "tcp://127.0.0.1:6546", autostart = FALSE)
 #' nano$dialer
-#' start(nano$dialer[[1]])
+#' nano$dialer_start()
 #' nano$dialer
 #' close(nano$dialer[[1]])
 #' nano$close()
 #'
 #' @export
 #'
-dial <- function(socket,
-                 url = "inproc://nanonext",
-                 autostart = TRUE) {
-
-  res <- if (autostart) .Call(rnng_dial, socket, url) else .Call(rnng_dialer_create, socket, url)
-  is.integer(res) && return(res)
-
-  if (is.environment(socket)) {
-
-    socket[["dialer"]] <- c(.subset2(socket, "dialer"), res)
-    socket[["dialer_setopt"]] <- function(type = c("bool", "int", "ms", "size",
-                                                   "string", "uint64"),
-                                          opt,
-                                          value) invisible(lapply(.subset2(socket, "dialer"),
-                                                                  setopt,
-                                                                  type = type,
-                                                                  opt = opt,
-                                                                  value = value))
-
-  } else {
-
-    attr(socket, "dialer") <- c(attr(socket, "dialer"), res)
-
-  }
-
-  invisible(0L)
-
-}
+dial <- function(socket, url = "inproc://nanonext", autostart = TRUE)
+  invisible(.Call(rnng_dial, socket, url, autostart))
 
 #' Listen to an Address from a Socket
 #'
 #' Creates a new Listener and binds it to a Socket.
 #'
-#' @param socket a Socket or nano object.
+#' @param socket a Socket.
 #' @param url [default 'inproc://nanonext'] a URL to dial or listen at, specifying
 #'     the transport and address as a character string e.g. 'inproc://anyvalue'
 #'     or 'tcp://127.0.0.1:5555' (see \link{transports}).
 #' @param autostart [default TRUE] whether to start the listener. Set to FALSE
-#'     if you wish to set configuration options on the listener as it is not
-#'     generally possible to change these once started.
+#'     if setting configuration options on the listener as it is not generally
+#'     possible to change these once started. Supplying a non-logical value will
+#'     error.
 #'
 #' @return Invisibly, an integer exit code (zero on success). A new Listener
 #'     (object of class 'nanoListener' and 'nano') is created and bound to the
-#'     Socket or nano object if successful.
+#'     Socket if successful.
 #'
 #' @details To view all Listeners bound to a socket use \code{$listener} on the
 #'     socket, which returns a list of Listener objects. To access any individual
 #'     Listener (e.g. to set options on it), index into the list e.g.
 #'     \code{$listener[[1]]} to return the first Listener.
-#'
-#'     This function may be used to bind a new Listener to a Socket, or else a
-#'     nano object. If called on a nano object, the listener is attached to the
-#'     object rather than the socket for ease of access, e.g. \code{$listener[[1]]}
-#'     rather than \code{$socket$listener[[1]]}, but is otherwise equivalent to
-#'     calling \code{listen()} on the object's socket directly.
 #'
 #'     A listener is an external pointer to a listener object, which accepts
 #'     incoming connections. A given listener object may have many connections
@@ -174,55 +138,29 @@ dial <- function(socket,
 #' close(socket)
 #'
 #' nano <- nano("bus")
-#' listen(nano, url = "tcp://127.0.0.1:6548", autostart = FALSE)
+#' nano$listen(url = "tcp://127.0.0.1:6548", autostart = FALSE)
 #' nano$listener
-#' start(nano$listener[[1]])
+#' nano$listener_start()
 #' nano$listener
 #' close(nano$listener[[1]])
 #' nano$close()
 #'
 #' @export
 #'
-listen <- function(socket,
-                   url = "inproc://nanonext",
-                   autostart = TRUE) {
-
-  res <- if (autostart) .Call(rnng_listen, socket, url) else .Call(rnng_listener_create, socket, url)
-  is.integer(res) && return(res)
-
-  if (is.environment(socket)) {
-
-    socket[["listener"]] <- c(.subset2(socket, "listener"), res)
-    socket[["listener_setopt"]] <- function(type = c("bool", "int", "ms", "size",
-                                                   "string", "uint64"),
-                                            opt,
-                                            value) invisible(lapply(.subset2(socket, "listener"),
-                                                                    setopt,
-                                                                    type = type,
-                                                                    opt = opt,
-                                                                    value = value))
-
-  } else {
-
-    attr(socket, "listener") <- c(attr(socket, "listener"), res)
-
-  }
-
-  invisible(0L)
-
-}
+listen <- function(socket, url = "inproc://nanonext", autostart = TRUE)
+  invisible(.Call(rnng_listen, socket, url, autostart))
 
 #' Start Listener/Dialer
 #'
 #' Start a Listener/Dialer.
 #'
 #' @param x a Listener or Dialer.
-#' @param async [default TRUE] logical flag whether the connection attempt,
-#'     including any name resolution, is to be made asynchronously. This helps
-#'     an application be more resilient, but it also generally makes diagnosing
-#'     failures somewhat more difficult.  If FALSE, failure, such as if the
-#'     connection is refused, will be returned immediately, and no further
-#'     action will be taken.
+#' @param async [default TRUE] (applicable to Dialers only) logical flag whether
+#'     the connection attempt, including any name resolution, is to be made
+#'     asynchronously. This behaviour is more resilient, but also generally
+#'     makes diagnosing failures somewhat more difficult. If FALSE, failure,
+#'     such as if the connection is refused, will be returned immediately, and
+#'     no further action will be taken. Supplying a non-logical value will error.
 #' @param ... not used.
 #'
 #' @return Invisibly, an integer exit code (zero on success).
@@ -236,23 +174,27 @@ NULL
 #' @method start nanoListener
 #' @export
 #'
-start.nanoListener <- function(x, ...) invisible(.Call(rnng_listener_start, x))
+start.nanoListener <- function(x, ...)
+  invisible(.Call(rnng_listener_start, x))
 
 #' @rdname start
 #' @method start nanoDialer
 #' @export
 #'
-start.nanoDialer <- function(x, async = TRUE, ...) invisible(.Call(rnng_dialer_start, x, async))
+start.nanoDialer <- function(x, async = TRUE, ...)
+  invisible(.Call(rnng_dialer_start, x, async))
 
 #' @rdname close
 #' @method close nanoDialer
 #' @export
 #'
-close.nanoDialer <- function(con, ...) invisible(.Call(rnng_dialer_close, con))
+close.nanoDialer <- function(con, ...)
+  invisible(.Call(rnng_dialer_close, con))
 
 #' @rdname close
 #' @method close nanoListener
 #' @export
 #'
-close.nanoListener <- function(con, ...) invisible(.Call(rnng_listener_close, con))
+close.nanoListener <- function(con, ...)
+  invisible(.Call(rnng_listener_close, con))
 

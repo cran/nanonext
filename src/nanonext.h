@@ -62,7 +62,11 @@
 #include <R_ext/Visibility.h>
 
 #ifdef NANONEXT_INTERNALS
+#define ERROR_OUT(xc) Rf_error("%d | %s", xc, nng_strerror(xc))
+#define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
 extern SEXP mk_error(const int);
+extern SEXP mk_error_recv(const int);
+extern SEXP mk_error_ncurl(const int);
 extern SEXP nano_decode(unsigned char *, size_t, const int, const int);
 extern SEXP nano_encode(SEXP);
 extern SEXP nano_encodes(SEXP, SEXP);
@@ -87,7 +91,6 @@ extern SEXP nano_ProtocolSymbol;
 extern SEXP nano_RawSymbol;
 extern SEXP nano_ResponseSymbol;
 extern SEXP nano_ResultSymbol;
-extern SEXP nano_RnngHttpSymbol;
 extern SEXP nano_RtcSymbol;
 extern SEXP nano_SerialSymbol;
 extern SEXP nano_SocketSymbol;
@@ -99,7 +102,8 @@ extern SEXP nano_UnserSymbol;
 extern SEXP nano_UrlSymbol;
 
 extern SEXP nano_aioFormals;
-extern SEXP nano_aioFunctions;
+extern SEXP nano_aioFuncs;
+extern SEXP nano_aioNFuncs;
 extern SEXP nano_error;
 extern SEXP nano_ncurlAio;
 extern SEXP nano_recvAio;
@@ -120,17 +124,14 @@ extern SEXP rnng_close(SEXP);
 extern SEXP rnng_ctx_close(SEXP);
 extern SEXP rnng_ctx_open(SEXP);
 extern SEXP rnng_device(SEXP, SEXP);
-extern SEXP rnng_dial(SEXP, SEXP);
+extern SEXP rnng_dial(SEXP, SEXP, SEXP);
 extern SEXP rnng_dialer_close(SEXP);
-extern SEXP rnng_dialer_create(SEXP, SEXP);
 extern SEXP rnng_dialer_start(SEXP, SEXP);
-extern SEXP rnng_listen(SEXP, SEXP);
+extern SEXP rnng_listen(SEXP, SEXP, SEXP);
 extern SEXP rnng_listener_close(SEXP);
-extern SEXP rnng_listener_create(SEXP, SEXP);
 extern SEXP rnng_listener_start(SEXP);
-extern SEXP rnng_matchwarn(SEXP);
 extern SEXP rnng_messenger(SEXP);
-extern SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_protocol_open(SEXP, SEXP);
 extern SEXP rnng_random(SEXP);
@@ -145,6 +146,7 @@ extern SEXP rnng_sha256(SEXP, SEXP, SEXP);
 extern SEXP rnng_sha384(SEXP, SEXP, SEXP);
 extern SEXP rnng_sha512(SEXP, SEXP, SEXP);
 extern SEXP rnng_sleep(SEXP);
+extern SEXP rnng_status_code(SEXP);
 extern SEXP rnng_stream_close(SEXP);
 extern SEXP rnng_stream_dial(SEXP, SEXP, SEXP);
 extern SEXP rnng_stream_listen(SEXP, SEXP, SEXP);

@@ -22,7 +22,9 @@
 #'
 #' @param object a Socket, Context, Stream, Listener or Dialer.
 #' @param type [default 'bool'] type of option - either 'bool', 'int', 'ms'
-#'     (duration), 'size', 'string' or 'uint64'.
+#'     (duration), 'size', 'string' or 'uint64'. Alternatively, for performance,
+#'     specify an integer position in the vector of choices e.g. 1L for 'bool',
+#'     2L for 'int' etc.
 #' @param opt name of option, e.g. 'reconnect-time-min', as a character string.
 #'     See \link{opts}.
 #' @param value value of option.
@@ -63,7 +65,8 @@
 setopt <- function(object,
                    type = c("bool", "int", "ms", "size", "string", "uint64"),
                    opt,
-                   value) invisible(.Call(rnng_set_opt, object, type, opt, value))
+                   value)
+  invisible(.Call(rnng_set_opt, object, type, opt, value))
 
 #' Subscribe Topic
 #'
@@ -105,7 +108,8 @@ setopt <- function(object,
 #'
 #' @export
 #'
-subscribe <- function(con, topic = NULL) invisible(.Call(rnng_set_opt, con, 0L, "sub:subscribe", topic))
+subscribe <- function(con, topic = NULL)
+  invisible(.Call(rnng_set_opt, con, 0L, "sub:subscribe", topic))
 
 #' Unsubscribe Topic
 #'
@@ -151,7 +155,8 @@ subscribe <- function(con, topic = NULL) invisible(.Call(rnng_set_opt, con, 0L, 
 #'
 #' @export
 #'
-unsubscribe <- function(con, topic = NULL) invisible(.Call(rnng_set_opt, con, 0L, "sub:unsubscribe", topic))
+unsubscribe <- function(con, topic = NULL)
+  invisible(.Call(rnng_set_opt, con, 0L, "sub:unsubscribe", topic))
 
 #' Set Survey Time
 #'
@@ -196,5 +201,6 @@ unsubscribe <- function(con, topic = NULL) invisible(.Call(rnng_set_opt, con, 0L
 #'
 #' @export
 #'
-survey_time <- function(con, time) invisible(.Call(rnng_set_opt, con, 3L, "surveyor:survey-time", time))
+survey_time <- function(con, time)
+  invisible(.Call(rnng_set_opt, con, 3L, "surveyor:survey-time", time))
 

@@ -20,13 +20,16 @@ recv_aio(
 'character', 'complex', 'double', 'integer', 'logical', 'numeric', or 'raw'.
 The default 'serial' means a serialised R object, for the other modes,
 the raw vector received will be converted into the respective mode.
-For Streams, 'serial' is not an option and the default is 'character'.}
+For Streams, 'serial' is not an option and the default is 'character'.
+Alternatively, for performance, specify an integer position in the vector
+of choices e.g. 1L for 'serial', 2L for 'character' etc.}
 
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
 applies a socket-specific default, usually the same as no timeout.}
 
 \item{keep.raw}{[default FALSE] logical flag whether to keep and return the
-received raw vector along with the converted data.}
+received raw vector along with the converted data. Supplying a non-logical
+value will error.}
 
 \item{n}{[default 65536L] applicable to Streams only, the maximum number of
 bytes to receive. Can be an over-estimate, but note that a buffer of this

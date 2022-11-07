@@ -38,8 +38,8 @@
 #'     \code{\link{recv}} or their async counterparts \code{\link{send_aio}} and
 #'     \code{\link{recv_aio}}.
 #'
-#'     For nano objects, use the \code{$context()} method, which will return a
-#'     new context.
+#'     For nano objects, use the \code{$context_open()} method, which will
+#'     attach a new context at \code{$context}. See \code{\link{nano}}.
 #'
 #' @examples
 #' s <- socket("req", listen = "inproc://nanonext")
@@ -49,9 +49,11 @@
 #' close(s)
 #'
 #' n <- nano("req", listen = "inproc://nanonext")
-#' ctx <- n$context()
-#' ctx
-#' close(ctx)
+#' n$context_open()
+#' n$context
+#' n$context_open()
+#' n$context
+#' n$context_close()
 #' n$close()
 #'
 #' @export
@@ -78,12 +80,16 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #'     as a raw vector. Use 'serial' for sending and receiving within R to ensure
 #'     perfect reproducibility. Use 'raw' for sending vectors of any type (will be
 #'     converted to a raw byte vector for sending) - essential when interfacing
-#'     with external applications.
+#'     with external applications. Alternatively, for performance, specify an
+#'     integer position in the vector of choices i.e. 1L for 'serial' or 2L for
+#'     'raw'.
 #' @param recv_mode [default 'serial'] mode of vector to be received - one of
 #'     'serial', 'character', 'complex', 'double', 'integer', 'logical',
-#'     'numeric', or 'raw'. The default 'serial' means a serialised R object, for
-#'     the other modes, the raw vector received will be converted into the
-#'     respective mode.
+#'     'numeric', or 'raw'. The default 'serial' means a serialised R object,
+#'     for the other modes, the raw vector received will be converted into the
+#'     respective mode. Alternatively, for performance, specify an integer
+#'     position in the vector of choices e.g. 1L for 'serial', 2L for 'character'
+#'     etc.
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout. Note
 #'     that this applies to receiving the request. The total elapsed time would
@@ -92,7 +98,7 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #'     become unavailable since sending the request).
 #' @param ... additional arguments passed to the function specified by 'execute'.
 #'
-#' @return Invisibly, an integer exit code (zero on success).
+#' @return Integer exit code (zero on success).
 #'
 #' @details Receive will block while awaiting a message to arrive and is usually
 #'     the desired behaviour. Set a timeout to allow the function to return
@@ -111,13 +117,13 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #' ctxq <- context(req)
 #' ctxp <- context(rep)
 #'
-#' send(ctxq, 2022, block = 100, echo = FALSE)
+#' send(ctxq, 2022, block = 100)
 #' reply(ctxp, execute = function(x) x + 1, send_mode = "raw", timeout = 100)
-#' recv(ctxq, mode = "double", block = 100, keep.raw = FALSE)
+#' recv(ctxq, mode = "double", block = 100)
 #'
-#' send(ctxq, 100, mode = "raw", block = 100, echo = FALSE)
+#' send(ctxq, 100, mode = "raw", block = 100)
 #' reply(ctxp, recv_mode = "double", execute = log, base = 10, timeout = 100)
-#' recv(ctxq, block = 100, keep.raw = FALSE)
+#' recv(ctxq, block = 100)
 #'
 #' close(req)
 #' close(rep)
@@ -181,7 +187,7 @@ reply <- function(context,
 #' # works if req and rep are running in parallel in different processes
 #' reply(ctxp, execute = function(x) x + 1, timeout = 10)
 #' aio <- request(ctxq, data = 2022, timeout = 10)
-#' call_aio(aio)
+#' call_aio(aio)$data
 #'
 #' close(req)
 #' close(rep)
@@ -194,11 +200,7 @@ request <- function(context,
                     recv_mode = c("serial", "character", "complex", "double",
                                   "integer", "logical", "numeric", "raw"),
                     timeout = NULL,
-                    keep.raw = FALSE) {
-
+                    keep.raw = FALSE)
   result <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout,
                   keep.raw, environment())
-
-}
-
 

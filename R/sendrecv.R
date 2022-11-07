@@ -27,15 +27,15 @@
 #'     For Streams, 'raw' is the only option and this argument is ignored. Use
 #'     'serial' for perfect reproducibility within R, although 'raw' must be used
 #'     when interfacing with external applications that do not understand R
-#'     serialisation.
+#'     serialisation. Alternatively, for performance, specify an integer position
+#'     in the vector of choices i.e. 1L for 'serial' or 2L for 'raw'.
 #' @param block [default NULL] which applies the connection default (see section
 #'     'Blocking' below). Specify logical TRUE to block until successful or FALSE
 #'     to return immediately even if unsuccessful (e.g. if no connection is
 #'     available), or else an integer value specifying the maximum time to block
 #'     in milliseconds, after which the operation will time out.
-#' @param ... not used.
 #'
-#' @return Invisibly, an integer exit code (zero on success).
+#' @return Integer exit code (zero on success).
 #'
 #' @section Blocking:
 #'
@@ -73,11 +73,8 @@
 #'
 #' @export
 #'
-send <- function(con,
-                 data,
-                 mode = c("serial", "raw"),
-                 block = NULL,
-                 ...) invisible(.Call(rnng_send, con, data, mode, block))
+send <- function(con, data, mode = c("serial", "raw"), block = NULL)
+  .Call(rnng_send, con, data, mode, block)
 
 #' Receive
 #'
@@ -89,8 +86,11 @@ send <- function(con,
 #'     The default 'serial' means a serialised R object, for the other modes,
 #'     the raw vector received will be converted into the respective mode.
 #'     For Streams, 'serial' is not an option and the default is 'character'.
+#'     Alternatively, for performance, specify an integer position in the vector
+#'     of choices e.g. 1L for 'serial', 2L for 'character' etc.
 #' @param keep.raw [default FALSE] logical flag whether to keep and return the
-#'     received raw vector along with the converted data.
+#'     received raw vector along with the converted data. Supplying a non-logical
+#'     value will error.
 #' @param n [default 65536L] applicable to Streams only, the maximum number of
 #'     bytes to receive. Can be an over-estimate, but note that a buffer of this
 #'     size is reserved.
@@ -160,5 +160,6 @@ recv <- function(con,
                           "integer", "logical", "numeric", "raw"),
                  block = NULL,
                  keep.raw = FALSE,
-                 n = 65536L) .Call(rnng_recv, con, mode, block, keep.raw, n)
+                 n = 65536L)
+  .Call(rnng_recv, con, mode, block, keep.raw, n)
 

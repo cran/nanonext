@@ -31,7 +31,6 @@ SEXP nano_ProtocolSymbol;
 SEXP nano_RawSymbol;
 SEXP nano_ResponseSymbol;
 SEXP nano_ResultSymbol;
-SEXP nano_RnngHttpSymbol;
 SEXP nano_RtcSymbol;
 SEXP nano_SerialSymbol;
 SEXP nano_SocketSymbol;
@@ -43,7 +42,8 @@ SEXP nano_UnserSymbol;
 SEXP nano_UrlSymbol;
 
 SEXP nano_aioFormals;
-SEXP nano_aioFunctions;
+SEXP nano_aioFuncs;
+SEXP nano_aioNFuncs;
 SEXP nano_error;
 SEXP nano_ncurlAio;
 SEXP nano_recvAio;
@@ -65,7 +65,6 @@ static void RegisterSymbols(void) {
   nano_RawSymbol = Rf_install("raw");
   nano_ResponseSymbol = Rf_install("response");
   nano_ResultSymbol = Rf_install("result");
-  nano_RnngHttpSymbol = Rf_install("rnng_aio_http");
   nano_RtcSymbol = Rf_install("rawToChar");
   nano_SerialSymbol = Rf_install("serialize");
   nano_SocketSymbol = Rf_install("socket");
@@ -78,14 +77,20 @@ static void RegisterSymbols(void) {
 }
 
 static void PreserveObjects(void) {
-  R_PreserveObject(nano_aioFormals = Rf_list1(Rf_install(".")));
-  SEXP result, msgdata, msgraw;
-  PROTECT(result = Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
-  PROTECT(msgdata = Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata"), nano_ResultSymbol));
-  PROTECT(msgraw = Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw"), nano_ResultSymbol));
-  R_PreserveObject(nano_aioFunctions = Rf_list3(result, msgdata, msgraw));
-  UNPROTECT(3);
-  R_PreserveObject(nano_error = Rf_mkString("errorValue"));
+  R_PreserveObject(nano_aioFormals = Rf_list1(nano_AioSymbol));
+  R_PreserveObject(nano_aioFuncs = Rf_allocVector(LISTSXP, 3));
+  SETCAR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
+  SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata"), nano_ResultSymbol));
+  SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw"), nano_ResultSymbol));
+  SEXP nano_AioHttpSymbol = Rf_install("rnng_aio_http");
+  R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 4));
+  SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(1)));
+  SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(2)));
+  SETCADDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(3)));
+  SETCADDDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(4)));
+  R_PreserveObject(nano_error = Rf_cons(Rf_mkString("errorValue"), R_NilValue));
+  SET_TAG(nano_error, R_ClassSymbol);
+  Rf_classgets(nano_error, Rf_mkString("errorValue"));
   R_PreserveObject(nano_ncurlAio = Rf_allocVector(STRSXP, 2));
   SET_STRING_ELT(nano_ncurlAio, 0, Rf_mkChar("ncurlAio"));
   SET_STRING_ELT(nano_ncurlAio, 1, Rf_mkChar("recvAio"));
@@ -98,7 +103,8 @@ static void PreserveObjects(void) {
 
 static void ReleaseObjects(void) {
   R_ReleaseObject(nano_aioFormals);
-  R_ReleaseObject(nano_aioFunctions);
+  R_ReleaseObject(nano_aioFuncs);
+  R_ReleaseObject(nano_aioNFuncs);
   R_ReleaseObject(nano_error);
   R_ReleaseObject(nano_ncurlAio);
   R_ReleaseObject(nano_recvAio);
@@ -119,19 +125,16 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_ctx_close", (DL_FUNC) &rnng_ctx_close, 1},
   {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 1},
   {"rnng_device", (DL_FUNC) &rnng_device, 2},
-  {"rnng_dial", (DL_FUNC) &rnng_dial, 2},
+  {"rnng_dial", (DL_FUNC) &rnng_dial, 3},
   {"rnng_dialer_close", (DL_FUNC) &rnng_dialer_close, 1},
-  {"rnng_dialer_create", (DL_FUNC) &rnng_dialer_create, 2},
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
   {"rnng_base64dec", (DL_FUNC) &rnng_base64dec, 2},
   {"rnng_base64enc", (DL_FUNC) &rnng_base64enc, 2},
-  {"rnng_listen", (DL_FUNC) &rnng_listen, 2},
+  {"rnng_listen", (DL_FUNC) &rnng_listen, 3},
   {"rnng_listener_close", (DL_FUNC) &rnng_listener_close, 1},
-  {"rnng_listener_create", (DL_FUNC) &rnng_listener_create, 2},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
-  {"rnng_matchwarn", (DL_FUNC) &rnng_matchwarn, 1},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
-  {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 7},
+  {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 8},
   {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 7},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 2},
   {"rnng_random", (DL_FUNC) &rnng_random, 1},
@@ -141,11 +144,12 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 4},
-  {"rnng_sleep", (DL_FUNC) &rnng_sleep, 1},
   {"rnng_sha224", (DL_FUNC) &rnng_sha224, 3},
   {"rnng_sha256", (DL_FUNC) &rnng_sha256, 3},
   {"rnng_sha384", (DL_FUNC) &rnng_sha384, 3},
   {"rnng_sha512", (DL_FUNC) &rnng_sha512, 3},
+  {"rnng_sleep", (DL_FUNC) &rnng_sleep, 1},
+  {"rnng_status_code", (DL_FUNC) &rnng_status_code, 1},
   {"rnng_stream_close", (DL_FUNC) &rnng_stream_close, 1},
   {"rnng_stream_dial", (DL_FUNC) &rnng_stream_dial, 3},
   {"rnng_stream_listen", (DL_FUNC) &rnng_stream_listen, 3},
