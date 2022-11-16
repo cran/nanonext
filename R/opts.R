@@ -21,13 +21,11 @@
 #' Set \link{opts} on a Socket, Context, Stream, Listener or Dialer.
 #'
 #' @param object a Socket, Context, Stream, Listener or Dialer.
-#' @param type [default 'bool'] type of option - either 'bool', 'int', 'ms'
-#'     (duration), 'size', 'string' or 'uint64'. Alternatively, for performance,
-#'     specify an integer position in the vector of choices e.g. 1L for 'bool',
-#'     2L for 'int' etc.
 #' @param opt name of option, e.g. 'reconnect-time-min', as a character string.
 #'     See \link{opts}.
-#' @param value value of option.
+#' @param value value of option. Supply character type for 'string' options,
+#'     integer or double for 'int', 'duration', 'size' and 'uint64', and logical
+#'     for 'bool'.
 #'
 #' @return Invisibly, an integer exit code (zero on success).
 #'
@@ -36,37 +34,71 @@
 #'     with 'autostart = FALSE' if configuration needs to be set.
 #'
 #'     To set options on a Listener or Dialer attached to a Socket or nano object,
-#'     you must pass in the objects directly via for example \code{$listener[[1]]}
-#'     for the first Listener.
+#'     pass in the objects directly via for example \code{$listener[[1]]} for
+#'     the first Listener.
 #'
 #' @examples
 #' s <- socket("pair")
-#' setopt(s, "ms", "recv-timeout", 2000)
+#' setopt(s, "recv-timeout", 2000)
 #' close(s)
 #'
 #' s <- socket("req")
 #' ctx <- context(s)
-#' setopt(ctx, "ms", "send-timeout", 2000)
+#' setopt(ctx, "send-timeout", 2000)
 #' close(ctx)
 #' close(s)
 #'
 #' s <- socket("pair", dial = "inproc://nanonext", autostart = FALSE)
-#' setopt(s$dialer[[1]], "ms", "reconnect-time-min", 2000)
+#' setopt(s$dialer[[1]], "reconnect-time-min", 2000)
 #' start(s$dialer[[1]])
 #' close(s)
 #'
 #' s <- socket("pair", listen = "inproc://nanonext", autostart = FALSE)
-#' setopt(s$listener[[1]], "size", "recv-size-max", 1024)
+#' setopt(s$listener[[1]], "recv-size-max", 1024)
 #' start(s$listener[[1]])
 #' close(s)
 #'
 #' @export
 #'
-setopt <- function(object,
-                   type = c("bool", "int", "ms", "size", "string", "uint64"),
-                   opt,
-                   value)
-  invisible(.Call(rnng_set_opt, object, type, opt, value))
+setopt <- function(object, opt, value)
+  invisible(.Call(rnng_set_opt, object, opt, value))
+
+#' Get Option for a Socket, Context, Stream, Listener or Dialer
+#'
+#' Get value of \link{opts} for a Socket, Context, Stream, Listener or Dialer.
+#'
+#' @inheritParams setopt
+#'
+#' @return The value of the option (logical for type 'bool', integer for 'int',
+#'     'duration' and 'size', character for 'string' and double for 'uint64').
+#'
+#' @details To get options for a Listener or Dialer attached to a Socket or nano
+#'     object, pass in the objects directly via for example \code{$listener[[1]]}
+#'     for the first Listener.
+#'
+#' @examples
+#' s <- socket("pair")
+#' getopt(s, "send-buffer")
+#' close(s)
+#'
+#' s <- socket("req")
+#' ctx <- context(s)
+#' getopt(ctx, "send-timeout")
+#' close(ctx)
+#' close(s)
+#'
+#' s <- socket("pair", dial = "inproc://nanonext", autostart = FALSE)
+#' getopt(s$dialer[[1]], "reconnect-time-min")
+#' close(s)
+#'
+#' s <- socket("pair", listen = "inproc://nanonext", autostart = FALSE)
+#' getopt(s$listener[[1]], "recv-size-max")
+#' close(s)
+#'
+#' @export
+#'
+getopt <- function(object, opt)
+  .Call(rnng_get_opt, object, opt)
 
 #' Subscribe Topic
 #'
@@ -109,7 +141,7 @@ setopt <- function(object,
 #' @export
 #'
 subscribe <- function(con, topic = NULL)
-  invisible(.Call(rnng_set_opt, con, 0L, "sub:subscribe", topic))
+  invisible(.Call(rnng_subscribe, con, topic, TRUE))
 
 #' Unsubscribe Topic
 #'
@@ -156,7 +188,7 @@ subscribe <- function(con, topic = NULL)
 #' @export
 #'
 unsubscribe <- function(con, topic = NULL)
-  invisible(.Call(rnng_set_opt, con, 0L, "sub:unsubscribe", topic))
+  invisible(.Call(rnng_subscribe, con, topic, FALSE))
 
 #' Set Survey Time
 #'
@@ -202,5 +234,5 @@ unsubscribe <- function(con, topic = NULL)
 #' @export
 #'
 survey_time <- function(con, time)
-  invisible(.Call(rnng_set_opt, con, 3L, "surveyor:survey-time", time))
+  invisible(.Call(rnng_set_opt, con, "surveyor:survey-time", time))
 

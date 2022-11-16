@@ -50,13 +50,13 @@ nng_error <- function(xc) .Call(rnng_strerror, xc)
 #' Clock Utility
 #'
 #' Provides the number of elapsed milliseconds since an arbitrary reference time
-#'     in the past. The reference time will be the same for a given program, but
-#'     may differ between programs.
+#'     in the past. The reference time will be the same for a given session, but
+#'     may differ between sessions.
 #'
 #' @details A convenience function for building concurrent applications. The
 #'     resolution of the clock depends on the underlying system timing facilities
 #'     and may not be particularly fine-grained. This utility should however be
-#'     faster than using base \code{Sys.time()}.
+#'     faster than using \code{Sys.time()}.
 #'
 #' @return A double.
 #'
@@ -78,6 +78,9 @@ mclock <- function() .Call(rnng_clock)
 #'
 #' @details If 'msec' is non-integer, it will be coerced to integer. Non-numeric
 #'     input will be ignored and return immediately.
+#'
+#'     Note that unlike \code{\link{Sys.sleep}}, this function is not
+#'     user-interruptible by sending SIGINT e.g. with ctrl + c.
 #'
 #' @examples
 #' time <- mclock(); msleep(100); mclock() - time
@@ -128,7 +131,8 @@ random <- function(n = 1L) .Call(rnng_random, n)
 #'
 #'     Warning: this function is designed to be called in an isolated process
 #'     with the two sockets. Once called, it will block with no ability to
-#'     interrupt. Kill the process to terminate the device.
+#'     interrupt. To terminate the device, the process must be killed (in
+#'     interactive sessions this may be done by sending SIGQUIT e.g. ctrl + \).
 #'
 #' @export
 #'
@@ -136,7 +140,7 @@ device <- function(s1, s2) .Call(rnng_device, s1, s2)
 
 #' Is Nano
 #'
-#' Is the object an object created by the nanonext package i.e. a nanoSocket,
+#' Is the object an object created by \{nanonext\} i.e. a nanoSocket,
 #'     nanoContext, nanoStream, nanoListener, nanoDialer or nano Object.
 #'
 #' @param x an object.
@@ -222,8 +226,7 @@ is_error_value <- function(x) inherits(x, "errorValue")
 
 #' nanonext Initialise
 #'
-#' Initialise global options. This function prints a deprecation message and no
-#'     longer has any effect.
+#' This function prints a deprecation message and no longer has any effect.
 #'
 #' @param warn Deprecated.
 #'
@@ -233,7 +236,7 @@ is_error_value <- function(x) inherits(x, "errorValue")
 #'
 nano_init <- function(warn) {
 
-  message("nanonext 0.7.0 | 'nano_init()' is deprecated as 'errorValues' no longer generate warnings")
+  message("nanonext 0.7 | 'nano_init()' is deprecated. See 'news' for updated warning behaviour")
 
 }
 

@@ -41,6 +41,7 @@ SEXP nano_TextframesSymbol;
 SEXP nano_UnserSymbol;
 SEXP nano_UrlSymbol;
 
+SEXP nano_addRedirect;
 SEXP nano_aioFormals;
 SEXP nano_aioFuncs;
 SEXP nano_aioNFuncs;
@@ -77,11 +78,12 @@ static void RegisterSymbols(void) {
 }
 
 static void PreserveObjects(void) {
+  R_PreserveObject(nano_addRedirect = Rf_allocVector(STRSXP, 1));
   R_PreserveObject(nano_aioFormals = Rf_list1(nano_AioSymbol));
   R_PreserveObject(nano_aioFuncs = Rf_allocVector(LISTSXP, 3));
   SETCAR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
-  SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata"), nano_ResultSymbol));
-  SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw"), nano_ResultSymbol));
+  SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata"), nano_DataSymbol));
+  SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw"), nano_DataSymbol));
   SEXP nano_AioHttpSymbol = Rf_install("rnng_aio_http");
   R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 4));
   SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(1)));
@@ -102,15 +104,16 @@ static void PreserveObjects(void) {
 }
 
 static void ReleaseObjects(void) {
-  R_ReleaseObject(nano_aioFormals);
-  R_ReleaseObject(nano_aioFuncs);
-  R_ReleaseObject(nano_aioNFuncs);
-  R_ReleaseObject(nano_error);
-  R_ReleaseObject(nano_ncurlAio);
-  R_ReleaseObject(nano_recvAio);
-  R_ReleaseObject(nano_sendAio);
-  R_ReleaseObject(nano_success);
   R_ReleaseObject(nano_unresolved);
+  R_ReleaseObject(nano_success);
+  R_ReleaseObject(nano_sendAio);
+  R_ReleaseObject(nano_recvAio);
+  R_ReleaseObject(nano_ncurlAio);
+  R_ReleaseObject(nano_error);
+  R_ReleaseObject(nano_aioNFuncs);
+  R_ReleaseObject(nano_aioFuncs);
+  R_ReleaseObject(nano_aioFormals);
+  R_ReleaseObject(nano_addRedirect);
 }
 
 static const R_CallMethodDef callMethods[] = {
@@ -130,6 +133,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
   {"rnng_base64dec", (DL_FUNC) &rnng_base64dec, 2},
   {"rnng_base64enc", (DL_FUNC) &rnng_base64enc, 2},
+  {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
   {"rnng_listen", (DL_FUNC) &rnng_listen, 3},
   {"rnng_listener_close", (DL_FUNC) &rnng_listener_close, 1},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
@@ -143,7 +147,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_request", (DL_FUNC) &rnng_request, 7},
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
-  {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 4},
+  {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},
   {"rnng_sha224", (DL_FUNC) &rnng_sha224, 3},
   {"rnng_sha256", (DL_FUNC) &rnng_sha256, 3},
   {"rnng_sha384", (DL_FUNC) &rnng_sha384, 3},
@@ -154,6 +158,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_stream_dial", (DL_FUNC) &rnng_stream_dial, 3},
   {"rnng_stream_listen", (DL_FUNC) &rnng_stream_listen, 3},
   {"rnng_strerror", (DL_FUNC) &rnng_strerror, 1},
+  {"rnng_subscribe", (DL_FUNC) &rnng_subscribe, 3},
   {"rnng_thread_create", (DL_FUNC) &rnng_thread_create, 1},
   {"rnng_unresolved", (DL_FUNC) &rnng_unresolved, 1},
   {"rnng_version", (DL_FUNC) &rnng_version, 0},

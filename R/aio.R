@@ -120,16 +120,16 @@ recv_aio <- function(con,
                      timeout = NULL,
                      keep.raw = FALSE,
                      n = 65536L)
-  result <- .Call(rnng_recv_aio, con, mode, timeout, keep.raw, n, environment())
+  data <- .Call(rnng_recv_aio, con, mode, timeout, keep.raw, n, environment())
 
 # Core aio functions -----------------------------------------------------------
 
-#' Call the Value of an Asynchronous AIO Operation
+#' Call the Value of an Asynchronous Aio Operation
 #'
-#' Retrieve the value of an asynchronous AIO operation, waiting for the AIO
+#' Retrieve the value of an asynchronous Aio operation, waiting for the
 #'     operation to complete if still in progress.
 #'
-#' @param aio An Aio (object of class 'sendAio' or 'recvAio').
+#' @param aio an Aio (object of class 'sendAio' or 'recvAio').
 #'
 #' @return The passed object (invisibly).
 #'
@@ -184,11 +184,11 @@ recv_aio <- function(con,
 #'
 call_aio <- function(aio) invisible(.Call(rnng_aio_call, aio))
 
-#' Stop Asynchronous AIO Operation
+#' Stop Asynchronous Aio Operation
 #'
-#' Stop an asynchronous AIO operation.
+#' Stop an asynchronous Aio operation.
 #'
-#' @param aio An Aio (object of class 'sendAio' or 'recvAio').
+#' @inheritParams call_aio
 #'
 #' @return Invisible NULL.
 #'
@@ -209,13 +209,14 @@ stop_aio <- function(aio) invisible(.Call(rnng_aio_stop, aio))
 #' Query whether an Aio or Aio value remains unresolved. Unlike
 #'     \code{\link{call_aio}}, this function does not wait for completion.
 #'
-#' @param aio An Aio (object of class 'sendAio' or 'recvAio'), or Aio value
+#' @param aio an Aio (object of class 'sendAio' or 'recvAio'), or Aio value
 #'     stored in \code{$result}, \code{$raw} or \code{$data} as the case may be.
 #'
-#' @return Logical TRUE or FALSE.
+#' @return Logical TRUE if 'aio' is an unresolved Aio or Aio value, or FALSE
+#'     otherwise.
 #'
-#' @details Returns TRUE for unresolved Aios or Aio values, FALSE otherwise.
-#'     Suitable for use in control flow statements such as \code{while} or \code{if}.
+#' @details Suitable for use in control flow statements such as \code{while} or
+#'     \code{if}.
 #'
 #'     Note: querying resolution may cause a previously unresolved Aio to resolve.
 #'

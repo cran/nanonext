@@ -4,25 +4,17 @@
 \alias{setopt}
 \title{Set Option on Socket, Context, Stream, Listener or Dialer}
 \usage{
-setopt(
-  object,
-  type = c("bool", "int", "ms", "size", "string", "uint64"),
-  opt,
-  value
-)
+setopt(object, opt, value)
 }
 \arguments{
 \item{object}{a Socket, Context, Stream, Listener or Dialer.}
 
-\item{type}{[default 'bool'] type of option - either 'bool', 'int', 'ms'
-(duration), 'size', 'string' or 'uint64'. Alternatively, for performance,
-specify an integer position in the vector of choices e.g. 1L for 'bool',
-2L for 'int' etc.}
-
 \item{opt}{name of option, e.g. 'reconnect-time-min', as a character string.
 See \link{opts}.}
 
-\item{value}{value of option.}
+\item{value}{value of option. Supply character type for 'string' options,
+integer or double for 'int', 'duration', 'size' and 'uint64', and logical
+for 'bool'.}
 }
 \value{
 Invisibly, an integer exit code (zero on success).
@@ -36,27 +28,27 @@ Note: once a dialer or listener has started, it is not generally
     with 'autostart = FALSE' if configuration needs to be set.
 
     To set options on a Listener or Dialer attached to a Socket or nano object,
-    you must pass in the objects directly via for example \code{$listener[[1]]}
-    for the first Listener.
+    pass in the objects directly via for example \code{$listener[[1]]} for
+    the first Listener.
 }
 \examples{
 s <- socket("pair")
-setopt(s, "ms", "recv-timeout", 2000)
+setopt(s, "recv-timeout", 2000)
 close(s)
 
 s <- socket("req")
 ctx <- context(s)
-setopt(ctx, "ms", "send-timeout", 2000)
+setopt(ctx, "send-timeout", 2000)
 close(ctx)
 close(s)
 
 s <- socket("pair", dial = "inproc://nanonext", autostart = FALSE)
-setopt(s$dialer[[1]], "ms", "reconnect-time-min", 2000)
+setopt(s$dialer[[1]], "reconnect-time-min", 2000)
 start(s$dialer[[1]])
 close(s)
 
 s <- socket("pair", listen = "inproc://nanonext", autostart = FALSE)
-setopt(s$listener[[1]], "size", "recv-size-max", 1024)
+setopt(s$listener[[1]], "recv-size-max", 1024)
 start(s$listener[[1]])
 close(s)
 
