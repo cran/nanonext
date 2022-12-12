@@ -1,3 +1,9 @@
+# nanonext 0.7.2
+
+#### Updates
+
+* For raw to character hash conversion, uses snprintf instead of sprintf for CRAN compliance.
+
 # nanonext 0.7.1
 
 #### New Features
