@@ -1,4 +1,4 @@
-# Copyright (C) 2022 Hibiki AI Limited <info@hibiki-ai.com>
+# Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
 #
 # This file is part of nanonext.
 #
@@ -107,7 +107,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
                                                                   setopt,
                                                                   opt = opt,
                                                                   value = value))
-      if (!autostart) nano[["dialer_start"]] <- function(async = TRUE) {
+      if (isFALSE(autostart)) nano[["dialer_start"]] <- function(async = TRUE) {
         s <- start(.subset2(nano, "dialer")[[1L]], async = async)
         if (s == 0L) rm("dialer_start", envir = nano)
         invisible(s)
@@ -127,7 +127,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
                                                                     setopt,
                                                                     opt = opt,
                                                                     value = value))
-      if (!autostart) nano[["listener_start"]] <- function() {
+      if (isFALSE(autostart)) nano[["listener_start"]] <- function() {
         s <- start(.subset2(nano, "listener")[[1L]])
         if (s == 0L) rm("listener_start", envir = nano)
         invisible(s)
@@ -149,7 +149,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
                                                                   setopt,
                                                                   opt = opt,
                                                                   value = value))
-      if (!autostart) nano[["dialer_start"]] <- function(async = TRUE) {
+      if (isFALSE(autostart)) nano[["dialer_start"]] <- function(async = TRUE) {
         s <- start((d <- .subset2(nano, "dialer"))[[length(d)]], async = async)
         if (s == 0L) rm("dialer_start", envir = nano)
         invisible(s)
@@ -170,7 +170,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
                                                                     setopt,
                                                                     opt = opt,
                                                                     value = value))
-      if (!autostart) nano[["listener_start"]] <- function() {
+      if (isFALSE(autostart)) nano[["listener_start"]] <- function() {
         s <- start((l <- .subset2(nano, "listener"))[[length(l)]])
         if (s == 0L) rm("listener_start", envir = nano)
         invisible(s)
@@ -346,10 +346,14 @@ print.nanoListener <- function(x, ...) {
 #'
 print.nanoStream <- function(x, ...) {
 
-  cat(sprintf(if (length(attr(x, "dialer")))
-    "< nanoStream >\n - type: dialer\n - url: %s\n - textframes: %s\n" else
-      "< nanoStream >\n - type: listener\n - url: %s\n - textframes: %s\n",
-    attr(x, "url"), attr(x, "textframes")), file = stdout())
+  if (length(attr(x, "dialer")))
+    cat(sprintf("< nanoStream >\n - type: dialer\n - url: %s\n - textframes: %s\n",
+                attr(x, "url"), attr(x, "textframes")), file = stdout())
+  else if (length(attr(x, "listener")))
+    cat(sprintf("< nanoStream >\n - type: listener\n - url: %s\n - textframes: %s\n",
+                attr(x, "url"), attr(x, "textframes")), file = stdout())
+  else
+    cat("< nanoStream >\n - not active\n", file = stdout())
   invisible(x)
 
 }
@@ -380,6 +384,16 @@ print.sendAio <- function(x, ...) {
 print.ncurlAio <- function(x, ...) {
 
   cat("< ncurlAio >\n - $status for response status code\n - $headers for response headers\n - $raw for raw message\n - $data for message data\n", file = stdout())
+  invisible(x)
+
+}
+
+#' @export
+#'
+print.ncurlSession <- function(x, ...) {
+
+  cat(sprintf("< ncurlSession >\n - %s\n",
+              if (length(attr(x, "aio"))) "use transact() to return data" else "not active" ), file = stdout())
   invisible(x)
 
 }
