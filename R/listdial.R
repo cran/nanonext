@@ -58,7 +58,7 @@
 #'     challenging communications problems.
 #'
 #'     Any configuration options on the dialer/listener should be set by
-#'     \code{\link{setopt}} before starting the dialer/listener with
+#'     \code{\link{opt<-}} before starting the dialer/listener with
 #'     \code{\link{start}}.
 #'
 #'     Dialers/Listeners may be destroyed by \code{\link{close}}. They are also
@@ -84,7 +84,7 @@
 #' @export
 #'
 dial <- function(socket, url = "inproc://nanonext", autostart = TRUE)
-  invisible(.Call(rnng_dial, socket, url, autostart))
+  invisible(.Call(rnng_dial, socket, url, autostart, NULL))
 
 #' Listen to an Address from a Socket
 #'
@@ -125,7 +125,7 @@ dial <- function(socket, url = "inproc://nanonext", autostart = TRUE)
 #'     challenging communications problems.
 #'
 #'     Any configuration options on the dialer/listener should be set by
-#'     \code{\link{setopt}} before starting the dialer/listener with
+#'     \code{\link{opt<-}} before starting the dialer/listener with
 #'     \code{\link{start}}.
 #'
 #'     Dialers/Listeners may be destroyed by \code{\link{close}}. They are also
@@ -151,7 +151,7 @@ dial <- function(socket, url = "inproc://nanonext", autostart = TRUE)
 #' @export
 #'
 listen <- function(socket, url = "inproc://nanonext", autostart = TRUE)
-  invisible(.Call(rnng_listen, socket, url, autostart))
+  invisible(.Call(rnng_listen, socket, url, autostart, NULL))
 
 #' Start Listener/Dialer
 #'

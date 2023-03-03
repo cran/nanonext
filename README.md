@@ -64,8 +64,9 @@ Web utilities:
 8.  [ncurl: (Async) HTTP Client](#ncurl-async-http-client)
 9.  [stream: Websocket Client](#stream-websocket-client)
 10. [Cryptographic Hashing](#cryptographic-hashing)
-11. [Building from Source](#building-from-source)
-12. [Links](#links)
+11. [Options and Statistics](#options-and-statistics)
+12. [Building from Source](#building-from-source)
+13. [Links](#links)
 
 ### Installation
 
@@ -365,7 +366,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] 2.593 -0.328 0.571 0.646 1.092 ...
+#>  num [1:100000000] 0.824 0.427 -1.37 -1.831 0.401 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -442,6 +443,10 @@ pub |> send(c(1, 10, 10, 20), mode = "raw")
 #> [1] 0
 sub |> recv(mode = "double")
 #> [1]  1 10 10 20
+pub |> send(c(2, 10, 10, 20), mode = "raw")
+#> [1] 0
+sub |> recv(mode = "double")
+#> 'errorValue' int 8 | Try again
 
 close(pub)
 close(sub)
@@ -465,7 +470,7 @@ res1 <- socket("respondent", dial = "inproc://nanoservice")
 res2 <- socket("respondent", dial = "inproc://nanoservice")
 
 # sur sets a survey timeout, applying to this and subsequent surveys
-sur |> survey_time(500)
+sur |> survey_time(value = 500)
 
 # sur sends a message and then requests 2 async receives
 sur |> send("service check")
@@ -489,7 +494,7 @@ aio2$data
 #> 'unresolved' logi NA
 
 # after the survey expires, the second resolves into a timeout error
-Sys.sleep(0.5)
+msleep(500)
 aio2$data
 #> 'errorValue' int 5 | Timed out
 
@@ -498,10 +503,13 @@ close(res1)
 close(res2)
 ```
 
-Above it can be seen that the final value resolves into a timeout, which
-is an integer 5 classed as ‘errorValue’. All integer error codes are
-classed as ‘errorValue’ to be easily distinguishable from integer
-message values.
+Above, `msleep()` is an uninterruptible sleep function (utilising the
+NNG library), taking a time in milliseconds.
+
+It can be seen that the final value resolves into a timeout, which is an
+integer 5 classed as ‘errorValue’. All integer error codes are classed
+as ‘errorValue’ to be easily distinguishable from integer message
+values.
 
 [« Back to ToC](#table-of-contents)
 
@@ -526,11 +534,11 @@ ncurl("https://httpbin.org/headers")
 #>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
 #>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
 #>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 33 63 35 31 62 33 37 2d 36 32 32 38 63 38 61 37 33 36 61 37 63 63 34
-#> [101] 61 34 39 34 33 39 36 66 66 22 0a 20 20 7d 0a 7d 0a
+#>  [76] 2d 36 34 30 31 61 36 33 63 2d 32 38 38 62 62 33 66 32 35 38 35 61 39 65 31
+#> [101] 39 36 66 65 39 31 34 33 34 22 0a 20 20 7d 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63c51b37-6228c8a736a7cc4a494396ff\"\n  }\n}\n"
+#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6401a63c-288bb3f2585a9e196fe91434\"\n  }\n}\n"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
@@ -551,17 +559,58 @@ res
 
 call_aio(res)$headers
 #> $Date
-#> [1] "Mon, 16 Jan 2023 09:39:03 GMT"
+#> [1] "Fri, 03 Mar 2023 07:48:12 GMT"
 #> 
 #> $Server
 #> [1] "gunicorn/19.9.0"
 
 res$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-63c51b37-0a9c25b56da3a6841d860396\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"212.36.172.203\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6401a63c-413dd500166f01060651af22\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
 ```
 
 In this respect, it may be used as a performant and lightweight method
 for making REST API requests.
+
+`ncurl_session()` creates a re-usable open connection and presents a
+much faster and more efficient solution for repeated polling of an API
+endpoint. `transact()` is then used to request data multiple times as
+required. This method allows a polling frequency that exceeds a server’s
+new connection limits, where this is permitted.
+
+``` r
+sess <- ncurl_session("https://httpbin.org/get",
+                      headers = c(`Content-Type` = "application/json", Authorization = "Bearer APIKEY"),
+                      response = "date")
+sess
+#> < ncurlSession >
+#>  - use transact() to return data
+
+transact(sess)
+#> $status
+#> [1] 200
+#> 
+#> $headers
+#> $headers$date
+#> [1] "Fri, 03 Mar 2023 07:48:13 GMT"
+#> 
+#> 
+#> $raw
+#>   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 20 0a 20 20 22 68 65 61 64 65
+#>  [26] 72 73 22 3a 20 7b 0a 20 20 20 20 22 41 75 74 68 6f 72 69 7a 61 74 69 6f 6e
+#>  [51] 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 2c 20 0a 20 20 20 20
+#>  [76] 22 43 6f 6e 74 65 6e 74 2d 54 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74
+#> [101] 69 6f 6e 2f 6a 73 6f 6e 22 2c 20 0a 20 20 20 20 22 48 6f 73 74 22 3a 20 22
+#> [126] 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22 58 2d 41 6d 7a
+#> [151] 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 30 31
+#> [176] 61 36 33 64 2d 33 66 64 33 38 66 63 32 37 34 31 35 33 38 31 64 37 36 31 39
+#> [201] 34 61 65 35 22 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22
+#> [226] 31 38 35 2e 32 32 35 2e 34 35 2e 34 39 22 2c 20 0a 20 20 22 75 72 6c 22 3a
+#> [251] 20 22 68 74 74 70 73 3a 2f 2f 68 74 74 70 62 69 6e 2e 6f 72 67 2f 67 65 74
+#> [276] 22 0a 7d 0a
+#> 
+#> $data
+#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6401a63d-3fd38fc27415381d76194ae5\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
+```
 
 [« Back to ToC](#table-of-contents)
 
@@ -576,13 +625,12 @@ servers. The argument `textframes = TRUE` can be specified where the
 websocket server uses text rather than binary frames.
 
 ``` r
-# official demo API key used below
-s <- stream(dial = "wss://ws.eodhistoricaldata.com/ws/forex?api_token=OeAFFmMliFG5orCUuwAKQ8l4WWFQ67YX",
-            textframes = TRUE)
+# connecting to an echo service
+s <- stream(dial = "wss://echo.websocket.events/", textframes = TRUE)
 s
 #> < nanoStream >
 #>  - type: dialer
-#>  - url: wss://ws.eodhistoricaldata.com/ws/forex?api_token=OeAFFmMliFG5orCUuwAKQ8l4WWFQ67YX
+#>  - url: wss://echo.websocket.events/
 #>  - textframes: TRUE
 ```
 
@@ -593,16 +641,27 @@ processing streaming data.
 
 ``` r
 s |> recv()
-#> [1] "{\"status_code\":200,\"message\":\"Authorized\"}"
+#> [1] "echo.websocket.events sponsored by Lob.com"
 
-s |> send('{"action": "subscribe", "symbols": "EURUSD"}')
+s |> send("initial message")
 #> [1] 0
 
 s |> recv()
-#> [1] "{\"s\":\"EURUSD\",\"a\":1.08243,\"b\":1.08241,\"dc\":\"0.0185\",\"dd\":\"0.0002\",\"ppms\":false,\"t\":1673861944000}"
+#> [1] "initial message"
+
+s |> recv_aio() -> r
+
+s |> send("async message")
+#> [1] 0
+
+s |> send("final message")
+#> [1] 0
 
 s |> recv()
-#> [1] "{\"s\":\"EURUSD\",\"a\":1.08242,\"b\":1.0824,\"dc\":\"0.0176\",\"dd\":\"0.0002\",\"ppms\":false,\"t\":1673861944000}"
+#> [1] "final message"
+
+r$data
+#> [1] "async message"
 
 close(s)
 ```
@@ -645,6 +704,61 @@ base64dec(base64enc("hello world!"))
 #> [1] "hello world!"
 ```
 
+Performance is such that base64 decoding a character string into a raw
+vector can be faster than creating a new raw vector using `as.raw()`.
+
+[« Back to ToC](#table-of-contents)
+
+### Options and Statistics
+
+Use `opt()` and `'opt<-'()` to get and set options on a Socket, Context,
+Stream, Listener or Dialer.
+
+See the function documentation page for a list of common options.
+
+Once a dialer or listener has started, it is not generally possible to
+change its configuration. In this case, the dialer or listener should be
+created specifying ‘autostart = FALSE’.
+
+``` r
+s <- socket(listen = "inproc://options", autostart = FALSE)
+
+# no maximum message size
+opt(s$listener[[1]], "recv-size-max")
+#> [1] 0
+
+# enfore maximum message size to protect against denial-of-service type attacks
+opt(s$listener[[1]], "recv-size-max") <- 8192L
+
+opt(s$listener[[1]], "recv-size-max")
+#> [1] 8192
+
+start(s$listener[[1]])
+```
+
+Similarly `stat()` has been implemented as the interface to NNG’s
+statistics framework.
+
+This can be used on a Socket, Listener or Dialer to query useful
+statistics such as the total number of connection attempts, the current
+number of connections etc.
+
+See the function documentation page for available statistics.
+
+``` r
+s <- socket(listen = "inproc://stat")
+
+# no active connections (pipes)
+stat(s, "pipes")
+#> [1] 0
+
+s1 <- socket(dial = "inproc://stat")
+
+# one now that the dialer has conneceted
+stat(s, "pipes")
+#> [1] 1
+```
+
 [« Back to ToC](#table-of-contents)
 
 ### Building from Source
@@ -653,7 +767,7 @@ base64dec(base64enc("hello world!"))
 
 Installation from source requires ‘libnng’ \>= v1.6.0 and ‘libmbedtls’
 \>= 2 - suitable installations are automatically detected - or else
-‘cmake’ to compile ‘libnng’ v1.6.0 pre-release (539e559) and
+‘cmake’ to compile ‘libnng’ v1.6.0 pre-release (8e1836f) and
 ‘libmbedtls’ v3.2.1 included within the package sources.
 
 Note: ‘libnng’ v1.6.0 is not yet available in system repositories;
@@ -667,17 +781,17 @@ to package installation to specify a custom location for ‘libmbedtls’ or
 Package installation will automatically build the libraries if required.
 
 *Additional requirements for Solaris: (i) the ‘xz’ package - available
-on OpenCSW, and (ii) a more recent version of ‘cmake’ than that
-available on OpenCSW - see the ‘cmake’ website for the latest source
-file which can be built with just a C compiler.*
+on OpenCSW, and (ii) a more recent version of ‘cmake’ than available on
+OpenCSW - refer to the ‘cmake’ website for the latest source file
+(requiring only a C compiler to build).*
 
 #### Windows
 
-For R \>= 4.2 using the ‘rtools42’ toolchain, ‘libnng’ v1.6.0 (539e559)
+For R \>= 4.2 using the ‘rtools42’ toolchain, ‘libnng’ v1.6.0 (8e1836f)
 and ‘libmbedtls’ v3.2.1 will be automatically compiled from the package
 sources during installation.
 
-For previous R versions, pre-compiled ‘libnng’ v1.6.0 (539e559) and
+For previous R versions, pre-compiled ‘libnng’ v1.6.0 (8e1836f) and
 ‘libmbedtls’ v3.2.1 libraries are downloaded and used for installation
 instead.
 

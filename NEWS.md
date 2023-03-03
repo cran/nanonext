@@ -1,3 +1,26 @@
+# nanonext 0.8.0
+
+#### New Features
+
+* Implements `stat()`, an interface to the NNG statistics framework. Can be used to return the number of currently connected pipes for a socket, connection attempts for a listener/dialer etc.
+* Implements `parse_url()`, which parses a URL as per NNG. Provides a fast and standardised method for obtaining parts of a URL string.
+
+#### Updates
+
+*Please review the following potentially breaking changes, and only update when ready:*
+
+* Using `socket()` specifying either 'dial' or 'listen', a failure to either dial or listen (due to an invalid URL for example) will now error rather than return a socket with a warning. This is safer behaviour that should make it easier to detect bugs in user code.
+* `opt()` and `'opt<-'()` have been implemented as more ergonomic options getter and setter functions to replace `getopt()` and `setopt()`. These will error if the option does not exist / input value is invalid etc.
+* `subscribe()`, `unsubscribe()` and `survey_time()` now return the Socket or Context invisibly rather than an exit code, and will error upon invalid input etc.
+* `survey_time()` argument name is now 'value', with a default of 1000L.
+* nano Object methods `$opt`, `$listener_opt`, and `$dialer_opt` re-implemented to either get or set values depending on whether the 'value' parameter has been supplied.
+
+*Other changes:*
+
+* Bundled 'libnng' source updated to v1.6.0 pre-release (8e1836f).
+* Supported R version amended to >= 2.12, when person() adopted the current format used for package description.
+* Internal performance enhancements.
+
 # nanonext 0.7.3
 
 #### New Features

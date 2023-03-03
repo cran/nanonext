@@ -457,7 +457,7 @@ SEXP rnng_ctx_close(SEXP context) {
 
 // dialers and listeners -------------------------------------------------------
 
-SEXP rnng_dial(SEXP socket, SEXP url, SEXP autostart) {
+SEXP rnng_dial(SEXP socket, SEXP url, SEXP autostart, SEXP error) {
 
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
     Rf_error("'socket' is not a valid Socket");
@@ -481,6 +481,7 @@ SEXP rnng_dial(SEXP socket, SEXP url, SEXP autostart) {
 
   if (xc) {
     R_Free(dp);
+    if (error != R_NilValue) ERROR_OUT(xc);
     ERROR_RET(xc);
   }
 
@@ -517,7 +518,7 @@ SEXP rnng_dial(SEXP socket, SEXP url, SEXP autostart) {
 
 }
 
-SEXP rnng_listen(SEXP socket, SEXP url, SEXP autostart) {
+SEXP rnng_listen(SEXP socket, SEXP url, SEXP autostart, SEXP error) {
 
   if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
     Rf_error("'socket' is not a valid Socket");
@@ -530,6 +531,7 @@ SEXP rnng_listen(SEXP socket, SEXP url, SEXP autostart) {
   const int xc = start ? nng_listen(*sock, up, lp, 0) : nng_listener_create(lp, *sock, up);
   if (xc) {
     R_Free(lp);
+    if (error != R_NilValue) ERROR_OUT(xc);
     ERROR_RET(xc);
   }
 
@@ -1054,9 +1056,9 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
   }
 
   if (xc)
-    ERROR_RET(xc);
+    ERROR_OUT(xc);
 
-  return nano_success;
+  return object;
 
 }
 
@@ -1095,9 +1097,9 @@ SEXP rnng_subscribe(SEXP object, SEXP value, SEXP sub) {
   }
 
   if (xc)
-    ERROR_RET(xc);
+    ERROR_OUT(xc);
 
-  return nano_success;
+  return object;
 
 }
 
@@ -1234,6 +1236,58 @@ SEXP rnng_get_opt(SEXP object, SEXP opt) {
     out = Rf_ScalarReal((double) uval);
   }
 
+  return out;
+
+}
+
+// statistics ------------------------------------------------------------------
+
+SEXP rnng_stats_get(SEXP object, SEXP stat) {
+
+  if (TYPEOF(object) != EXTPTRSXP)
+    Rf_error("'object' is not a valid Socket, Listener or Dialer");
+
+  const char *statname = CHAR(STRING_ELT(stat, 0));
+  SEXP out;
+  int xc, typ;
+  nng_stat *nst, *sst;
+
+  xc = nng_stats_get(&nst);
+  if (xc)
+    ERROR_OUT(xc);
+
+  const SEXP ptrtag = R_ExternalPtrTag(object);
+  if (ptrtag == nano_SocketSymbol) {
+
+    nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(object);
+    sst = nng_stat_find_socket(nst, *sock);
+
+  } else if (ptrtag == nano_ListenerSymbol) {
+    nng_listener *list = (nng_listener *) R_ExternalPtrAddr(object);
+    sst = nng_stat_find_listener(nst, *list);
+
+  } else if (ptrtag == nano_DialerSymbol) {
+    nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(object);
+    sst = nng_stat_find_dialer(nst, *dial);
+
+  } else {
+    Rf_error("'object' is not a valid Socket, Listener or Dialer");
+  }
+
+  sst = nng_stat_find(sst, statname);
+  if (sst == NULL) {
+    nng_stats_free(nst);
+    return R_NilValue;
+  }
+
+  typ = nng_stat_type(sst);
+  if (typ == NNG_STAT_STRING) {
+    out = Rf_mkString(nng_stat_string(sst));
+  } else {
+    out = Rf_ScalarReal((double) nng_stat_value(sst));
+  }
+
+  nng_stats_free(nst);
   return out;
 
 }

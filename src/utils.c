@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Hibiki AI Limited <info@hibiki-ai.com>
+// Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
 //
 // This file is part of nanonext.
 //
@@ -111,6 +111,37 @@ SEXP rnng_random(SEXP n) {
 
 }
 
+SEXP rnng_url_parse(SEXP url) {
+
+  const char *up = CHAR(STRING_ELT(url, 0));
+  nng_url *urlp;
+  int xc;
+
+  xc = nng_url_parse(&urlp, up);
+  if (xc)
+    ERROR_OUT(xc);
+
+  SEXP out;
+  const char *names[] = {"rawurl", "scheme", "userinfo", "host", "hostname",
+                         "port", "path", "query", "fragment", "requri", ""};
+  PROTECT(out = Rf_mkNamed(STRSXP, names));
+  SET_STRING_ELT(out, 0, Rf_mkChar(urlp->u_rawurl));
+  SET_STRING_ELT(out, 1, urlp->u_scheme == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_scheme));
+  SET_STRING_ELT(out, 2, urlp->u_userinfo == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_userinfo));
+  SET_STRING_ELT(out, 3, urlp->u_host == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_host));
+  SET_STRING_ELT(out, 4, urlp->u_hostname == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_hostname));
+  SET_STRING_ELT(out, 5, urlp->u_port == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_port));
+  SET_STRING_ELT(out, 6, urlp->u_path == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_path));
+  SET_STRING_ELT(out, 7, urlp->u_query == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_query));
+  SET_STRING_ELT(out, 8, urlp->u_fragment == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_fragment));
+  SET_STRING_ELT(out, 9, urlp->u_requri == NULL ? Rf_mkChar("") : Rf_mkChar(urlp->u_requri));
+  nng_url_free(urlp);
+
+  UNPROTECT(1);
+  return out;
+
+}
+
 SEXP rnng_device(SEXP s1, SEXP s2) {
 
   if (R_ExternalPtrTag(s1) != nano_SocketSymbol)
@@ -124,6 +155,14 @@ SEXP rnng_device(SEXP s1, SEXP s2) {
     ERROR_OUT(xc);
 
   return R_NilValue;
+
+}
+
+SEXP rnng_is_nul_byte(SEXP x) {
+
+  if (TYPEOF(x) == RAWSXP && Rf_xlength(x) == 1 && RAW(x)[0] == 0)
+    return Rf_ScalarLogical(1);
+  return Rf_ScalarLogical(0);
 
 }
 
