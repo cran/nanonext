@@ -122,6 +122,46 @@ recv_aio <- function(con,
                      n = 65536L)
   data <- .Call(rnng_recv_aio, con, mode, timeout, keep.raw, n, environment())
 
+#' Receive Async and Signal a Condition
+#'
+#' A signalling version of the function takes a 'conditionVariable' as an
+#'     additional argument and signals it when the async receive is complete.
+#'
+#' @param cv \strong{For the signalling version}: a 'conditionVariable' that
+#'     should be signalled when the async receive is complete.
+#'
+#' @details \strong{For the signalling version}: when the receive is complete,
+#'     the supplied 'conditionVariable' is signalled by incrementing its value
+#'     by 1. This happens asynchronously and independently of the R execution
+#'     thread.
+#'
+#' @examples
+#' # Signalling a condition variable
+#'
+#' s1 <- socket("pair", listen = "tcp://127.0.0.1:6546")
+#' cv <- cv()
+#' msg <- recv_aio_signal(s1, timeout = 100, cv = cv)
+#' until(cv, 10L)
+#' msg$data
+#' close(s1)
+#'
+#' # in another process in parallel
+#' s2 <- socket("pair", dial = "tcp://127.0.0.1:6546")
+#' res <- send_aio(s2, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
+#' close(s2)
+#'
+#' @rdname recv_aio
+#' @export
+#'
+recv_aio_signal <- function(con,
+                            mode = c("serial", "character", "complex", "double",
+                                     "integer", "logical", "numeric", "raw"),
+                            timeout = NULL,
+                            keep.raw = FALSE,
+                            n = 65536L,
+                            cv)
+  data <- .Call(rnng_cv_recv_aio, con, mode, timeout, keep.raw, n, environment(), cv)
+
 # Core aio functions -----------------------------------------------------------
 
 #' Call the Value of an Asynchronous Aio Operation
@@ -239,4 +279,20 @@ stop_aio <- function(aio) invisible(.Call(rnng_aio_stop, aio))
 #' @export
 #'
 unresolved <- function(aio) .Call(rnng_unresolved, aio)
+
+#' Technical Utility: Query if an Aio is Unresolved
+#'
+#' Query whether an Aio remains unresolved. This function is an experimental
+#'     technical utility version of \code{\link{unresolved}} not intended for
+#'     ordinary use. Provides a method of querying the busy status of an Aio
+#'     without altering its state in any way i.e. not attempting to retrieve the
+#'     result or message.
+#'
+#' @param aio an Aio (object of class 'sendAio' or 'recvAio').
+#'
+#' @return Logical TRUE if 'aio' is an unresolved Aio, or FALSE otherwise.
+#'
+#' @export
+#'
+.unresolved <- function(aio) .Call(rnng_unresolved2, aio)
 

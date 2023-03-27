@@ -7,11 +7,12 @@
 \title{nanonext: NNG (Nanomsg Next Gen) Lightweight Messaging Library}
 \description{
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a socket
-    library providing high-performance scalability protocols, implementing a
+    library providing high-performance scalability protocols, a
     cross-platform standard for messaging and communications. Serves as a
     concurrency framework for building distributed applications, utilising
     'aio' objects which resolve automatically upon completion of asynchronous
-    operations.
+    operations. Implements synchronisation primitives, allowing R to wait
+    upon events being signalled by concurrent messaging threads.
 }
 \section{Usage notes}{
 
@@ -35,9 +36,11 @@ R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a socket
 
     Guide to the implemented protocols for sockets: \link{protocols}
 
-    Guide to the supported transports for dialers and listeners: \link{transports}
+    Guide to the supported transports for dialers and listeners:
+    \link{transports}
 
-    Guide to the options that can be set using: \link{opt<-}
+    Guide to the options that can be inspected and set using: \link{opt} /
+    \link{opt<-}
 }
 
 \section{Conceptual overview}{

@@ -14,11 +14,12 @@ badge](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https:/
 <!-- badges: end -->
 
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a
-socket library providing high-performance scalability protocols,
-implementing a cross-platform standard for messaging and communications.
-Serves as a concurrency framework for building distributed applications,
-utilising ‘aio’ objects which resolve automatically upon completion of
-asynchronous operations.
+socket library providing high-performance scalability protocols, a
+cross-platform standard for messaging and communications. Serves as a
+concurrency framework for building distributed applications, utilising
+‘aio’ objects which resolve automatically upon completion of
+asynchronous operations. Implements synchronisation primitives, allowing
+R to wait upon events being signalled by concurrent messaging threads.
 
 Designed for performance and reliability, the NNG library is written in
 C and {nanonext} is a lightweight zero-dependency wrapper. Provides the
@@ -49,7 +50,7 @@ Web utilities:
 - stream - secure websockets client (and generic low-level socket
   interface)
 - messenger - console-based instant messaging with authentication
-- sha\[224\|256\|384\|512\] - cryptographic hash and HMAC algorithms
+- sha\[1\|224\|256\|384\|512\] - cryptographic hash and HMAC algorithms
 - base64\[enc\|dec\] - base64 encoding and decoding
 
 ### Table of Contents
@@ -59,14 +60,15 @@ Web utilities:
 3.  [Cross-language Exchange](#cross-language-exchange)
 4.  [Async and Concurrency](#async-and-concurrency)
 5.  [RPC and Distributed Computing](#rpc-and-distributed-computing)
-6.  [Publisher / Subscriber Model](#publisher-subscriber-model)
-7.  [Surveyor / Respondent Model](#surveyor-respondent-model)
-8.  [ncurl: (Async) HTTP Client](#ncurl-async-http-client)
-9.  [stream: Websocket Client](#stream-websocket-client)
-10. [Cryptographic Hashing](#cryptographic-hashing)
-11. [Options and Statistics](#options-and-statistics)
-12. [Building from Source](#building-from-source)
-13. [Links](#links)
+6.  [Synchronisation Primitives](#synchronisation-primitives)
+7.  [Publisher / Subscriber Model](#publisher-subscriber-model)
+8.  [Surveyor / Respondent Model](#surveyor-respondent-model)
+9.  [ncurl: (Async) HTTP Client](#ncurl-async-http-client)
+10. [stream: Websocket Client](#stream-websocket-client)
+11. [Cryptographic Hashing](#cryptographic-hashing)
+12. [Options and Statistics](#options-and-statistics)
+13. [Building from Source](#building-from-source)
+14. [Links](#links)
 
 ### Installation
 
@@ -268,7 +270,7 @@ msg$data
 #>   a b
 #> 1 1 2
 msg$raw
-#>   [1] 58 0a 00 00 00 03 00 04 02 02 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>   [1] 58 0a 00 00 00 03 00 04 02 03 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
 #>  [26] 03 13 00 00 00 02 00 00 00 0e 00 00 00 01 3f f0 00 00 00 00 00 00 00 00 00
 #>  [51] 0e 00 00 00 01 40 00 00 00 00 00 00 00 00 00 04 02 00 00 00 01 00 04 00 09
 #>  [76] 00 00 00 05 6e 61 6d 65 73 00 00 00 10 00 00 00 02 00 04 00 09 00 00 00 01
@@ -366,7 +368,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] 0.824 0.427 -1.37 -1.831 0.401 ...
+#>  num [1:100000000] 1.0595 0.0664 0.1575 0.9746 -0.3545 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -383,6 +385,122 @@ which may typically be NULL or an exit code.
 The {mirai} package <https://shikokuchuo.net/mirai/> (available on CRAN)
 uses {nanonext} as the back-end to provide asynchronous execution of
 arbitrary R code using the RPC model.
+
+The {crew} package <https://wlandau.github.io/crew/> (available on CRAN)
+by William Landau further extends {mirai} to different computing
+platforms for distributed workers.
+
+[« Back to ToC](#table-of-contents)
+
+### Synchronisation Primitives
+
+{nanonext} implements synchronisation primitives provided by the NNG
+library for cross-platform use.
+
+As the R interpreter runs on a single thread, synchronisation primitives
+such as mutexes and condition variables are not natively implemented in
+the R language. However, as NNG is inherently threaded and messaging can
+be asynchronous, it is possible to synchronise between NNG events
+happening independently and the main R execution thread.
+
+The events that can be signalled include asynchronous receive
+completions, and pipe events - these are when connections are
+established or when they are dropped.
+
+Condition variables can be used simply to record such events, or more
+powerfully, to wait upon these events. The condition variables
+implemented in {nanonext} include a both a condition (value) and flag
+(binary). Each signal increments the value, and each return of `wait()`
+or `until()` decrements the value. A non-zero condition allows waiting
+threads to continue.
+
+In any situation where polling for an event presents a solution, waiting
+upon a condition to be signalled can be more efficient, both in terms of
+consuming no resources while waiting, and also being synchronised with
+the event (having no latency).
+
+The following shows how condition variables and signalling work in
+practice.
+
+Example 1: set up a socket, and wait for the other side to connect:
+
+``` r
+sock <- socket("pair", listen = "inproc://nanopipe")
+
+cv <- cv() # create new condition variable
+cv_value(cv)
+#> [1] 0
+
+pipe_notify(sock, cv = cv, add = TRUE, remove = TRUE)
+
+# wait(cv) # uncomment in normal usage - but would block
+
+# for illustration:
+sock2 <- socket("pair", dial = "inproc://nanopipe")
+
+cv_value(cv) # incremented when pipe to 'sock2' was created
+#> [1] 1
+
+wait(cv) # wait() now does not block
+
+cv_value(cv) # wait() decrements the CV value - calling wait() again will block
+#> [1] 0
+
+close(sock2)
+
+cv_value(cv) # incremented when pipe to 'sock2' was destroyed
+#> [1] 1
+
+close(sock)
+```
+
+Example 2: wait until a message is received or connection is dropped:
+
+``` r
+sock <- socket("pair", listen = "inproc://nanosignal")
+sock2 <- socket("pair", dial = "inproc://nanosignal")
+
+cv <- cv() # create new condition variable
+cv_value(cv)
+#> [1] 0
+
+pipe_notify(sock, cv = cv, add = FALSE, remove = TRUE, flag = TRUE)
+
+send(sock2, "this message will wake waiting thread") # in real usage happens concurrently with wait()
+#> [1] 0
+
+r <- recv_aio_signal(sock, cv = cv) # same cv passed to signalling form of recv_aio()
+
+# wakes as soon as the asynchronous receive completes
+wait(cv) || stop("peer disconnected")
+#> [1] TRUE
+
+r$data
+#> [1] "this message will wake waiting thread"
+
+close(sock)
+close(sock2)
+```
+
+The above example shows the working of the flag within the condition
+variable. As the pipe notification was specified to raise a flag, this
+can be used to distinguish between a pipe event signal and a message
+receive signal.
+
+In the case a flag is raised, `wait()` returns FALSE rather than TRUE.
+So the above code will stop with the custom error message upon
+disconnect or else continue. This affords a way of handling disconnects
+that would not be possible if simply using `call_aio()`, which is also a
+blocking wait (on a single message).
+
+As can be seen, this type of mechanism presents a powerful way of
+waiting simulatenously on multiple events, and also distinguishing
+between them. `pipe_notify()` can also be set to signal two condition
+variables upon each event, providing even more flexibility in creating
+complex concurrent applications.
+
+For further details, please refer to the function documentation for
+`cv()`.
 
 [« Back to ToC](#table-of-contents)
 
@@ -534,11 +652,11 @@ ncurl("https://httpbin.org/headers")
 #>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
 #>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
 #>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 34 30 31 61 36 33 63 2d 32 38 38 62 62 33 66 32 35 38 35 61 39 65 31
-#> [101] 39 36 66 65 39 31 34 33 34 22 0a 20 20 7d 0a 7d 0a
+#>  [76] 2d 36 34 32 31 35 65 66 39 2d 31 34 39 35 31 65 66 39 35 64 65 37 64 65 34
+#> [101] 64 34 35 35 36 30 63 39 35 22 0a 20 20 7d 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6401a63c-288bb3f2585a9e196fe91434\"\n  }\n}\n"
+#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-64215ef9-14951ef95de7de4d45560c95\"\n  }\n}\n"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
@@ -559,13 +677,13 @@ res
 
 call_aio(res)$headers
 #> $Date
-#> [1] "Fri, 03 Mar 2023 07:48:12 GMT"
+#> [1] "Mon, 27 Mar 2023 09:16:41 GMT"
 #> 
 #> $Server
 #> [1] "gunicorn/19.9.0"
 
 res$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6401a63c-413dd500166f01060651af22\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-64215ef9-781527dd121d916b1a92a377\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -591,7 +709,7 @@ transact(sess)
 #> 
 #> $headers
 #> $headers$date
-#> [1] "Fri, 03 Mar 2023 07:48:13 GMT"
+#> [1] "Mon, 27 Mar 2023 09:16:42 GMT"
 #> 
 #> 
 #> $raw
@@ -601,15 +719,15 @@ transact(sess)
 #>  [76] 22 43 6f 6e 74 65 6e 74 2d 54 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74
 #> [101] 69 6f 6e 2f 6a 73 6f 6e 22 2c 20 0a 20 20 20 20 22 48 6f 73 74 22 3a 20 22
 #> [126] 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22 58 2d 41 6d 7a
-#> [151] 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 30 31
-#> [176] 61 36 33 64 2d 33 66 64 33 38 66 63 32 37 34 31 35 33 38 31 64 37 36 31 39
-#> [201] 34 61 65 35 22 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22
-#> [226] 31 38 35 2e 32 32 35 2e 34 35 2e 34 39 22 2c 20 0a 20 20 22 75 72 6c 22 3a
+#> [151] 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 32 31
+#> [176] 35 65 66 61 2d 32 35 32 65 37 39 65 31 31 39 39 38 62 38 66 61 36 63 30 66
+#> [201] 61 33 66 33 22 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22
+#> [226] 32 31 33 2e 38 36 2e 31 36 39 2e 33 34 22 2c 20 0a 20 20 22 75 72 6c 22 3a
 #> [251] 20 22 68 74 74 70 73 3a 2f 2f 68 74 74 70 62 69 6e 2e 6f 72 67 2f 67 65 74
 #> [276] 22 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6401a63d-3fd38fc27415381d76194ae5\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-64215efa-252e79e11998b8fa6c0fa3f3\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
 ```
 
 [« Back to ToC](#table-of-contents)
@@ -670,10 +788,11 @@ close(s)
 
 ### Cryptographic Hashing
 
-Functions performing hashing using the SHA-2 series of algorithms is
-included: `sha224()`, `sha256()`, `sha384()` and `sha512()`.
+Functions performing hashing using the SHA-1 and SHA-2 series of
+algorithms are included: `sha1()`, `sha224()`, `sha256()`, `sha384()`
+and `sha512()`.
 
-These call the secure, optimized implementations from the ‘Mbed TLS’
+These expose the secure, optimized implementations from the ‘Mbed TLS’
 library and return a hash either directly as a raw vector or converted
 to a character string. For use in authentication, raw vectors can be
 compared directly for the highest performance.
@@ -787,9 +906,9 @@ OpenCSW - refer to the ‘cmake’ website for the latest source file
 
 #### Windows
 
-For R \>= 4.2 using the ‘rtools42’ toolchain, ‘libnng’ v1.6.0 (8e1836f)
-and ‘libmbedtls’ v3.2.1 will be automatically compiled from the package
-sources during installation.
+For R \>= 4.2 using the ‘Rtools42’ or ‘Rtools43’ toolchains, ‘libnng’
+v1.6.0 (8e1836f) and ‘libmbedtls’ v3.2.1 will be automatically compiled
+from the package sources during installation.
 
 For previous R versions, pre-compiled ‘libnng’ v1.6.0 (8e1836f) and
 ‘libmbedtls’ v3.2.1 libraries are downloaded and used for installation

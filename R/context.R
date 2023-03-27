@@ -151,7 +151,7 @@ reply <- function(context,
 #'
 #' Implements a caller/client for the req node of the req/rep protocol. Sends
 #'     data to the rep node (executor/server) and returns an Aio, which can be
-#'     called when the result is required.
+#'     called for the value when required.
 #'
 #' @inheritParams reply
 #' @inheritParams recv
@@ -203,4 +203,46 @@ request <- function(context,
                     keep.raw = FALSE)
   data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout,
                 keep.raw, environment())
+
+#' Request over Context and Signal a Condition Variable
+#'
+#' A signalling version of the function takes a 'conditionVariable' as an
+#'     additional argument and signals it when the async receive is complete.
+#'
+#' @inheritParams recv_aio_signal
+#'
+#' @details \strong{For the signalling version}: when the receive is complete,
+#'     the supplied 'conditionVariable' is signalled by incrementing its value
+#'     by 1. This happens asynchronously and independently of the R execution
+#'     thread.
+#'
+#' @examples
+#' # Signalling a condition variable
+#'
+#' req <- socket("req", listen = "tcp://127.0.0.1:6546")
+#' ctxq <- context(req)
+#' cv <- cv()
+#' aio <- request_signal(ctxq, data = 2022, timeout = 50L, cv = cv)
+#' until(cv, 10L)
+#' close(req)
+#'
+#' # The following should be run in another process
+#' # rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
+#' # ctxp <- context(rep)
+#' # reply(ctxp, execute = function(x) x + 1, timeout = 50L)
+#' # close(rep)
+#'
+#' @rdname request
+#' @export
+#'
+request_signal <- function(context,
+                           data,
+                           send_mode = c("serial", "raw"),
+                           recv_mode = c("serial", "character", "complex", "double",
+                                         "integer", "logical", "numeric", "raw"),
+                           timeout = NULL,
+                           keep.raw = FALSE,
+                           cv)
+  data <- .Call(rnng_cv_request, context, data, send_mode, recv_mode, timeout,
+                keep.raw, environment(), cv)
 

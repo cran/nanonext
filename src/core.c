@@ -407,6 +407,15 @@ static void context_finalizer(SEXP xptr) {
 
 }
 
+// language utils --------------------------------------------------------------
+
+SEXP rnng_make_weakref(SEXP key, SEXP value) {
+
+  R_MakeWeakRef(key, value, R_NilValue, FALSE);
+  return key;
+
+}
+
 // contexts --------------------------------------------------------------------
 
 SEXP rnng_ctx_open(SEXP socket) {
@@ -481,7 +490,7 @@ SEXP rnng_dial(SEXP socket, SEXP url, SEXP autostart, SEXP error) {
 
   if (xc) {
     R_Free(dp);
-    if (error != R_NilValue) ERROR_OUT(xc);
+    if (LOGICAL(error)[0]) ERROR_OUT(xc);
     ERROR_RET(xc);
   }
 
@@ -531,7 +540,7 @@ SEXP rnng_listen(SEXP socket, SEXP url, SEXP autostart, SEXP error) {
   const int xc = start ? nng_listen(*sock, up, lp, 0) : nng_listener_create(lp, *sock, up);
   if (xc) {
     R_Free(lp);
-    if (error != R_NilValue) ERROR_OUT(xc);
+    if (LOGICAL(error)[0]) ERROR_OUT(xc);
     ERROR_RET(xc);
   }
 
