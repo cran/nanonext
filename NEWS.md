@@ -1,3 +1,17 @@
+# nanonext 0.8.2
+
+#### New Features
+
+* `lock()` and `unlock()` implemented to prevent further pipe connections from being established at a socket, optionally tied to the value of a condition variable.
+
+#### Updates
+
+* `context()` gains the argument 'verify' with a default of TRUE. This adds additional protection to notably the `request()` and `request_signal()` functions when using timeouts, as these require a connection to be present.
+* Sending and hashing of language objects and symbols is now possible after fixes to serialisation.
+* `until()` now works as intended.
+* Removes recently-introduced `msg_pipe()` and `'weakref<-'()` to maintain simplicity of user interface.
+* Internal performance enhancements.
+
 # nanonext 0.8.1
 
 #### New Features

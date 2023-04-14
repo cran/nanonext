@@ -23,6 +23,11 @@
 #'     and listeners, while still benefiting from separate state tracking.
 #'
 #' @param socket a Socket.
+#' @param verify [default TRUE] logical value whether to verify there is a
+#'     connection at the socket with the result stored internally within the
+#'     context (required for features of certain functions). Set to FALSE for
+#'     performance if not using features which explicitly require verification.
+#'     Supplying a non-logical value will error.
 #'
 #' @return A new Context (object of class 'nanoContext' and 'nano').
 #'
@@ -58,7 +63,7 @@
 #'
 #' @export
 #'
-context <- function(socket) .Call(rnng_ctx_open, socket)
+context <- function(socket, verify = TRUE) .Call(rnng_ctx_open, socket, verify)
 
 #' @rdname close
 #' @method close nanoContext
@@ -157,8 +162,9 @@ reply <- function(context,
 #' @inheritParams recv
 #' @param data an object (if send_mode = 'raw', a vector).
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
-#'     applies a socket-specific default, usually the same as no timeout. Note
-#'     that this applies to receiving the result.
+#'     applies a socket-specific default, usually the same as no timeout. The
+#'     context must have been created with \code{context(verify = TRUE)}, or
+#'     else this value will be ignored.
 #'
 #' @return A 'recvAio' (object of class 'recvAio') (invisibly).
 #'
@@ -177,6 +183,11 @@ reply <- function(context,
 #'     otherwise). This allows an error to be easily distinguished from a NULL
 #'     return value. \code{\link{is_nul_byte}} can be used to test for a nul byte.
 #'
+#'     The value for 'timeout' is valid only when using a verified context
+#'     created with \code{context(verify = TRUE)}, and ignored otherwise. This
+#'     is as it is an error to specify a timeout without there being an existing
+#'     connection.
+#'
 #' @examples
 #' req <- socket("req", listen = "tcp://127.0.0.1:6546")
 #' rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
@@ -185,9 +196,9 @@ reply <- function(context,
 #' ctxp <- context(rep)
 #'
 #' # works if req and rep are running in parallel in different processes
-#' reply(ctxp, execute = function(x) x + 1, timeout = 10)
-#' aio <- request(ctxq, data = 2022, timeout = 10)
-#' call_aio(aio)$data
+#' reply(ctxp, execute = function(x) x + 1, timeout = 50)
+#' aio <- request(ctxq, data = 2022)
+#' aio$data
 #'
 #' close(req)
 #' close(rep)
@@ -222,14 +233,14 @@ request <- function(context,
 #' req <- socket("req", listen = "tcp://127.0.0.1:6546")
 #' ctxq <- context(req)
 #' cv <- cv()
-#' aio <- request_signal(ctxq, data = 2022, timeout = 50L, cv = cv)
+#' aio <- request_signal(ctxq, data = 2022, cv = cv)
 #' until(cv, 10L)
 #' close(req)
 #'
 #' # The following should be run in another process
 #' # rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
 #' # ctxp <- context(rep)
-#' # reply(ctxp, execute = function(x) x + 1, timeout = 50L)
+#' # reply(ctxp, execute = function(x) x + 1)
 #' # close(rep)
 #'
 #' @rdname request

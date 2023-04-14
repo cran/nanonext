@@ -53,7 +53,7 @@
 #'     value is decremented by 1.
 #'
 #'     The internal condition may be inspected at any time using \code{cv_value}
-#'     and reset to zero using \code{cv_reset}. This affords a high degree of
+#'     and reset using \code{cv_reset}. This affords a high degree of
 #'     flexibility in designing complex concurrent applications.
 #'
 #' @section Flag:
@@ -182,40 +182,43 @@ cv_reset <- function(cv) invisible(.Call(rnng_cv_reset, cv))
 pipe_notify <- function(socket, cv, cv2 = NULL, add = TRUE, remove = TRUE, flag = TRUE)
   invisible(.Call(rnng_pipe_notify, socket, cv, cv2, add, remove, flag))
 
-#' Message Pipe
+#' Lock / Unlock a Socket
 #'
-#' Returns the pipe (single connection) associated with a received message.
+#' Prevents further pipe connections from being established at a Socket.
 #'
-#' @param aio a 'recvAio' object, not including 'ncurlAio' objects.
+#' @param socket a Socket.
+#' @param cv (optional) a 'conditionVariable'. If supplied, the socket is locked
+#'     only while the value of the condition variable is non-zero.
 #'
-#' @details Note: this function returns an external pointer to an existing pipe,
-#'     it does not allocate a new one.
-#'
-#' @return A 'nanoPipe' object.
+#' @return Invisibly, an integer exit code (zero on success).
 #'
 #' @examples
-#' s <- socket("req", listen = "inproc://nanopipe")
-#' s1 <- socket("rep", dial = "inproc://nanopipe")
-#' ctx <- context(s)
-#' ctx1 <- context(s1)
+#' s <- socket("bus", listen = "inproc://nanolock")
+#' s1 <- socket("bus", dial = "inproc://nanolock")
+#' lock(s)
+#' s2 <- socket("bus", dial = "inproc://nanolock")
 #'
-#' send(ctx, "test")
-#' r <- recv_aio(ctx1)
-#' call_aio(r)
+#' send(s, "test")
+#' recv(s1)
+#' recv(s2)
 #'
-#' pipe <- msg_pipe(r)
-#' pipe
+#' unlock(s)
+#' s3 <- socket("bus", dial = "inproc://nanolock")
+#' send(s, "test")
+#' recv(s1)
+#' recv(s3)
 #'
 #' close(s)
 #' close(s1)
+#' close(s2)
+#' close(s3)
 #'
 #' @export
 #'
-msg_pipe <- function(aio) .Call(rnng_msg_pipe, aio)
+lock <- function(socket, cv = NULL) invisible(.Call(rnng_socket_lock, socket, cv))
 
-#' @rdname close
-#' @method close nanoPipe
+#' @rdname lock
 #' @export
 #'
-close.nanoPipe <- function(con, ...) invisible(.Call(rnng_pipe_close, con))
+unlock <- function(socket) invisible(.Call(rnng_socket_unlock, socket))
 

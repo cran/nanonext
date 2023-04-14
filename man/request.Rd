@@ -48,8 +48,9 @@ position in the vector of choices e.g. 1L for 'serial', 2L for 'character'
 etc.}
 
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
-applies a socket-specific default, usually the same as no timeout. Note
-that this applies to receiving the result.}
+applies a socket-specific default, usually the same as no timeout. The
+context must have been created with \code{context(verify = TRUE)}, or
+else this value will be ignored.}
 
 \item{keep.raw}{[default FALSE] logical flag whether to keep and return the
 received raw vector along with the converted data. Supplying a non-logical
@@ -85,6 +86,11 @@ Sending the request and receiving the result are both performed async,
     otherwise). This allows an error to be easily distinguished from a NULL
     return value. \code{\link{is_nul_byte}} can be used to test for a nul byte.
 
+    The value for 'timeout' is valid only when using a verified context
+    created with \code{context(verify = TRUE)}, and ignored otherwise. This
+    is as it is an error to specify a timeout without there being an existing
+    connection.
+
 \strong{For the signalling version}: when the receive is complete,
     the supplied 'conditionVariable' is signalled by incrementing its value
     by 1. This happens asynchronously and independently of the R execution
@@ -98,9 +104,9 @@ ctxq <- context(req)
 ctxp <- context(rep)
 
 # works if req and rep are running in parallel in different processes
-reply(ctxp, execute = function(x) x + 1, timeout = 10)
-aio <- request(ctxq, data = 2022, timeout = 10)
-call_aio(aio)$data
+reply(ctxp, execute = function(x) x + 1, timeout = 50)
+aio <- request(ctxq, data = 2022)
+aio$data
 
 close(req)
 close(rep)
@@ -110,14 +116,14 @@ close(rep)
 req <- socket("req", listen = "tcp://127.0.0.1:6546")
 ctxq <- context(req)
 cv <- cv()
-aio <- request_signal(ctxq, data = 2022, timeout = 50L, cv = cv)
+aio <- request_signal(ctxq, data = 2022, cv = cv)
 until(cv, 10L)
 close(req)
 
 # The following should be run in another process
 # rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
 # ctxp <- context(rep)
-# reply(ctxp, execute = function(x) x + 1, timeout = 50L)
+# reply(ctxp, execute = function(x) x + 1)
 # close(rep)
 
 }

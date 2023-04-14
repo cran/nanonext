@@ -25,6 +25,10 @@
 
 #ifdef NANONEXT_INTERNALS
 #include <nng/nng.h>
+typedef struct nano_ctx_s {
+  nng_ctx ctx;
+  uint8_t verified;
+} nano_ctx;
 #endif
 
 #ifdef NANONEXT_PROTOCOLS
@@ -128,7 +132,7 @@ extern SEXP rnng_base64enc(SEXP, SEXP);
 extern SEXP rnng_clock(void);
 extern SEXP rnng_close(SEXP);
 extern SEXP rnng_ctx_close(SEXP);
-extern SEXP rnng_ctx_open(SEXP);
+extern SEXP rnng_ctx_open(SEXP, SEXP);
 extern SEXP rnng_cv_alloc(void);
 extern SEXP rnng_cv_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_cv_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -145,16 +149,13 @@ extern SEXP rnng_is_nul_byte(SEXP);
 extern SEXP rnng_listen(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_listener_close(SEXP);
 extern SEXP rnng_listener_start(SEXP);
-extern SEXP rnng_make_weakref(SEXP, SEXP);
 extern SEXP rnng_messenger(SEXP);
 extern SEXP rnng_messenger_thread_create(SEXP);
-extern SEXP rnng_msg_pipe(SEXP);
 extern SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_ncurl_session(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_ncurl_session_close(SEXP);
 extern SEXP rnng_ncurl_transact(SEXP);
-extern SEXP rnng_pipe_close(SEXP);
 extern SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_protocol_open(SEXP, SEXP);
 extern SEXP rnng_random(SEXP);
@@ -170,6 +171,8 @@ extern SEXP rnng_sha256(SEXP, SEXP, SEXP);
 extern SEXP rnng_sha384(SEXP, SEXP, SEXP);
 extern SEXP rnng_sha512(SEXP, SEXP, SEXP);
 extern SEXP rnng_sleep(SEXP);
+extern SEXP rnng_socket_lock(SEXP, SEXP);
+extern SEXP rnng_socket_unlock(SEXP);
 extern SEXP rnng_stats_get(SEXP, SEXP);
 extern SEXP rnng_status_code(SEXP);
 extern SEXP rnng_stream_close(SEXP);

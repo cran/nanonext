@@ -73,7 +73,7 @@ Pass the 'conditionVariable' to the signalling forms of the
     value is decremented by 1.
 
     The internal condition may be inspected at any time using \code{cv_value}
-    and reset to zero using \code{cv_reset}. This affords a high degree of
+    and reset using \code{cv_reset}. This affords a high degree of
     flexibility in designing complex concurrent applications.
 }
 

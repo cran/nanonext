@@ -19,6 +19,7 @@
 #include "nanonext.h"
 
 SEXP nano_AioSymbol;
+SEXP nano_AioHttpSymbol;
 SEXP nano_ContextSymbol;
 SEXP nano_CvSymbol;
 SEXP nano_DataSymbol;
@@ -58,6 +59,7 @@ SEXP nano_unresolved;
 
 static void RegisterSymbols(void) {
   nano_AioSymbol = Rf_install("aio");
+  nano_AioHttpSymbol = Rf_install("rnng_aio_http");
   nano_ContextSymbol = Rf_install("context");
   nano_CvSymbol = Rf_install("cv");
   nano_DataSymbol = Rf_install("data");
@@ -91,7 +93,6 @@ static void PreserveObjects(void) {
   SETCAR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
   SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata"), nano_DataSymbol));
   SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw"), nano_DataSymbol));
-  SEXP nano_AioHttpSymbol = Rf_install("rnng_aio_http");
   R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 4));
   SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(1)));
   SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(2)));
@@ -134,7 +135,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_clock", (DL_FUNC) &rnng_clock, 0},
   {"rnng_close", (DL_FUNC) &rnng_close, 1},
   {"rnng_ctx_close", (DL_FUNC) &rnng_ctx_close, 1},
-  {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 1},
+  {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 2},
   {"rnng_cv_alloc", (DL_FUNC) &rnng_cv_alloc, 0},
   {"rnng_cv_recv_aio", (DL_FUNC) &rnng_cv_recv_aio, 7},
   {"rnng_cv_request", (DL_FUNC) &rnng_cv_request, 8},
@@ -153,16 +154,13 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_listen", (DL_FUNC) &rnng_listen, 4},
   {"rnng_listener_close", (DL_FUNC) &rnng_listener_close, 1},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
-  {"rnng_make_weakref", (DL_FUNC) &rnng_make_weakref, 2},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
   {"rnng_messenger_thread_create", (DL_FUNC) &rnng_messenger_thread_create, 1},
-  {"rnng_msg_pipe", (DL_FUNC) &rnng_msg_pipe, 1},
   {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 8},
   {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 7},
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
   {"rnng_ncurl_session_close", (DL_FUNC) &rnng_ncurl_session_close, 1},
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
-  {"rnng_pipe_close", (DL_FUNC) &rnng_pipe_close, 1},
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 2},
   {"rnng_random", (DL_FUNC) &rnng_random, 1},
@@ -178,6 +176,8 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_sha384", (DL_FUNC) &rnng_sha384, 3},
   {"rnng_sha512", (DL_FUNC) &rnng_sha512, 3},
   {"rnng_sleep", (DL_FUNC) &rnng_sleep, 1},
+  {"rnng_socket_lock", (DL_FUNC) &rnng_socket_lock, 2},
+  {"rnng_socket_unlock", (DL_FUNC) &rnng_socket_unlock, 1},
   {"rnng_stats_get", (DL_FUNC) &rnng_stats_get, 2},
   {"rnng_status_code", (DL_FUNC) &rnng_status_code, 1},
   {"rnng_stream_close", (DL_FUNC) &rnng_stream_close, 1},
