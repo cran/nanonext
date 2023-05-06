@@ -4,19 +4,15 @@
 \alias{context}
 \title{Open Context}
 \usage{
-context(socket, verify = TRUE)
+context(socket, ...)
 }
 \arguments{
 \item{socket}{a Socket.}
 
-\item{verify}{[default TRUE] logical value whether to verify there is a
-connection at the socket with the result stored internally within the
-context (required for features of certain functions). Set to FALSE for
-performance if not using features which explicitly require verification.
-Supplying a non-logical value will error.}
+\item{...}{not used, present for compatibility purposes only.}
 }
 \value{
-A new Context (object of class 'nanoContext' and 'nano').
+A Context (object of class 'nanoContext' and 'nano').
 }
 \description{
 Open a new Context to be used with a Socket. The purpose of a Context is to

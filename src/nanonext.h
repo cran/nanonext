@@ -19,16 +19,9 @@
 #ifndef NANONEXT_H
 #define NANONEXT_H
 
-#ifdef NANONEXT_TIME
-#include <time.h>
-#endif
-
 #ifdef NANONEXT_INTERNALS
+#define NANONEXT_VERSION "0.8.3"
 #include <nng/nng.h>
-typedef struct nano_ctx_s {
-  nng_ctx ctx;
-  uint8_t verified;
-} nano_ctx;
 #endif
 
 #ifdef NANONEXT_PROTOCOLS
@@ -48,6 +41,14 @@ typedef struct nano_ctx_s {
 #include <nng/supplemental/http/http.h>
 #include <nng/supplemental/tls/tls.h>
 #include <nng/supplemental/util/platform.h>
+
+typedef struct nano_cv_s {
+  int condition;
+  uint8_t flag;
+  nng_mtx *mtx;
+  nng_cv *cv;
+} nano_cv;
+
 #endif
 
 #ifdef NANONEXT_TLS
@@ -132,11 +133,13 @@ extern SEXP rnng_base64enc(SEXP, SEXP);
 extern SEXP rnng_clock(void);
 extern SEXP rnng_close(SEXP);
 extern SEXP rnng_ctx_close(SEXP);
-extern SEXP rnng_ctx_open(SEXP, SEXP);
+extern SEXP rnng_ctx_create(SEXP);
+extern SEXP rnng_ctx_open(SEXP);
 extern SEXP rnng_cv_alloc(void);
 extern SEXP rnng_cv_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_cv_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_cv_reset(SEXP);
+extern SEXP rnng_cv_signal(SEXP);
 extern SEXP rnng_cv_until(SEXP, SEXP);
 extern SEXP rnng_cv_value(SEXP);
 extern SEXP rnng_cv_wait(SEXP);
@@ -151,8 +154,8 @@ extern SEXP rnng_listener_close(SEXP);
 extern SEXP rnng_listener_start(SEXP);
 extern SEXP rnng_messenger(SEXP);
 extern SEXP rnng_messenger_thread_create(SEXP);
-extern SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_ncurl_session(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_ncurl_session_close(SEXP);
 extern SEXP rnng_ncurl_transact(SEXP);
@@ -180,10 +183,11 @@ extern SEXP rnng_stream_dial(SEXP, SEXP, SEXP);
 extern SEXP rnng_stream_listen(SEXP, SEXP, SEXP);
 extern SEXP rnng_strerror(SEXP);
 extern SEXP rnng_subscribe(SEXP, SEXP, SEXP);
+extern SEXP rnng_timed_signal(SEXP);
 extern SEXP rnng_unresolved(SEXP);
 extern SEXP rnng_unresolved2(SEXP);
 extern SEXP rnng_url_parse(SEXP);
 extern SEXP rnng_version(void);
+extern SEXP rnng_version_string(void);
 
 #endif
-

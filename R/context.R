@@ -23,13 +23,9 @@
 #'     and listeners, while still benefiting from separate state tracking.
 #'
 #' @param socket a Socket.
-#' @param verify [default TRUE] logical value whether to verify there is a
-#'     connection at the socket with the result stored internally within the
-#'     context (required for features of certain functions). Set to FALSE for
-#'     performance if not using features which explicitly require verification.
-#'     Supplying a non-logical value will error.
+#' @param ... not used, present for compatibility purposes only.
 #'
-#' @return A new Context (object of class 'nanoContext' and 'nano').
+#' @return A Context (object of class 'nanoContext' and 'nano').
 #'
 #' @details Contexts allow the independent and concurrent use of stateful
 #'     operations using the same socket. For example, two different contexts
@@ -63,7 +59,31 @@
 #'
 #' @export
 #'
-context <- function(socket, verify = TRUE) .Call(rnng_ctx_open, socket, verify)
+context <- function(socket, ...) .Call(rnng_ctx_open, socket)
+
+#' Technical Utility: Open Context
+#'
+#' Open a new Context to be used with a Socket. This function is a performance
+#'     variant of \code{\link{context}}, designed to wrap a socket in a function
+#'     argument when calling \code{\link{request}} or \code{\link{reply}}.
+#'
+#' @param socket a Socket.
+#'
+#' @details External pointers created by this function are unclassed, hence
+#'     methods for contexts such as \code{\link{close}} will not work. However
+#'     they function as a Context would when passed to all messaging functions.
+#'     The context is automatically closed when the object is garbage collected.
+#'
+#' @return An external pointer.
+#'
+#' @examples
+#' s <- socket("req", listen = "inproc://nanonext")
+#' r <- request(.context(s), "request data")
+#' close(s)
+#'
+#' @export
+#'
+.context <- function(socket) .Call(rnng_ctx_create, socket)
 
 #' @rdname close
 #' @method close nanoContext
@@ -162,9 +182,7 @@ reply <- function(context,
 #' @inheritParams recv
 #' @param data an object (if send_mode = 'raw', a vector).
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
-#'     applies a socket-specific default, usually the same as no timeout. The
-#'     context must have been created with \code{context(verify = TRUE)}, or
-#'     else this value will be ignored.
+#'     applies a socket-specific default, usually the same as no timeout.
 #'
 #' @return A 'recvAio' (object of class 'recvAio') (invisibly).
 #'
@@ -183,21 +201,18 @@ reply <- function(context,
 #'     otherwise). This allows an error to be easily distinguished from a NULL
 #'     return value. \code{\link{is_nul_byte}} can be used to test for a nul byte.
 #'
-#'     The value for 'timeout' is valid only when using a verified context
-#'     created with \code{context(verify = TRUE)}, and ignored otherwise. This
-#'     is as it is an error to specify a timeout without there being an existing
-#'     connection.
+#'     It is recommended to use a new context for each request to ensure
+#'     consistent state tracking. For safety, the context used for the request
+#'     is closed when all references to the returned 'recvAio' are removed and
+#'     the object is garbage collected.
 #'
 #' @examples
 #' req <- socket("req", listen = "tcp://127.0.0.1:6546")
 #' rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
 #'
-#' ctxq <- context(req)
-#' ctxp <- context(rep)
-#'
 #' # works if req and rep are running in parallel in different processes
-#' reply(ctxp, execute = function(x) x + 1, timeout = 50)
-#' aio <- request(ctxq, data = 2022)
+#' reply(.context(rep), execute = function(x) x + 1, timeout = 50)
+#' aio <- request(.context(req), data = 2022)
 #' aio$data
 #'
 #' close(req)
@@ -256,4 +271,3 @@ request_signal <- function(context,
                            cv)
   data <- .Call(rnng_cv_request, context, data, send_mode, recv_mode, timeout,
                 keep.raw, environment(), cv)
-

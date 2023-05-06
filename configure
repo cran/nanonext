@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Library versions
-LIB_VER="8e1836f"
-TLS_VER="869298b"
+LIB_VER="c5e9d8a"
+TLS_VER="1873d3b"
 
 # Initialise
 PKG_CFLAGS=""
@@ -13,6 +13,7 @@ NNG_LIBS=""
 # Find compiler
 CC=`${R_HOME}/bin/R CMD config CC`
 CFLAGS=`${R_HOME}/bin/R CMD config CFLAGS`
+export CC=$CC
 
 # Detect -latomic linker flag for ARM architectures (Raspberry Pi etc.)
 echo "#include <stdint.h>
@@ -176,4 +177,3 @@ sed -e "s|@cflags@|$PKG_CFLAGS|" -e "s|@libs@|$PKG_LIBS|" src/Makevars.in > src/
 
 # Success
 exit 0
-

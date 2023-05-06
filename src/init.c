@@ -28,7 +28,6 @@ SEXP nano_DotcallSymbol;
 SEXP nano_HeadersSymbol;
 SEXP nano_IdSymbol;
 SEXP nano_ListenerSymbol;
-SEXP nano_NewEnvSymbol;
 SEXP nano_PipeSymbol;
 SEXP nano_ProtocolSymbol;
 SEXP nano_RawSymbol;
@@ -68,7 +67,6 @@ static void RegisterSymbols(void) {
   nano_HeadersSymbol = Rf_install("headers");
   nano_IdSymbol = Rf_install("id");
   nano_ListenerSymbol = Rf_install("listener");
-  nano_NewEnvSymbol = Rf_install("new.env");
   nano_PipeSymbol = Rf_install("pipe");
   nano_ProtocolSymbol = Rf_install("protocol");
   nano_RawSymbol = Rf_install("raw");
@@ -100,12 +98,16 @@ static void PreserveObjects(void) {
   SETCADDDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(4)));
   R_PreserveObject(nano_error = Rf_cons(Rf_mkString("errorValue"), R_NilValue));
   SET_TAG(nano_error, R_ClassSymbol);
-  R_PreserveObject(nano_ncurlAio = Rf_allocVector(STRSXP, 2));
-  SET_STRING_ELT(nano_ncurlAio, 0, Rf_mkChar("ncurlAio"));
-  SET_STRING_ELT(nano_ncurlAio, 1, Rf_mkChar("recvAio"));
-  R_PreserveObject(nano_ncurlSession = Rf_mkString("ncurlSession"));
-  R_PreserveObject(nano_recvAio = Rf_mkString("recvAio"));
-  R_PreserveObject(nano_sendAio = Rf_mkString("sendAio"));
+  R_PreserveObject(nano_ncurlAio = Rf_cons(Rf_allocVector(STRSXP, 2), R_NilValue));
+  SET_TAG(nano_ncurlAio, R_ClassSymbol);
+  SET_STRING_ELT(CAR(nano_ncurlAio), 0, Rf_mkChar("ncurlAio"));
+  SET_STRING_ELT(CAR(nano_ncurlAio), 1, Rf_mkChar("recvAio"));
+  R_PreserveObject(nano_ncurlSession = Rf_cons(Rf_mkString("ncurlSession"), R_NilValue));
+  SET_TAG(nano_ncurlSession, R_ClassSymbol);
+  R_PreserveObject(nano_recvAio = Rf_cons(Rf_mkString("recvAio"), R_NilValue));
+  SET_TAG(nano_recvAio, R_ClassSymbol);
+  R_PreserveObject(nano_sendAio = Rf_cons(Rf_mkString("sendAio"), R_NilValue));
+  SET_TAG(nano_sendAio, R_ClassSymbol);
   R_PreserveObject(nano_success = Rf_ScalarInteger(0));
   R_PreserveObject(nano_unresolved = Rf_shallow_duplicate(Rf_ScalarLogical(NA_LOGICAL)));
   Rf_classgets(nano_unresolved, Rf_mkString("unresolvedValue"));
@@ -135,11 +137,13 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_clock", (DL_FUNC) &rnng_clock, 0},
   {"rnng_close", (DL_FUNC) &rnng_close, 1},
   {"rnng_ctx_close", (DL_FUNC) &rnng_ctx_close, 1},
-  {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 2},
+  {"rnng_ctx_create", (DL_FUNC) &rnng_ctx_create, 1},
+  {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 1},
   {"rnng_cv_alloc", (DL_FUNC) &rnng_cv_alloc, 0},
   {"rnng_cv_recv_aio", (DL_FUNC) &rnng_cv_recv_aio, 7},
   {"rnng_cv_request", (DL_FUNC) &rnng_cv_request, 8},
   {"rnng_cv_reset", (DL_FUNC) &rnng_cv_reset, 1},
+  {"rnng_cv_signal", (DL_FUNC) &rnng_cv_signal, 1},
   {"rnng_cv_until", (DL_FUNC) &rnng_cv_until, 2},
   {"rnng_cv_value", (DL_FUNC) &rnng_cv_value, 1},
   {"rnng_cv_wait", (DL_FUNC) &rnng_cv_wait, 1},
@@ -156,8 +160,8 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
   {"rnng_messenger_thread_create", (DL_FUNC) &rnng_messenger_thread_create, 1},
-  {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 8},
-  {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 7},
+  {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 9},
+  {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 8},
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
   {"rnng_ncurl_session_close", (DL_FUNC) &rnng_ncurl_session_close, 1},
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
@@ -189,13 +193,19 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_unresolved2", (DL_FUNC) &rnng_unresolved2, 1},
   {"rnng_url_parse", (DL_FUNC) &rnng_url_parse, 1},
   {"rnng_version", (DL_FUNC) &rnng_version, 0},
+  {"rnng_version_string", (DL_FUNC) &rnng_version_string, 0},
+  {NULL, NULL, 0}
+};
+
+static const R_ExternalMethodDef externalMethods[] = {
+  {"rnng_timed_signal", (DL_FUNC) &rnng_timed_signal, -1},
   {NULL, NULL, 0}
 };
 
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
-  R_registerRoutines(dll, NULL, callMethods, NULL, NULL);
+  R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
 }
@@ -203,4 +213,3 @@ void attribute_visible R_init_nanonext(DllInfo* dll) {
 void attribute_visible R_unload_nanonext(DllInfo *info) {
   ReleaseObjects();
 }
-

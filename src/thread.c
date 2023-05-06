@@ -19,7 +19,7 @@
 #define NANONEXT_INTERNALS
 #define NANONEXT_PROTOCOLS
 #define NANONEXT_SUPPLEMENTALS
-#define NANONEXT_TIME
+#include <time.h>
 #include "nanonext.h"
 
 // messenger -------------------------------------------------------------------
@@ -33,12 +33,11 @@ static void thread_finalizer(SEXP xptr) {
 
 }
 
-static void rnng_messenger_thread(void *arg) {
+static void rnng_messenger_thread(void *args) {
 
-  SEXP list = (SEXP) arg;
+  SEXP list = (SEXP) args;
   SEXP socket = VECTOR_ELT(list, 0);
   SEXP key = VECTOR_ELT(list, 1);
-  SEXP two = VECTOR_ELT(list, 2);
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   unsigned char *buf;
   size_t sz;
@@ -64,7 +63,16 @@ static void rnng_messenger_thread(void *arg) {
                  tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
                  tms->tm_hour, tms->tm_min, tms->tm_sec);
         nng_free(buf, sz);
-        rnng_send(socket, key, two, Rf_ScalarLogical(0));
+        const SEXP enc = nano_encode(key);
+        const R_xlen_t xlen = Rf_xlength(enc);
+        unsigned char *dp = RAW(enc);
+        xc = nng_send(*sock, dp, xlen, NNG_FLAG_NONBLOCK);
+        if (xc) {
+          REprintf("| messenger session ended: %d-%02d-%02d %02d:%02d:%02d\n",
+                   tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
+                   tms->tm_hour, tms->tm_min, tms->tm_sec);
+          break;
+        }
         continue;
       }
       if (!strcmp((char *) buf, ":d ")) {
@@ -153,3 +161,57 @@ SEXP rnng_messenger_thread_create(SEXP list) {
 
 }
 
+static void rnng_timer_thread(void *args) {
+
+  SEXP pairlist = (SEXP) args;
+  SEXP cvar = CADR(pairlist);
+  SEXP time = CADDR(pairlist);
+  SEXP flag = CADDDR(pairlist);
+
+  nano_cv *ncv = R_ExternalPtrAddr(cvar);
+  nng_cv *cv = ncv->cv;
+  nng_mtx *mtx = ncv->mtx;
+
+  switch (TYPEOF(time)) {
+  case INTSXP:
+    nng_msleep((nng_duration) abs(INTEGER(time)[0]));
+    break;
+  case REALSXP:
+    nng_msleep((nng_duration) abs(Rf_asInteger(time)));
+    break;
+  }
+
+  if (Rf_asLogical(flag) == 1) {
+    nng_mtx_lock(mtx);
+    ncv->flag = 1;
+    ncv->condition++;
+    nng_cv_wake(cv);
+    nng_mtx_unlock(mtx);
+  } else {
+    nng_mtx_lock(mtx);
+    ncv->condition++;
+    nng_cv_wake(cv);
+    nng_mtx_unlock(mtx);
+  }
+
+}
+
+SEXP rnng_timed_signal(SEXP args) {
+
+  nng_thread *thr;
+  SEXP cvar, xptr;
+
+  cvar = CADR(args);
+  if (R_ExternalPtrTag(cvar) != nano_CvSymbol)
+    Rf_error("'cv' is not a valid Condition Variable");
+
+  nng_thread_create(&thr, rnng_timer_thread, args);
+
+  PROTECT(xptr = R_MakeExternalPtr(thr, R_NilValue, R_NilValue));
+  R_RegisterCFinalizerEx(xptr, thread_finalizer, TRUE);
+  Rf_classgets(xptr, Rf_mkString("thread"));
+
+  UNPROTECT(1);
+  return xptr;
+
+}

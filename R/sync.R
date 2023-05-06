@@ -28,7 +28,7 @@
 #'
 #'     For \code{cv_value}: integer value of the condition variable.
 #'
-#'     For \code{cv_reset}: invisible NULL.
+#'     For \code{cv_reset} and \code{cv_signal}: invisible NULL.
 #'
 #' @details Pass the 'conditionVariable' to the signalling forms of the
 #'     asynchronous receive functions: \code{\link{recv_aio_signal}} or
@@ -128,6 +128,20 @@ cv_value <- function(cv) .Call(rnng_cv_value, cv)
 #'
 cv_reset <- function(cv) invisible(.Call(rnng_cv_reset, cv))
 
+#' Condition Variables - Signal
+#'
+#' \code{cv_signal} signals a condition variable.
+#'
+#' @examples
+#' cv_value(cv)
+#' cv_signal(cv)
+#' cv_value(cv)
+#'
+#' @rdname cv
+#' @export
+#'
+cv_signal <- function(cv) invisible(.Call(rnng_cv_signal, cv))
+
 #' Pipe Notify
 #'
 #' Signals a 'conditionVariable' whenever pipes (individual connections) are
@@ -142,9 +156,9 @@ cv_reset <- function(cv) invisible(.Call(rnng_cv_reset, cv))
 #' @param remove [default TRUE] logical value whether to signal when a pipe is
 #'     removed.
 #' @param flag [default TRUE] logical value whether to also set a flag in the
-#'     'conditionVariable'. This allows pipe events to be easily distinguishable
-#'     from other signals, and causes any subsequent \code{\link{wait}} or
-#'     \code{\link{until}} to return FALSE instead of TRUE.
+#'     'conditionVariable'. This can help distinguish between different types of
+#'     signal, and causes any subsequent \code{\link{wait}} or \code{\link{until}}
+#'     to return FALSE instead of TRUE.
 #'
 #' @details For add: this event occurs after the pipe is fully added to the
 #'     socket. Prior to this time, it is not possible to communicate over the
@@ -154,7 +168,7 @@ cv_reset <- function(cv) invisible(.Call(rnng_cv_reset, cv))
 #'     socket. The underlying transport may be closed at this point, and it is
 #'     not possible to communicate using this pipe.
 #'
-#' @return Invisibly, an integer exit code (zero on success).
+#' @return Invisibly, zero on success (will otherwise error).
 #'
 #' @examples
 #' s <- socket(listen = "inproc://nanopipe")
@@ -190,7 +204,7 @@ pipe_notify <- function(socket, cv, cv2 = NULL, add = TRUE, remove = TRUE, flag 
 #' @param cv (optional) a 'conditionVariable'. If supplied, the socket is locked
 #'     only while the value of the condition variable is non-zero.
 #'
-#' @return Invisibly, an integer exit code (zero on success).
+#' @return Invisibly, zero on success (will otherwise error).
 #'
 #' @examples
 #' s <- socket("bus", listen = "inproc://nanolock")
@@ -222,3 +236,39 @@ lock <- function(socket, cv = NULL) invisible(.Call(rnng_socket_lock, socket, cv
 #'
 unlock <- function(socket) invisible(.Call(rnng_socket_unlock, socket))
 
+#' Signal a Condition Variable After a Specified Time
+#'
+#' Creates a new thread which signals a condition variable after a specified
+#'     time, causing its internal condition to increment by one (and threads
+#'     waiting on the condition to wake).
+#'
+#' @param cv a 'conditionVariable',
+#' @param time integer number of milliseconds after which to signal the
+#'     condition variable.
+#' @inheritParams pipe_notify
+#'
+#' @return A 'thread', which is an external pointer to the created thread. The
+#'     return value must be assigned to an object, otherwise the thread may be
+#'     garbage collected before it has performed its purpose.
+#'
+#' @details Non-integer values for 'time' are coerced to integer, and the
+#'     absolute value is taken (the sign is ignored). Non-numeric values are
+#'     ignored, in which case the condition variable is signalled immediately.
+#'
+#' @examples
+#' cv <- cv()
+#' cv_value(cv)
+#' start <- mclock()
+#'
+#' s <- timed_signal(cv, time = 100L, flag = FALSE)
+#' wait(cv) == TRUE
+#' mclock() - start
+#'
+#' s <- timed_signal(cv, time = 100L, flag = TRUE)
+#' wait(cv) == FALSE
+#' mclock() - start
+#'
+#' @export
+#'
+timed_signal <- function(cv, time, flag = TRUE)
+  .External(rnng_timed_signal, cv, time, flag)
