@@ -14,6 +14,69 @@
 # You should have received a copy of the GNU General Public License along with
 # nanonext. If not, see <https://www.gnu.org/licenses/>.
 
+# nanonext - TLS Configuration -------------------------------------------------
+
+#' Create TLS Configuration
+#'
+#' Create a TLS configuration object to be used for secure connections.
+#'
+#' @param client (optional) for creating a client configuration:
+#'
+#'     \strong{either} the absolute path to a file containing X.509
+#'     certificate(s) in PEM format, comprising the certificate authority
+#'     certificate chain (and revocation list if present), used to validate
+#'     certificates presented by peers,
+#'
+#'     \strong{or} a length 2 character vector comprising [i] the certificate
+#'     authority certificate chain and [ii] the certificate revocation list or
+#'     the empty character \code{""} if not applicable.
+#' @param server (optional) for creating a server configuration:
+#'
+#'     \strong{either} the absolute path to a single file containing the PEM
+#'     encoded certificate and associated private key (may contain additional
+#'     certificates leading to a validation chain, with the leaf certificate
+#'     first, although the self-signed root is not required as the client should
+#'     already have this),
+#'
+#'     \strong{or} a length 2 character vector comprising [i] the certificate
+#'     (optionally certificate chain) and [ii] the associated private or secret
+#'     key.
+#' @param pass [default NULL] required only if the secret key supplied to
+#'     'server' is encrypted with a password. For security, consider providing
+#'     through a function that returns this value, rather than directly.
+#' @param auth (optional) logical value whether to require authentication - by
+#'     default TRUE for client and FALSE for server configurations. If TRUE, the
+#'     session is only allowed to proceed if the peer has presented a certificate
+#'     and it has been validated. If FALSE, authentication is optional, whereby
+#'     a certificate is validated if presented by the peer, but the session
+#'     allowed to proceed otherwise. If neither 'client' nor 'server' are
+#'     supplied, then no authentication is performed and this argument has no
+#'     effect. Supplying a non-logical value will error.
+#'
+#' @return A 'tlsConfig' object.
+#'
+#' @details Specify one of 'client' or 'server' only, or neither (in which case
+#'     an empty client configuration is created), as a configuration can only be
+#'     of one type.
+#'
+#'     For creating client configurations for public internet usage, root CA
+#'     ceritficates can usually be found at
+#'     \file{/etc/ssl/certs/ca-certificates.crt} on Linux systems. Otherwise,
+#'     root CA certificates in PEM format are available at the Common CA
+#'     Database site run by Mozilla: \url{https://www.ccadb.org/resources}
+#'     (select the Server Authentication SSL/TLS certificates text file).
+#'     \emph{This link is not endorsed; use at your own risk.}
+#'
+#' @examples
+#' tls <- tls_config()
+#' tls
+#' ncurl("https://www.r-project.org/", timeout = 1000L, tls = tls)
+#'
+#' @export
+#'
+tls_config <- function(client = NULL, server = NULL, pass = NULL, auth = is.null(server))
+  .Call(rnng_tls_config, client, server, pass, auth)
+
 # nanonext - Cryptographic Hashing ---------------------------------------------
 
 #' Cryptographic Hashing Using the SHA-2 Algorithms

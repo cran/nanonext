@@ -11,6 +11,7 @@ status](https://www.r-pkg.org/badges/version/nanonext?color=112d4e)](https://CRA
 badge](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https://shikokuchuo.r-universe.dev)
 [![R-CMD-check](https://github.com/shikokuchuo/nanonext/workflows/R-CMD-check/badge.svg)](https://github.com/shikokuchuo/nanonext/actions)
 [![codecov](https://codecov.io/gh/shikokuchuo/nanonext/branch/main/graph/badge.svg)](https://app.codecov.io/gh/shikokuchuo/nanonext)
+[![DOI](https://zenodo.org/badge/451104675.svg)](https://zenodo.org/badge/latestdoi/451104675)
 <!-- badges: end -->
 
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a
@@ -22,11 +23,11 @@ asynchronous operations. Implements synchronisation primitives, allowing
 R to wait upon events being signalled by concurrent messaging threads.
 
 Designed for performance and reliability, the NNG library is written in
-C and {nanonext} is a lightweight zero-dependency wrapper. Provides the
-interface for code and processes to communicate with each other -
-receive data generated in Python, perform analysis in R, and send
-results to a C++ program – all on the same computer or on networks
-spanning the globe.
+C and [`nanonext`](https://doi.org/10.5281/zenodo.7903429) is a
+lightweight zero-dependency wrapper. Provides the interface for code and
+processes to communicate with each other - receive data generated in
+Python, perform analysis in R, and send results to a C++ program – all
+on the same computer or on networks spanning the globe.
 
 Implemented scalability protocols:
 
@@ -86,7 +87,7 @@ install.packages("nanonext", repos = "https://shikokuchuo.r-universe.dev")
 
 ### Interfaces
 
-{nanonext} offers 2 equivalent interfaces: a functional interface, and
+`nanonext` offers 2 equivalent interfaces: a functional interface, and
 an object-oriented interface.
 
 #### Functional Interface
@@ -159,7 +160,7 @@ nano2$recv()
 
 ### Cross-language Exchange
 
-{nanonext} provides a fast and reliable data interface between different
+`nanonext` provides a fast and reliable data interface between different
 programming languages where NNG has an implementation, including C, C++,
 Java, Python, Go, Rust etc.
 
@@ -188,7 +189,7 @@ import pynng
 socket = pynng.Pair0(listen="ipc:///tmp/nanonext.socket")
 ```
 
-Create nano object in R using {nanonext}, then send a vector of
+Create nano object in R using `nanonext`, then send a vector of
 ‘doubles’, specifying mode as ‘raw’:
 
 ``` r
@@ -220,7 +221,7 @@ n$recv(mode = "double")
 
 ### Async and Concurrency
 
-{nanonext} implements true async send and receive, leveraging NNG as a
+`nanonext` implements true async send and receive, leveraging NNG as a
 massively-scaleable concurrency framework.
 
 ``` r
@@ -321,7 +322,7 @@ close(s2)
 
 ### RPC and Distributed Computing
 
-{nanonext} implements remote procedure calls (RPC) using NNG’s req/rep
+`nanonext` implements remote procedure calls (RPC) using NNG’s req/rep
 protocol to provide a basis for distributed computing.
 
 Can be used to perform computationally-expensive calculations or
@@ -368,7 +369,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] 0.85 0.994 0.498 1.802 -0.144 ...
+#>  num [1:100000000] 0.821 -0.28 -0.7501 -0.0818 -0.1577 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -382,8 +383,8 @@ In such a case, calling or querying the value confirms that the
 operation has completed, and provides the return value of the function,
 which may typically be NULL or an exit code.
 
-The {mirai} package <https://shikokuchuo.net/mirai/>
-(<https://cran.r-project.org/package=mirai>) uses {nanonext} as the
+The [`mirai`](https://doi.org/10.5281/zenodo.7912722) package
+(<https://cran.r-project.org/package=mirai>) uses `nanonext` as the
 back-end to provide asynchronous execution of arbitrary R code using the
 RPC model.
 
@@ -391,7 +392,7 @@ RPC model.
 
 ### Synchronisation Primitives
 
-{nanonext} implements synchronisation primitives provided by the NNG
+`nanonext` implements synchronisation primitives provided by the NNG
 library for cross-platform use.
 
 As the R interpreter runs on a single thread, synchronisation primitives
@@ -406,7 +407,7 @@ established or when they are dropped.
 
 Condition variables can be used simply to record such events, or more
 powerfully, to wait upon these events. The condition variables
-implemented in {nanonext} include a both a condition (value) and flag
+implemented in `nanonext` include a both a condition (value) and flag
 (binary). Each signal increments the value, and each return of `wait()`
 or `until()` decrements the value. A non-zero condition allows waiting
 threads to continue.
@@ -503,7 +504,7 @@ For further details, please refer to the function documentation for
 
 ### Publisher Subscriber Model
 
-{nanonext} fully implements NNG’s pub/sub protocol as per the below
+`nanonext` fully implements NNG’s pub/sub protocol as per the below
 example. A subscriber can subscribe to one or multiple topics broadcast
 by a publisher.
 
@@ -649,11 +650,11 @@ ncurl("https://httpbin.org/headers")
 #>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
 #>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
 #>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 34 35 36 33 37 34 31 2d 34 36 33 34 36 39 31 66 36 63 37 36 36 30 37
-#> [101] 32 33 64 32 34 61 62 32 30 22 0a 20 20 7d 0a 7d 0a
+#>  [76] 2d 36 34 37 33 61 33 38 65 2d 33 66 61 31 39 62 33 34 31 64 62 38 30 63 32
+#> [101] 66 33 34 30 37 30 32 34 37 22 0a 20 20 7d 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-64563741-4634691f6c7660723d24ab20\"\n  }\n}\n"
+#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6473a38e-3fa19b341db80c2f34070247\"\n  }\n}\n"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
@@ -674,13 +675,13 @@ res
 
 call_aio(res)$headers
 #> $Date
-#> [1] "Sat, 06 May 2023 11:17:27 GMT"
+#> [1] "Sun, 28 May 2023 18:55:10 GMT"
 #> 
 #> $Server
 #> [1] "gunicorn/19.9.0"
 
 res$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-64563742-3979941e4cd984a4053d85a6\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6473a38e-6d36a8dd29a484e23ae028be\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -706,7 +707,7 @@ transact(sess)
 #> 
 #> $headers
 #> $headers$date
-#> [1] "Sat, 06 May 2023 11:17:28 GMT"
+#> [1] "Sun, 28 May 2023 18:55:10 GMT"
 #> 
 #> 
 #> $raw
@@ -716,15 +717,15 @@ transact(sess)
 #>  [76] 22 43 6f 6e 74 65 6e 74 2d 54 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74
 #> [101] 69 6f 6e 2f 6a 73 6f 6e 22 2c 20 0a 20 20 20 20 22 48 6f 73 74 22 3a 20 22
 #> [126] 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22 58 2d 41 6d 7a
-#> [151] 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 35 36
-#> [176] 33 37 34 37 2d 30 65 30 65 61 36 36 30 34 39 63 65 36 30 36 31 36 62 61 30
-#> [201] 62 39 36 32 22 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22
-#> [226] 31 38 35 2e 32 32 35 2e 34 35 2e 34 39 22 2c 20 0a 20 20 22 75 72 6c 22 3a
+#> [151] 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 37 33
+#> [176] 61 33 38 65 2d 30 61 38 39 33 65 34 34 33 30 66 30 39 36 34 39 35 65 65 32
+#> [201] 37 63 32 65 22 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22
+#> [226] 38 38 2e 32 30 32 2e 31 33 36 2e 38 33 22 2c 20 0a 20 20 22 75 72 6c 22 3a
 #> [251] 20 22 68 74 74 70 73 3a 2f 2f 68 74 74 70 62 69 6e 2e 6f 72 67 2f 67 65 74
 #> [276] 22 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-64563747-0e0ea66049ce60616ba0b962\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6473a38e-0a893e4430f096495ee27c2e\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
 ```
 
 [« Back to ToC](#table-of-contents)
@@ -866,7 +867,7 @@ s <- socket(listen = "inproc://stat")
 
 # no active connections (pipes)
 stat(s, "pipes")
-#> [1] 0
+#> [1] 1
 
 s1 <- socket(dial = "inproc://stat")
 
@@ -881,20 +882,24 @@ stat(s, "pipes")
 
 #### Linux / Mac / Solaris
 
-Installation from source requires ‘libnng’ \>= v1.6.0 and ‘libmbedtls’
-\>= 2 - suitable installations are automatically detected - or else
-‘cmake’ to compile ‘libnng’ v1.6.0 alpha (c5e9d8a) and ‘libmbedtls’
-v3.4.0 included within the package sources.
+Installation from source requires ‘libnng’ \>= v1.5.0 and ‘libmbedtls’
+\>= 2 (suitable installations are automatically detected), or else
+‘cmake’ to compile ‘libnng’ v1.6.0 pre-release (8e1836f) and
+‘libmbedtls’ v3.4.0 included within the package sources.
 
-Note: ‘libnng’ v1.6.0 is not yet available in system repositories;
+**It is recommended for optimal performance and stability to let the
+package automatically compile bundled versions of ‘libmbedtls’ and
+‘libnng’ during installation.** To always compile the libraries from
+source even if system installations exist, set the `NANONEXT_LIBS`
+environment variable prior to installation e.g. by
+`Sys.setenv(NANONEXT_LIBS = 1)`.
+
+It is not necessary / recommended to install system libraries, but
+‘libnng’ is available as libnng-dev (deb) or nng-devel (rpm), and
 ‘libmbedtls’ is available as libmbedtls-dev (deb) or libmbedtls-devel
-(rpm).
-
-The ‘INCLUDE_DIR’ and ‘LIB_DIR’ environment variables may be set prior
-to package installation to specify a custom location for ‘libmbedtls’ or
-‘libnng’ other than the standard filesystem locations.
-
-Package installation will automatically build the libraries if required.
+(rpm). The `INCLUDE_DIR` and `LIB_DIR` environment variables may be set
+prior to package installation to specify a custom location for
+‘libmbedtls’ or ‘libnng’ other than the standard filesystem locations.
 
 *Additional requirements for Solaris: (i) the ‘xz’ package - available
 on OpenCSW, and (ii) a more recent version of ‘cmake’ than available on
@@ -911,21 +916,21 @@ MBEDTLS_SSL_DTLS_CONNECTION_ID_COMPAT 0.*
 #### Windows
 
 For R \>= 4.2 using the ‘Rtools42’ or ‘Rtools43’ toolchains, ‘libnng’
-v1.6.0 alpha (c5e9d8a) and ‘libmbedtls’ v3.4.0 will be automatically
-compiled from the package sources during installation.
+v1.6.0 pre-release (8e1836f) and ‘libmbedtls’ v3.4.0 will be
+automatically compiled from the package sources during installation.
 
-For previous R versions, pre-compiled ‘libnng’ v1.6.0 alpha (c5e9d8a)
-and ‘libmbedtls’ v3.4.0 libraries are downloaded and used for
+For previous R versions, pre-compiled ‘libnng’ v1.6.0 pre-release
+(8e1836f) and ‘libmbedtls’ v3.4.0 libraries are downloaded and used for
 installation instead.
 
 [« Back to ToC](#table-of-contents)
 
 ### Links
 
-nanonext on CRAN: <https://cran.r-project.org/package=nanonext><br />
-Package website: <https://shikokuchuo.net/nanonext/><br />
+`nanonext` website: <https://shikokuchuo.net/nanonext/><br /> `nanonext`
+on CRAN: <https://cran.r-project.org/package=nanonext><br />
 
-nanonext is listed in CRAN Task Views:<br /> - High Performance
+`nanonext` is listed in CRAN Task Views:<br /> - High Performance
 Computing:
 <https://cran.r-project.org/view=HighPerformanceComputing><br /> - Web
 Technologies: <https://cran.r-project.org/view=WebTechnologies><br />

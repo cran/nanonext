@@ -13,9 +13,14 @@
 Logical TRUE if 'aio' is an unresolved Aio, or FALSE otherwise.
 }
 \description{
-Query whether an Aio remains unresolved. This function is an experimental
-    technical utility version of \code{\link{unresolved}} not intended for
-    ordinary use. Provides a method of querying the busy status of an Aio
-    without altering its state in any way i.e. not attempting to retrieve the
-    result or message.
+Query whether an Aio remains unresolved. This is an experimental technical
+    utility version of \code{\link{unresolved}} not intended for ordinary
+    use. Provides a method of querying the busy status of an Aio without
+    altering its state in any way i.e. not attempting to retrieve the result
+    or message.
+}
+\details{
+\code{.unresolved()} is not intended to be used for 'recvAio'
+    returned by a signalling function, in which case \code{\link{unresolved}}
+    must be used in all cases.
 }

@@ -16,6 +16,7 @@
 
 // nanonext - package level registrations --------------------------------------
 
+#define NANONEXT_SUPPLEMENTALS
 #include "nanonext.h"
 
 SEXP nano_AioSymbol;
@@ -41,6 +42,7 @@ SEXP nano_StateSymbol;
 SEXP nano_StatusSymbol;
 SEXP nano_StreamSymbol;
 SEXP nano_TextframesSymbol;
+SEXP nano_TlsSymbol;
 SEXP nano_UnserSymbol;
 SEXP nano_UrlSymbol;
 
@@ -55,6 +57,10 @@ SEXP nano_recvAio;
 SEXP nano_sendAio;
 SEXP nano_success;
 SEXP nano_unresolved;
+
+#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
+nng_mtx *shr_mtx;
+#endif
 
 static void RegisterSymbols(void) {
   nano_AioSymbol = Rf_install("aio");
@@ -80,6 +86,7 @@ static void RegisterSymbols(void) {
   nano_StatusSymbol = Rf_install("status");
   nano_StreamSymbol = Rf_install("stream");
   nano_TextframesSymbol = Rf_install("textframes");
+  nano_TlsSymbol = Rf_install("tls");
   nano_UnserSymbol = Rf_install("unserialize");
   nano_UrlSymbol = Rf_install("url");
 }
@@ -87,10 +94,12 @@ static void RegisterSymbols(void) {
 static void PreserveObjects(void) {
   R_PreserveObject(nano_addRedirect = Rf_allocVector(STRSXP, 1));
   R_PreserveObject(nano_aioFormals = Rf_cons(nano_AioSymbol, R_NilValue));
-  R_PreserveObject(nano_aioFuncs = Rf_allocVector(LISTSXP, 3));
+  R_PreserveObject(nano_aioFuncs = Rf_allocVector(LISTSXP, 5));
   SETCAR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
   SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata"), nano_DataSymbol));
   SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw"), nano_DataSymbol));
+  SETCADDDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata2"), nano_DataSymbol));
+  SETCAD4R(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw2"), nano_DataSymbol));
   R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 4));
   SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(1)));
   SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(2)));
@@ -130,7 +139,9 @@ static void ReleaseObjects(void) {
 static const R_CallMethodDef callMethods[] = {
   {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
   {"rnng_aio_get_msgdata", (DL_FUNC) &rnng_aio_get_msgdata, 1},
+  {"rnng_aio_get_msgdata2", (DL_FUNC) &rnng_aio_get_msgdata2, 1},
   {"rnng_aio_get_msgraw", (DL_FUNC) &rnng_aio_get_msgraw, 1},
+  {"rnng_aio_get_msgraw2", (DL_FUNC) &rnng_aio_get_msgraw2, 1},
   {"rnng_aio_http", (DL_FUNC) &rnng_aio_http, 3},
   {"rnng_aio_result", (DL_FUNC) &rnng_aio_result, 1},
   {"rnng_aio_stop", (DL_FUNC) &rnng_aio_stop, 1},
@@ -189,11 +200,11 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_stream_listen", (DL_FUNC) &rnng_stream_listen, 3},
   {"rnng_strerror", (DL_FUNC) &rnng_strerror, 1},
   {"rnng_subscribe", (DL_FUNC) &rnng_subscribe, 3},
+  {"rnng_tls_config", (DL_FUNC) &rnng_tls_config, 4},
   {"rnng_unresolved", (DL_FUNC) &rnng_unresolved, 1},
   {"rnng_unresolved2", (DL_FUNC) &rnng_unresolved2, 1},
   {"rnng_url_parse", (DL_FUNC) &rnng_url_parse, 1},
   {"rnng_version", (DL_FUNC) &rnng_version, 0},
-  {"rnng_version_string", (DL_FUNC) &rnng_version_string, 0},
   {NULL, NULL, 0}
 };
 
@@ -205,6 +216,9 @@ static const R_ExternalMethodDef externalMethods[] = {
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
+#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
+  nng_mtx_alloc(&shr_mtx);
+#endif
   R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
@@ -212,4 +226,7 @@ void attribute_visible R_init_nanonext(DllInfo* dll) {
 
 void attribute_visible R_unload_nanonext(DllInfo *info) {
   ReleaseObjects();
+#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
+  nng_mtx_free(shr_mtx);
+#endif
 }

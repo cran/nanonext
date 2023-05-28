@@ -19,10 +19,7 @@
 #ifndef NANONEXT_H
 #define NANONEXT_H
 
-#ifdef NANONEXT_INTERNALS
-#define NANONEXT_VERSION "0.8.3"
 #include <nng/nng.h>
-#endif
 
 #ifdef NANONEXT_PROTOCOLS
 #include <nng/protocol/bus0/bus.h>
@@ -49,6 +46,10 @@ typedef struct nano_cv_s {
   nng_cv *cv;
 } nano_cv;
 
+#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
+extern nng_mtx *shr_mtx;
+#endif
+
 #endif
 
 #ifdef NANONEXT_TLS
@@ -67,7 +68,6 @@ typedef struct nano_cv_s {
 #include <Rversion.h>
 #include <R_ext/Visibility.h>
 
-#ifdef NANONEXT_INTERNALS
 #define ERROR_OUT(xc) Rf_error("%d | %s", xc, nng_strerror(xc))
 #define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
 extern SEXP mk_error(const int);
@@ -82,7 +82,6 @@ extern SEXP rawOneString(unsigned char *, R_xlen_t, R_xlen_t *);
 extern void socket_finalizer(SEXP);
 extern void dialer_finalizer(SEXP);
 extern void listener_finalizer(SEXP);
-#endif
 
 extern SEXP nano_AioSymbol;
 extern SEXP nano_ContextSymbol;
@@ -107,6 +106,7 @@ extern SEXP nano_StateSymbol;
 extern SEXP nano_StatusSymbol;
 extern SEXP nano_StreamSymbol;
 extern SEXP nano_TextframesSymbol;
+extern SEXP nano_TlsSymbol;
 extern SEXP nano_UnserSymbol;
 extern SEXP nano_UrlSymbol;
 
@@ -124,7 +124,9 @@ extern SEXP nano_unresolved;
 
 extern SEXP rnng_aio_call(SEXP);
 extern SEXP rnng_aio_get_msgdata(SEXP);
+extern SEXP rnng_aio_get_msgdata2(SEXP);
 extern SEXP rnng_aio_get_msgraw(SEXP);
+extern SEXP rnng_aio_get_msgraw2(SEXP);
 extern SEXP rnng_aio_http(SEXP, SEXP, SEXP);
 extern SEXP rnng_aio_result(SEXP);
 extern SEXP rnng_aio_stop(SEXP);
@@ -184,10 +186,10 @@ extern SEXP rnng_stream_listen(SEXP, SEXP, SEXP);
 extern SEXP rnng_strerror(SEXP);
 extern SEXP rnng_subscribe(SEXP, SEXP, SEXP);
 extern SEXP rnng_timed_signal(SEXP);
+extern SEXP rnng_tls_config(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_unresolved(SEXP);
 extern SEXP rnng_unresolved2(SEXP);
 extern SEXP rnng_url_parse(SEXP);
 extern SEXP rnng_version(void);
-extern SEXP rnng_version_string(void);
 
 #endif

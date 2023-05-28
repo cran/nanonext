@@ -41,10 +41,9 @@
 #'     These are case-insensitive and will return NULL if not present.
 #' @param timeout (optional) integer value in milliseconds after which the
 #'     transaction times out if not yet complete.
-#' @param pem (optional) applicable to secure HTTPS sites only. The path to a
-#'     file containing X.509 certificate(s) in PEM format, comprising the
-#'     certificate authority certificate chain (and revocation list if present).
-#'     If missing or NULL, certificates are not validated.
+#' @param tls (optional) applicable to secure HTTPS sites only, a client TLS
+#'     Configuration object created by \code{\link{tls_config}}. If missing or
+#'     NULL, certificates are not validated.
 #'
 #' @return Named list of 4 elements:
 #'     \itemize{
@@ -70,12 +69,12 @@
 #'       method = "PUT",
 #'       headers = list(Authorization = "Bearer APIKEY"),
 #'       data = "hello world",
-#'       timeout = 2000L)
+#'       timeout = 1500L)
 #' ncurl("http://httpbin.org/post",
 #'       method = "POST",
 #'       headers = c(`Content-Type` = "application/json"),
 #'       data = '{"k":"v"}',
-#'       timeout = 2000L)
+#'       timeout = 1500L)
 #'
 #' @export
 #'
@@ -88,10 +87,10 @@ ncurl <- function(url,
                   data = NULL,
                   response = NULL,
                   timeout = NULL,
-                  pem = NULL)
+                  tls = NULL)
   if (async)
-    data <- .Call(rnng_ncurl_aio, url, convert, method, headers, data, timeout, pem, environment()) else
-      .Call(rnng_ncurl, url, convert, follow, method, headers, data, response, timeout, pem)
+    data <- .Call(rnng_ncurl_aio, url, convert, method, headers, data, timeout, tls, environment()) else
+      .Call(rnng_ncurl, url, convert, follow, method, headers, data, response, timeout, tls)
 
 #' ncurl Session
 #'
@@ -122,8 +121,8 @@ ncurl_session <- function(url,
                           data = NULL,
                           response = NULL,
                           timeout = NULL,
-                          pem = NULL)
-    .Call(rnng_ncurl_session, url, convert, method, headers, data, response, timeout, pem)
+                          tls = NULL)
+    .Call(rnng_ncurl_session, url, convert, method, headers, data, response, timeout, tls)
 
 #' @param session an 'ncurlSession' object.
 #'

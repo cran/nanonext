@@ -1,16 +1,16 @@
 library(nanonext)
-nanotest <- function(x) invisible(x || stop())
-nanotestw <- function(x) invisible(suppressWarnings(x) || stop())
-nanotestz <- function(x) invisible(x == 0L || stop())
-nanotestnano <- function(x) invisible(is_nano(x) || stop())
-nanotestn <- function(x) invisible(is.null(x) || stop())
-nanotestnn <- function(x) invisible(!is.null(x) || stop())
-nanotestp <- function(x) invisible(is.character(capture.output(print(x))) || stop())
-nanotestxp <- function(x) invisible(typeof(x) == "externalptr" || stop())
+nanotest <- function(x) invisible(x || stop("is not TRUE when expected to be TRUE"))
+nanotestw <- function(x) invisible(suppressWarnings(x) || stop("is not TRUE when expected to be TRUE"))
+nanotestz <- function(x) invisible(x == 0L || stop("does not equal 0L as expected"))
+nanotestnano <- function(x) invisible(is_nano(x) || stop("does not inherit from class 'nano' as expected"))
+nanotestn <- function(x) invisible(is.null(x) || stop("is not NULL when expected to be NULL"))
+nanotestnn <- function(x) invisible(!is.null(x) || stop("is NULL when expected to be not NULL"))
+nanotestp <- function(x) invisible(is.character(capture.output(print(x))) || stop("print output of expression cannot be captured as a character value"))
+nanotestxp <- function(x) invisible(typeof(x) == "externalptr" || stop("is not of type 'externalptr' as expected"))
 nanotesterr <- function(x, e = "")
-  invisible(grepl(e, tryCatch(x, error = identity)[["message"]], fixed = TRUE) || stop())
+  invisible(grepl(e, tryCatch(x, error = identity)[["message"]], fixed = TRUE) || stop("expected error message '", e, "' not generated"))
 
-nanotest(is.character(ver <- nanonext_version()) && length(ver) == 1L)
+nng_version()
 n <- nano("pair", listen = "inproc://nanonext", autostart = FALSE)
 n1 <- nano("pair", dial = "inproc://nanonext", autostart = FALSE)
 nanotest(inherits(n, "nanoObject"))
@@ -165,8 +165,10 @@ nanotest(n1$socket[state] == "closed")
 req <- nano("req", listen = "inproc://testing")
 rep <- socket("rep", dial = "inproc://testing", listen = "inproc://testing2")
 nanotestp(rep)
-nanotest(stat(rep, "dialers") == 1)
-nanotest(stat(rep, "protocol") == "rep")
+if (nng_version()[1] == "1.6.0pre") {
+  nanotest(stat(rep, "dialers") == 1)
+  nanotest(stat(rep, "protocol") == "rep")
+}
 nanotestn(stat(rep, "nonexistentstat"))
 nanotestnano(req$opt("req:resend-time", 1000))
 nanotest(req$opt("req:resend-time") == 1000L)
@@ -320,7 +322,7 @@ relo <- ncurl("https://cran.r-project.org/package=nanonext", convert = FALSE, re
 nanotest(is.integer(call_aio(relo)$status))
 relo <- ncurl("https://cran.r-project.org/package=nanonext", convert = FALSE, response = list("server"), async = TRUE)
 nanotest(is.integer(call_aio(relo)$status))
-put1 <- ncurl("http://httpbin.org/put", async = TRUE, method = "PUT", headers = c(Authorization = "Bearer token"), data = "test", response = c("date", "server"))
+put1 <- ncurl("http://httpbin.org/put", async = TRUE, method = "PUT", headers = c(Authorization = "Bearer token"), data = "test", response = c("date", "server"), timeout = 3000L)
 nanotest(is.integer(call_aio(put1)$status))
 nanotestnn(put1$headers)
 nanotestnn(put1$raw)
@@ -342,7 +344,7 @@ nanotestnn(sess)
 nanotest(is_error_value(sess) || length(transact(sess)) == 4L)
 nanotest(is_error_value(sess) || close(sess) == 0L)
 nanotesterr(transact(sess), "ncurlSession")
-nanotest(is_error_value(ncurl_session("https://i")))
+nanotestw(is_error_value(ncurl_session("https://i")))
 nanotesterr(stream(dial = "wss://127.0.0.1:5555"))
 nanotesterr(stream(listen = "errorValue3"), "argument")
 nanotesterr(stream(), "specify")
@@ -422,6 +424,11 @@ nanotestz(close(s2))
 nanotestz(close(s3))
 nanotestz(close(s4))
 
+nanotest(nanonext:::.DollarNames.ncurlAio(NULL, "sta") == "status")
+nanotest(nanonext:::.DollarNames.recvAio(NULL, "dat") == "data")
+nanotest(nanonext:::.DollarNames.sendAio(NULL, "r") == "result")
+nanotestnn(nanonext:::.DollarNames.nano(NULL))
+
 fakesock <- `class<-`(new.env(), "nanoSocket")
 nanotesterr(dial(fakesock), "valid Socket")
 nanotesterr(dial(fakesock, autostart = FALSE), "valid Socket")
@@ -479,3 +486,31 @@ nanotest(base64dec(base64enc("test")) == "test")
 nanotest(is.raw(base64enc(data.frame(), convert = FALSE)))
 nanotest(is.integer(unserialize(base64dec(base64enc(c(1L, 2L)), convert = FALSE))))
 nanotesterr(base64dec("__"), "not valid base64")
+
+file <- tempfile()
+pem <- "-----BEGIN CERTIFICATE----- -----END CERTIFICATE-----"
+cat(pem, file = file)
+nanotesterr(tls_config(client = file), "Cryptographic error")
+nanotesterr(tls_config(server = file), "Cryptographic error")
+nanotesterr(tls_config(client = c(pem, pem)), "Cryptographic error")
+nanotesterr(tls_config(server = c(pem, pem)), "Cryptographic error")
+unlink(file)
+nanotestxp(tls <- tls_config(client = c(
+"-----BEGIN CERTIFICATE-----
+MIICGTCCAZ+gAwIBAgIQCeCTZaz32ci5PhwLBCou8zAKBggqhkjOPQQDAzBOMQswCQYDVQQGEwJV
+UzEXMBUGA1UEChMORGlnaUNlcnQsIEluYy4xJjAkBgNVBAMTHURpZ2lDZXJ0IFRMUyBFQ0MgUDM4
+NCBSb290IEc1MB4XDTIxMDExNTAwMDAwMFoXDTQ2MDExNDIzNTk1OVowTjELMAkGA1UEBhMCVVMx
+FzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMSYwJAYDVQQDEx1EaWdpQ2VydCBUTFMgRUNDIFAzODQg
+Um9vdCBHNTB2MBAGByqGSM49AgEGBSuBBAAiA2IABMFEoc8Rl1Ca3iOCNQfN0MsYndLxf3c1Tzvd
+lHJS7cI7+Oz6e2tYIOyZrsn8aLN1udsJ7MgT9U7GCh1mMEy7H0cKPGEQQil8pQgO4CLp0zVozptj
+n4S1mU1YoI71VOeVyaNCMEAwHQYDVR0OBBYEFMFRRVBZqz7nLFr6ICISB4CIfBFqMA4GA1UdDwEB
+/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMDA2gAMGUCMQCJao1H5+z8blUD2Wds
+Jk6Dxv3J+ysTvLd6jLRl0mlpYxNjOyZQLgGheQaRnUi/wr4CMEfDFXuxoJGZSZOoPHzoRgaLLPIx
+AJSdYsiJvRmEFOml+wG4DXZDjC5Ty3zfDBeWUA==
+-----END CERTIFICATE-----", ""
+)))
+nanotest(inherits(tls, "tlsConfig"))
+nanotestp(tls)
+nanotest(is_error_value(ncurl("https://www.cam.ac.uk/", tls = tls)$status))
+nanotest(is_error_value(call_aio(ncurl("https://www.cam.ac.uk/", async = TRUE, tls = tls))$status))
+nanotestxp(tls <- tls_config())

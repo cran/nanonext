@@ -419,6 +419,15 @@ print.thread <- function(x, ...) {
 
 #' @export
 #'
+print.tlsConfig <- function(x, ...) {
+
+  cat(sprintf("< TLS %s configuration >\n - auth mode: %s\n - %s\n", attr(x, "spec"), attr(x, "mode"), attr(x, "source")), file = stdout())
+  invisible(x)
+
+}
+
+#' @export
+#'
 `[[.nano` <- function(x, i, exact = FALSE)
   attr(x, i, exact = exact)
 
