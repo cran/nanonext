@@ -18,11 +18,11 @@
 
 #' Create TLS Configuration
 #'
-#' Create a TLS configuration object to be used for secure connections.
+#' Create a TLS configuration object to be used for secure connections. Specify
+#'     'client' to create a client configuration or 'server' to create a server
+#'     configuration.
 #'
-#' @param client (optional) for creating a client configuration:
-#'
-#'     \strong{either} the absolute path to a file containing X.509
+#' @param client \strong{either} the character path to a file containing X.509
 #'     certificate(s) in PEM format, comprising the certificate authority
 #'     certificate chain (and revocation list if present), used to validate
 #'     certificates presented by peers,
@@ -30,25 +30,23 @@
 #'     \strong{or} a length 2 character vector comprising [i] the certificate
 #'     authority certificate chain and [ii] the certificate revocation list or
 #'     the empty character \code{""} if not applicable.
-#' @param server (optional) for creating a server configuration:
-#'
-#'     \strong{either} the absolute path to a single file containing the PEM
-#'     encoded certificate and associated private key (may contain additional
-#'     certificates leading to a validation chain, with the leaf certificate
-#'     first, although the self-signed root is not required as the client should
-#'     already have this),
+#' @param server \strong{either} the character path to a file containing
+#'     the PEM encoded certificate and associated private key (may contain
+#'     additional certificates leading to a validation chain, with the leaf
+#'     certificate first, although the self-signed root is not required as the
+#'     client should already have this),
 #'
 #'     \strong{or} a length 2 character vector comprising [i] the certificate
 #'     (optionally certificate chain) and [ii] the associated private or secret
 #'     key.
-#' @param pass [default NULL] required only if the secret key supplied to
-#'     'server' is encrypted with a password. For security, consider providing
-#'     through a function that returns this value, rather than directly.
-#' @param auth (optional) logical value whether to require authentication - by
-#'     default TRUE for client and FALSE for server configurations. If TRUE, the
-#'     session is only allowed to proceed if the peer has presented a certificate
-#'     and it has been validated. If FALSE, authentication is optional, whereby
-#'     a certificate is validated if presented by the peer, but the session
+#' @param pass (optional) required only if the secret key supplied to 'server'
+#'     is encrypted with a password. For security, consider providing through a
+#'     function that returns this value, rather than directly.
+#' @param auth logical value whether to require authentication - by default TRUE
+#'     for client and FALSE for server configurations. If TRUE, the session is
+#'     only allowed to proceed if the peer has presented a certificate and it
+#'     has been validated. If FALSE, authentication is optional, whereby a
+#'     certificate is validated if presented by the peer, but the session
 #'     allowed to proceed otherwise. If neither 'client' nor 'server' are
 #'     supplied, then no authentication is performed and this argument has no
 #'     effect. Supplying a non-logical value will error.
@@ -228,3 +226,48 @@ base64enc <- function(x, convert = TRUE) .Call(rnng_base64enc, x, convert)
 #' @export
 #'
 base64dec <- function(x, convert = TRUE) .Call(rnng_base64dec, x, convert)
+
+# nanonext - Key Gen and Certificates ------------------------------------------
+
+#' Generate Self-Signed Certificate and Key
+#'
+#' Generate self-signed x509 certificate and 4096 bit RSA private/public key
+#'     pair for use with authenticated, encrypted TLS communications.
+#'
+#' @param cn [default 'localhost'] character issuer common name (CN) for the
+#'     certificate. This can be either a hostname or an IP address, but must
+#'     match the actual server URL as client authentication will depend on it.
+#' @param valid [default '20301231235959'] character 'not after' date-time in
+#'     'yyyymmddhhmmss' format. The certificate is not valid after this time.
+#'
+#' @return A list of length 2, comprising \code{$server} and \code{$client}.
+#'     These may be passed directly to the relevant argument of \code{\link{tls_config}}.
+#'
+#' @details For interactive sessions only, a status message is printed at the
+#'     start of key / certificate generation and also when complete.
+#'
+#' @examples
+#'
+#' if (interactive()) {
+#' # Only run examples in interactive R sessions
+#'
+#' cert <- write_cert(cn = "127.0.0.1")
+#' ser <- tls_config(server = cert$server)
+#' cli <- tls_config(client = cert$client)
+#'
+#' s <- socket(listen = "tls+tcp://127.0.0.1:5555", tls = ser)
+#' s1 <- socket(dial = "tls+tcp://127.0.0.1:5555", tls = cli)
+#'
+#' # secure TLS connection established
+#'
+#' close(s1)
+#' close(s)
+#'
+#' cert
+#'
+#' }
+#'
+#' @export
+#'
+write_cert <- function(cn = "localhost", valid = "20301231235959")
+  .Call(rnng_write_cert, cn, valid, interactive())

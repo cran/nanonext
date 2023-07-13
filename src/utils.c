@@ -20,27 +20,17 @@
 #define NANONEXT_SUPPLEMENTALS
 #include "nanonext.h"
 
-// finalizers ------------------------------------------------------------------
+// definitions and finalizers --------------------------------------------------
 
-static void stream_dialer_finalizer(SEXP xptr) {
+typedef struct nano_stream_listener_s {
+  nng_stream_listener *list;
+  nng_tls_config *tls;
+} nano_stream_listener;
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
-  nng_stream_dialer *xp = (nng_stream_dialer *) R_ExternalPtrAddr(xptr);
-  nng_stream_dialer_close(xp);
-  nng_stream_dialer_free(xp);
-
-}
-
-static void stream_listener_finalizer(SEXP xptr) {
-
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
-  nng_stream_listener *xp = (nng_stream_listener *) R_ExternalPtrAddr(xptr);
-  nng_stream_listener_close(xp);
-  nng_stream_listener_free(xp);
-
-}
+typedef struct nano_stream_dialer_s {
+  nng_stream_dialer *dial;
+  nng_tls_config *tls;
+} nano_stream_dialer;
 
 static void stream_finalizer(SEXP xptr) {
 
@@ -49,6 +39,32 @@ static void stream_finalizer(SEXP xptr) {
   nng_stream *xp = (nng_stream *) R_ExternalPtrAddr(xptr);
   nng_stream_close(xp);
   nng_stream_free(xp);
+
+}
+
+static void stream_listener_finalizer(SEXP xptr) {
+
+  if (R_ExternalPtrAddr(xptr) == NULL)
+    return;
+  nano_stream_listener *xp = (nano_stream_listener *) R_ExternalPtrAddr(xptr);
+  nng_stream_listener_close(xp->list);
+  nng_stream_listener_free(xp->list);
+  if (xp->tls != NULL)
+    nng_tls_config_free(xp->tls);
+  R_Free(xp);
+
+}
+
+static void stream_dialer_finalizer(SEXP xptr) {
+
+  if (R_ExternalPtrAddr(xptr) == NULL)
+    return;
+  nano_stream_dialer *xp = (nano_stream_dialer *) R_ExternalPtrAddr(xptr);
+  nng_stream_dialer_close(xp->dial);
+  nng_stream_dialer_free(xp->dial);
+  if (xp->tls != NULL)
+    nng_tls_config_free(xp->tls);
+  R_Free(xp);
 
 }
 
@@ -379,46 +395,47 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
 SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP tls) {
 
   const char *add = CHAR(STRING_ELT(url, 0));
+  nano_stream_dialer *nsd = R_Calloc(1, nano_stream_dialer);
+  nng_stream *stream;
   nng_url *up;
-  nng_tls_config *cfg = NULL;
-  nng_stream_dialer *dp;
   nng_aio *aiop;
   int xc, frames = 0;
-  SEXP sd, st, klass;
+  SEXP st, sd, klass;
 
   if ((xc = nng_url_parse(&up, add)))
     goto exitlevel1;
 
-  if ((xc = nng_stream_dialer_alloc_url(&dp, up)))
+  xc = nng_stream_dialer_alloc_url(&nsd->dial, up);
+  if (xc)
     goto exitlevel2;
 
   if (!strcmp(up->u_scheme, "ws") || !strcmp(up->u_scheme, "wss")) {
     frames = LOGICAL(textframes)[0];
     if (frames &&
-        ((xc = nng_stream_dialer_set_bool(dp, "ws:recv-text", 1)) ||
-        (xc = nng_stream_dialer_set_bool(dp, "ws:send-text", 1))))
+        ((xc = nng_stream_dialer_set_bool(nsd->dial, "ws:recv-text", 1)) ||
+        (xc = nng_stream_dialer_set_bool(nsd->dial, "ws:send-text", 1))))
       goto exitlevel3;
   }
 
   if (!strcmp(up->u_scheme, "wss")) {
 
     if (tls == R_NilValue) {
-      if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_CLIENT)))
+      if ((xc = nng_tls_config_alloc(&nsd->tls, NNG_TLS_MODE_CLIENT)))
         goto exitlevel3;
 
-      if ((xc = nng_tls_config_server_name(cfg, up->u_hostname)) ||
-          (xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_NONE)) ||
-          (xc = nng_stream_dialer_set_ptr(dp, NNG_OPT_TLS_CONFIG, cfg)))
+      if ((xc = nng_tls_config_server_name(nsd->tls, up->u_hostname)) ||
+          (xc = nng_tls_config_auth_mode(nsd->tls, NNG_TLS_AUTH_MODE_NONE)) ||
+          (xc = nng_stream_dialer_set_ptr(nsd->dial, NNG_OPT_TLS_CONFIG, nsd->tls)))
         goto exitlevel4;
     } else {
 
       if (R_ExternalPtrTag(tls) != nano_TlsSymbol)
         Rf_error("'tls' is not a valid TLS Configuration");
-      cfg = (nng_tls_config *) R_ExternalPtrAddr(tls);
-      nng_tls_config_hold(cfg);
+      nsd->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
+      nng_tls_config_hold(nsd->tls);
 
-      if ((xc = nng_tls_config_server_name(cfg, up->u_hostname)) ||
-          (xc = nng_stream_dialer_set_ptr(dp, NNG_OPT_TLS_CONFIG, cfg)))
+      if ((xc = nng_tls_config_server_name(nsd->tls, up->u_hostname)) ||
+          (xc = nng_stream_dialer_set_ptr(nsd->dial, NNG_OPT_TLS_CONFIG, nsd->tls)))
         goto exitlevel4;
     }
 
@@ -427,24 +444,21 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP tls) {
   if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
     goto exitlevel4;
 
-  nng_stream_dialer_dial(dp, aiop);
+  nng_stream_dialer_dial(nsd->dial, aiop);
   nng_aio_wait(aiop);
   if ((xc = nng_aio_result(aiop)))
     goto exitlevel5;
 
-  nng_stream *stream;
   stream = nng_aio_get_output(aiop, 0);
 
   nng_aio_free(aiop);
-  if (cfg != NULL)
-    nng_tls_config_free(cfg);
   nng_url_free(up);
-
-  PROTECT(sd = R_MakeExternalPtr(dp, nano_DialerSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(sd, stream_dialer_finalizer, TRUE);
 
   PROTECT(st = R_MakeExternalPtr(stream, nano_StreamSymbol, R_NilValue));
   R_RegisterCFinalizerEx(st, stream_finalizer, TRUE);
+
+  PROTECT(sd = R_MakeExternalPtr(nsd, R_NilValue, R_NilValue));
+  R_RegisterCFinalizerEx(sd, stream_dialer_finalizer, TRUE);
   Rf_setAttrib(st, nano_DialerSymbol, sd);
   Rf_setAttrib(st, nano_UrlSymbol, url);
   Rf_setAttrib(st, nano_TextframesSymbol, Rf_ScalarLogical(frames));
@@ -460,10 +474,10 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP tls) {
   exitlevel5:
   nng_aio_free(aiop);
   exitlevel4:
-  if (cfg != NULL)
-    nng_tls_config_free(cfg);
+  if (nsd->tls != NULL)
+    nng_tls_config_free(nsd->tls);
   exitlevel3:
-  nng_stream_dialer_free(dp);
+  nng_stream_dialer_free(nsd->dial);
   exitlevel2:
   nng_url_free(up);
   exitlevel1:
@@ -474,74 +488,72 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP tls) {
 SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP tls) {
 
   const char *add = CHAR(STRING_ELT(url, 0));
+  nano_stream_listener *nsl = R_Calloc(1, nano_stream_listener);
+  nng_stream *stream;
   nng_url *up;
-  nng_tls_config *cfg = NULL;
-  nng_stream_listener *lp;
   nng_aio *aiop;
   int xc, frames = 0;
-  SEXP sl, st, klass;
+  SEXP st, sl, klass;
 
   if ((xc = nng_url_parse(&up, add)))
     goto exitlevel1;
 
-  if ((xc = nng_stream_listener_alloc_url(&lp, up)))
+  xc = nng_stream_listener_alloc_url(&nsl->list, up);
+  if (xc)
     goto exitlevel2;
 
   if (!strcmp(up->u_scheme, "ws") || !strcmp(up->u_scheme, "wss")) {
     frames = LOGICAL(textframes)[0];
     if (frames &&
-        ((xc = nng_stream_listener_set_bool(lp, "ws:recv-text", 1)) ||
-        (xc = nng_stream_listener_set_bool(lp, "ws:send-text", 1))))
+        ((xc = nng_stream_listener_set_bool(nsl->list, "ws:recv-text", 1)) ||
+        (xc = nng_stream_listener_set_bool(nsl->list, "ws:send-text", 1))))
       goto exitlevel3;
   }
 
   if (!strcmp(up->u_scheme, "wss")) {
 
     if (tls == R_NilValue) {
-      if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_SERVER)))
+      if ((xc = nng_tls_config_alloc(&nsl->tls, NNG_TLS_MODE_SERVER)))
         goto exitlevel3;
 
-      if ((xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_NONE)) ||
-          (xc = nng_stream_listener_set_ptr(lp, "tls-config", cfg)))
+      if ((xc = nng_tls_config_auth_mode(nsl->tls, NNG_TLS_AUTH_MODE_NONE)) ||
+          (xc = nng_stream_listener_set_ptr(nsl->list, NNG_OPT_TLS_CONFIG, nsl->tls)))
         goto exitlevel4;
     } else {
 
       if (R_ExternalPtrTag(tls) != nano_TlsSymbol)
         Rf_error("'tls' is not a valid TLS Configuration");
-      cfg = (nng_tls_config *) R_ExternalPtrAddr(tls);
-      nng_tls_config_hold(cfg);
+      nsl->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
+      nng_tls_config_hold(nsl->tls);
 
-      if ((xc = nng_tls_config_server_name(cfg, up->u_hostname)) ||
-          (xc = nng_stream_listener_set_ptr(lp, "tls-config", cfg)))
+      if ((xc = nng_tls_config_server_name(nsl->tls, up->u_hostname)) ||
+          (xc = nng_stream_listener_set_ptr(nsl->list, NNG_OPT_TLS_CONFIG, nsl->tls)))
         goto exitlevel4;
     }
 
   }
 
-  if ((xc = nng_stream_listener_listen(lp)))
+  if ((xc = nng_stream_listener_listen(nsl->list)))
     goto exitlevel4;
 
   if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
     goto exitlevel4;
 
-  nng_stream_listener_accept(lp, aiop);
+  nng_stream_listener_accept(nsl->list, aiop);
   nng_aio_wait(aiop);
   if ((xc = nng_aio_result(aiop)))
     goto exitlevel5;
 
-  nng_stream *stream;
   stream = nng_aio_get_output(aiop, 0);
 
   nng_aio_free(aiop);
-  if (cfg != NULL)
-    nng_tls_config_free(cfg);
   nng_url_free(up);
-
-  PROTECT(sl = R_MakeExternalPtr(lp, nano_ListenerSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(sl, stream_listener_finalizer, TRUE);
 
   PROTECT(st = R_MakeExternalPtr(stream, nano_StreamSymbol, R_NilValue));
   R_RegisterCFinalizerEx(st, stream_finalizer, TRUE);
+
+  PROTECT(sl = R_MakeExternalPtr(nsl, R_NilValue, R_NilValue));
+  R_RegisterCFinalizerEx(sl, stream_listener_finalizer, TRUE);
   Rf_setAttrib(st, nano_ListenerSymbol, sl);
   Rf_setAttrib(st, nano_UrlSymbol, url);
   Rf_setAttrib(st, nano_TextframesSymbol, Rf_ScalarLogical(frames));
@@ -557,10 +569,10 @@ SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP tls) {
   exitlevel5:
   nng_aio_free(aiop);
   exitlevel4:
-  if (cfg != NULL)
-    nng_tls_config_free(cfg);
+  if (nsl->tls != NULL)
+    nng_tls_config_free(nsl->tls);
   exitlevel3:
-  nng_stream_listener_free(lp);
+  nng_stream_listener_free(nsl->list);
   exitlevel2:
   nng_url_free(up);
   exitlevel1:
@@ -573,6 +585,7 @@ SEXP rnng_stream_close(SEXP stream) {
   if (R_ExternalPtrTag(stream) != nano_StreamSymbol)
     Rf_error("'stream' is not a valid or active Stream");
   nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(stream);
+  nng_stream_close(sp);
   nng_stream_free(sp);
   R_SetExternalPtrTag(stream, R_NilValue);
   R_ClearExternalPtr(stream);
@@ -673,37 +686,44 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
 
   if ((usefile = Rf_xlength(client)) > 0) {
     const char *file = CHAR(STRING_ELT(client, 0));
-    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_CLIENT)) ||
-        (xc = nng_tls_config_auth_mode(cfg, mod)))
-      ERROR_OUT(xc);
+    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_CLIENT)))
+      goto exitlevel1;
+    if ((xc = nng_tls_config_auth_mode(cfg, mod)))
+      goto exitlevel2;
+
     if (usefile == 1) {
+      file = R_ExpandFileName(file);
       if ((xc = nng_tls_config_ca_file(cfg, file)))
-        ERROR_OUT(xc);
+        goto exitlevel2;
     } else {
       const char *crl = CHAR(STRING_ELT(client, 1));
       if ((xc = nng_tls_config_ca_chain(cfg, file, strncmp(crl, "", 1) ? crl : NULL)))
-        ERROR_OUT(xc);
+        goto exitlevel2;
     }
 
   } else if ((usefile = Rf_xlength(server)) > 0) {
     const char *file = CHAR(STRING_ELT(server, 0));
     const char *pss = pass != R_NilValue ? CHAR(STRING_ELT(pass, 0)) : NULL;
-    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_SERVER)) ||
-        (xc = nng_tls_config_auth_mode(cfg, mod)))
-      ERROR_OUT(xc);
+    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_SERVER)))
+      goto exitlevel1;
+    if ((xc = nng_tls_config_auth_mode(cfg, mod)))
+      goto exitlevel2;
+
     if (usefile == 1) {
+      file = R_ExpandFileName(file);
       if ((xc = nng_tls_config_cert_key_file(cfg, file, pss)))
-        ERROR_OUT(xc);
+        goto exitlevel2;
     } else {
       const char *key = CHAR(STRING_ELT(server, 1));
       if ((xc = nng_tls_config_own_cert(cfg, file, key, pss)))
-        ERROR_OUT(xc);
+        goto exitlevel2;
     }
 
   } else {
-    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_CLIENT)) ||
-        (xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_NONE)))
-      ERROR_OUT(xc);
+    if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_CLIENT)))
+      goto exitlevel1;
+    if ((xc = nng_tls_config_auth_mode(cfg, NNG_TLS_AUTH_MODE_NONE)))
+      goto exitlevel2;
   }
 
   PROTECT(xp = R_MakeExternalPtr(cfg, nano_TlsSymbol, R_NilValue));
@@ -712,18 +732,20 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
   if (client != R_NilValue) {
     Rf_setAttrib(xp, R_SpecSymbol, Rf_mkString("client"));
     Rf_setAttrib(xp, R_ModeSymbol, Rf_mkString(mod == NNG_TLS_AUTH_MODE_REQUIRED ? "required" : "optional"));
-    Rf_setAttrib(xp, R_SourceSymbol, usefile == 1 ? client : Rf_mkString("[ not from file ]"));
   } else if (server != R_NilValue) {
     Rf_setAttrib(xp, R_SpecSymbol, Rf_mkString("server"));
     Rf_setAttrib(xp, R_ModeSymbol, Rf_mkString(mod == NNG_TLS_AUTH_MODE_REQUIRED ? "required" : "optional"));
-    Rf_setAttrib(xp, R_SourceSymbol, usefile == 1 ? server : Rf_mkString("[ not from file ]"));
   } else {
     Rf_setAttrib(xp, R_SpecSymbol, Rf_mkString("client"));
     Rf_setAttrib(xp, R_ModeSymbol, Rf_mkString("none"));
-    Rf_setAttrib(xp, R_SourceSymbol, Rf_mkString("[ empty ]"));
   }
 
   UNPROTECT(1);
   return xp;
+
+  exitlevel2:
+    nng_tls_config_free(cfg);
+  exitlevel1:
+    ERROR_OUT(xc);
 
 }

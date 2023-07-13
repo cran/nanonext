@@ -38,6 +38,19 @@
 #include <nng/supplemental/http/http.h>
 #include <nng/supplemental/tls/tls.h>
 #include <nng/supplemental/util/platform.h>
+#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
+extern nng_mtx *shr_mtx;
+#endif
+
+typedef struct nano_listener_s {
+  nng_listener list;
+  nng_tls_config *tls;
+} nano_listener;
+
+typedef struct nano_dialer_s {
+  nng_dialer dial;
+  nng_tls_config *tls;
+} nano_dialer;
 
 typedef struct nano_cv_s {
   int condition;
@@ -46,10 +59,10 @@ typedef struct nano_cv_s {
   nng_cv *cv;
 } nano_cv;
 
-#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
-extern nng_mtx *shr_mtx;
 #endif
 
+#ifdef NANONEXT_TIME
+#include <time.h>
 #endif
 
 #ifdef NANONEXT_TLS
@@ -59,6 +72,26 @@ extern nng_mtx *shr_mtx;
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
 #include <mbedtls/version.h>
+#endif
+
+#ifdef NANONEXT_KEYCERT
+#include <mbedtls/version.h>
+#if MBEDTLS_VERSION_MAJOR == 2
+#include <mbedtls/config.h>
+#endif
+#include <mbedtls/platform.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/rsa.h>
+#include <mbedtls/x509_crt.h>
+#include <mbedtls/x509_csr.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/md.h>
+#include <mbedtls/error.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 #endif
 
 #define R_NO_REMAP
@@ -146,12 +179,13 @@ extern SEXP rnng_cv_until(SEXP, SEXP);
 extern SEXP rnng_cv_value(SEXP);
 extern SEXP rnng_cv_wait(SEXP);
 extern SEXP rnng_device(SEXP, SEXP);
-extern SEXP rnng_dial(SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_dial(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_dialer_close(SEXP);
 extern SEXP rnng_dialer_start(SEXP, SEXP);
+extern SEXP rnng_fini(void);
 extern SEXP rnng_get_opt(SEXP, SEXP);
 extern SEXP rnng_is_nul_byte(SEXP);
-extern SEXP rnng_listen(SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_listen(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_listener_close(SEXP);
 extern SEXP rnng_listener_start(SEXP);
 extern SEXP rnng_messenger(SEXP);
@@ -183,6 +217,7 @@ extern SEXP rnng_status_code(SEXP);
 extern SEXP rnng_stream_close(SEXP);
 extern SEXP rnng_stream_dial(SEXP, SEXP, SEXP);
 extern SEXP rnng_stream_listen(SEXP, SEXP, SEXP);
+extern SEXP rnng_strcat(SEXP, SEXP);
 extern SEXP rnng_strerror(SEXP);
 extern SEXP rnng_subscribe(SEXP, SEXP, SEXP);
 extern SEXP rnng_timed_signal(SEXP);
@@ -191,5 +226,9 @@ extern SEXP rnng_unresolved(SEXP);
 extern SEXP rnng_unresolved2(SEXP);
 extern SEXP rnng_url_parse(SEXP);
 extern SEXP rnng_version(void);
+extern SEXP rnng_weakref_make(SEXP, SEXP);
+extern SEXP rnng_weakref_key(SEXP);
+extern SEXP rnng_weakref_value(SEXP);
+extern SEXP rnng_write_cert(SEXP, SEXP, SEXP);
 
 #endif

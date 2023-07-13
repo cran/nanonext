@@ -160,7 +160,7 @@ recv_aio_signal <- function(con,
                             keep.raw = FALSE,
                             n = 65536L,
                             cv)
-  data <- .Call(rnng_cv_recv_aio, con, mode, timeout, keep.raw, n, environment(), cv)
+  data <- .Call(rnng_cv_recv_aio, con, mode, timeout, keep.raw, n, cv, environment())
 
 # Core aio functions -----------------------------------------------------------
 

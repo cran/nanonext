@@ -1,3 +1,22 @@
+# nanonext 0.9.1
+
+#### New Features
+
+* Enables secure TLS transports `tls+tcp://` and `wss://` for scalability protocols.
+  + `listen()` and `dial()` gain the argument 'tls' for supplying a TLS configuration object
+  + `write_cert()` generates 4096 bit RSA keys and self-signed X.509 certificates for use with `tls_config()`.
+* `weakref()`, `weakref_key()` and `weakref_value()` implement an interface to R's weak reference system. These may be used for synchronising the lifetimes of objects with reference objects such as Sockets or Aios, or creating read-only objects accessible by the weakref value alone.
+* `strcat()` provides a simple, fast utility to concatenate two strings.
+
+#### Updates
+
+* `tls_config()` now accepts a relative path if filenames are supplied for the 'client' or 'server' arguments.
+* 'tlsConfig' objects no longer have a 'source' attribute.
+* Fix cases where `base64enc()` failed for objects exceeding a certain size.
+* `stream()` has been updated internally for additional robustness.
+* Updates bundled 'libmbedtls' v3.4.0 source configuration for threading support.
+* Updates bundled 'libnng' to v1.6.0 alpha (c5e9d8a) again, having resolved previous issues.
+
 # nanonext 0.9.0
 
 *The package is now compatible (again) with currently released 'libnng' versions. It will attempt to use system 'libnng' versions >= 1.5 where detected, and only compile the bundled library where necessary.*

@@ -19,8 +19,9 @@ socket library providing high-performance scalability protocols, a
 cross-platform standard for messaging and communications. Serves as a
 concurrency framework for building distributed applications, utilising
 ‘aio’ objects which resolve automatically upon completion of
-asynchronous operations. Implements synchronisation primitives, allowing
-R to wait upon events being signalled by concurrent messaging threads.
+asynchronous operations. Implements connections with transport layer
+security, and synchronisation primitives, which allow R execution to
+wait upon events being signalled by concurrent messaging threads.
 
 Designed for performance and reliability, the NNG library is written in
 C and [`nanonext`](https://doi.org/10.5281/zenodo.7903429) is a
@@ -44,12 +45,16 @@ Supported transports:
 - IPC (inter-process)
 - TCP (IPv4 or IPv6)
 - WebSocket
+- TLS (over TCP and WebSocket)
+
+Development of the TLS implementation was generously supported by an [R
+Consortium ISC grant
+(2023)](https://www.r-consortium.org/all-projects/awarded-projects/2023-group-1).
 
 Web utilities:
 
 - ncurl - (async) http(s) client
-- stream - secure websockets client (and generic low-level socket
-  interface)
+- stream - secure websockets client / generic low-level socket interface
 - messenger - console-based instant messaging with authentication
 - sha\[1\|224\|256\|384\|512\] - cryptographic hash and HMAC algorithms
 - base64\[enc\|dec\] - base64 encoding and decoding
@@ -62,14 +67,15 @@ Web utilities:
 4.  [Async and Concurrency](#async-and-concurrency)
 5.  [RPC and Distributed Computing](#rpc-and-distributed-computing)
 6.  [Synchronisation Primitives](#synchronisation-primitives)
-7.  [Publisher / Subscriber Model](#publisher-subscriber-model)
-8.  [Surveyor / Respondent Model](#surveyor-respondent-model)
-9.  [ncurl: (Async) HTTP Client](#ncurl-async-http-client)
-10. [stream: Websocket Client](#stream-websocket-client)
-11. [Cryptographic Hashing](#cryptographic-hashing)
-12. [Options and Statistics](#options-and-statistics)
-13. [Building from Source](#building-from-source)
-14. [Links](#links)
+7.  [TLS Secure Connections](#tls-secure-connections)
+8.  [Publisher / Subscriber Model](#publisher-subscriber-model)
+9.  [Surveyor / Respondent Model](#surveyor-respondent-model)
+10. [ncurl: (Async) HTTP Client](#ncurl-async-http-client)
+11. [stream: Websocket Client](#stream-websocket-client)
+12. [Cryptographic Hashing](#cryptographic-hashing)
+13. [Options and Statistics](#options-and-statistics)
+14. [Building from Source](#building-from-source)
+15. [Links](#links)
 
 ### Installation
 
@@ -206,6 +212,7 @@ raw = socket.recv()
 array = np.frombuffer(raw)
 print(array)
 #> [1.1 2.2 3.3 4.4 5.5]
+
 msg = array.tobytes()
 socket.send(msg)
 ```
@@ -271,7 +278,7 @@ msg$data
 #>   a b
 #> 1 1 2
 msg$raw
-#>   [1] 58 0a 00 00 00 03 00 04 03 00 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
+#>   [1] 58 0a 00 00 00 03 00 04 03 01 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
 #>  [26] 03 13 00 00 00 02 00 00 00 0e 00 00 00 01 3f f0 00 00 00 00 00 00 00 00 00
 #>  [51] 0e 00 00 00 01 40 00 00 00 00 00 00 00 00 00 04 02 00 00 00 01 00 04 00 09
 #>  [76] 00 00 00 05 6e 61 6d 65 73 00 00 00 10 00 00 00 02 00 04 00 09 00 00 00 01
@@ -369,7 +376,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] 0.821 -0.28 -0.7501 -0.0818 -0.1577 ...
+#>  num [1:100000000] 0.509 -0.819 -0.305 -0.645 -1.277 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -499,6 +506,64 @@ complex concurrent applications.
 
 For further details, please refer to the function documentation for
 `cv()`.
+
+[« Back to ToC](#table-of-contents)
+
+### TLS Secure Connections
+
+Secure connections are enabled through the combination of NNG and Mbed
+TLS libraries.
+
+Authentication of endpoints and encryption of the TCP transport layer is
+achieved transparently by:
+
+1)  Specifying a secure `tls+tcp://` or `wss://` URL, and
+2)  Passing a TLS configuration object to the ‘tls’ argument of
+    `listen()` or `dial()`.
+
+A TLS configuration, or ‘tlsConfig’, object is created by the
+`tls_config()` function. Specify the argument ‘client’ to create a
+client configuration, and ‘server’ to create a server configuration.
+
+A client configuration requires a PEM-encoded CA certificate (chain)
+used to verify the server identity. A server configuration requires the
+certificate and associated private key. These may be supplied as files
+or directly as character vectors. Valid X.509 certificates generated via
+a Certificate Signing Request to a Certificate Authority are supported
+in this way.
+
+Additionally, the convenience function `write_cert()` can automatically
+generate a 4096 bit RSA key pair and self-signed X.509 certificate in
+the format required by `tls_config()`. The ‘cn’ argument must be
+provided and match exactly the hostname / IP address of the URL that is
+being used, e.g. in the example below ‘127.0.0.1’ must be used
+throughout, or alternatively ‘localhost’, but not a mixture of the two.
+
+``` r
+cert <- write_cert(cn = "127.0.0.1")
+str(cert)
+#> List of 2
+#>  $ server: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFFTCCAv2gAwIBAgIBATANBgkqhkiG9w0BAQsFADAiMRIwEAYDVQQDDAkxMjcu\nMC4wLjExDDAKBgNV"| __truncated__ "-----BEGIN RSA PRIVATE KEY-----\nMIIJKQIBAAKCAgEAvW8WSk+mqpqy0J8Ii0d/oybhrHn4IG0gkfl+Kp+sPpWlKyBF\nygUjTvbxG8EV"| __truncated__
+#>  $ client: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFFTCCAv2gAwIBAgIBATANBgkqhkiG9w0BAQsFADAiMRIwEAYDVQQDDAkxMjcu\nMC4wLjExDDAKBgNV"| __truncated__ ""
+
+ser <- tls_config(server = cert$server)
+ser
+#> < TLS server configuration >
+#>  - auth mode: optional
+
+cli <- tls_config(client = cert$client)
+cli
+#> < TLS client configuration >
+#>  - auth mode: required
+
+s <- socket(listen = "tls+tcp://127.0.0.1:5558", tls = ser)
+s1 <- socket(dial = "tls+tcp://127.0.0.1:5558", tls = cli)
+
+# secure TLS connection established
+
+close(s1)
+close(s)
+```
 
 [« Back to ToC](#table-of-contents)
 
@@ -639,7 +704,7 @@ returning immediately with an ‘ncurlAio’.
 For normal use, it takes just the URL. It can follow redirects.
 
 ``` r
-ncurl("https://httpbin.org/headers")
+ncurl("https://httpbin.org/get")
 #> $status
 #> [1] 200
 #> 
@@ -647,14 +712,17 @@ ncurl("https://httpbin.org/headers")
 #> NULL
 #> 
 #> $raw
-#>   [1] 7b 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73
-#>  [26] 74 22 3a 20 22 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22
-#>  [51] 58 2d 41 6d 7a 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31
-#>  [76] 2d 36 34 37 33 61 33 38 65 2d 33 66 61 31 39 62 33 34 31 64 62 38 30 63 32
-#> [101] 66 33 34 30 37 30 32 34 37 22 0a 20 20 7d 0a 7d 0a
+#>   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 20 0a 20 20 22 68 65 61 64 65
+#>  [26] 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73 74 22 3a 20 22 68 74 74 70 62
+#>  [51] 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22 58 2d 41 6d 7a 6e 2d 54 72 61
+#>  [76] 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 39 65 61 37 62 64 2d
+#> [101] 32 39 64 65 31 63 34 38 33 32 64 35 36 64 64 32 37 65 61 66 62 35 65 32 22
+#> [126] 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22 32 31 32 2e 33
+#> [151] 36 2e 31 37 32 2e 32 30 33 22 2c 20 0a 20 20 22 75 72 6c 22 3a 20 22 68 74
+#> [176] 74 70 73 3a 2f 2f 68 74 74 70 62 69 6e 2e 6f 72 67 2f 67 65 74 22 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6473a38e-3fa19b341db80c2f34070247\"\n  }\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-649ea7bd-29de1c4832d56dd27eafb5e2\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
@@ -675,13 +743,13 @@ res
 
 call_aio(res)$headers
 #> $Date
-#> [1] "Sun, 28 May 2023 18:55:10 GMT"
+#> [1] "Fri, 30 Jun 2023 10:00:35 GMT"
 #> 
 #> $Server
 #> [1] "gunicorn/19.9.0"
 
 res$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6473a38e-6d36a8dd29a484e23ae028be\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-649ea7c1-1113ec495a7a47f754b97ae5\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -707,7 +775,7 @@ transact(sess)
 #> 
 #> $headers
 #> $headers$date
-#> [1] "Sun, 28 May 2023 18:55:10 GMT"
+#> [1] "Fri, 30 Jun 2023 10:00:36 GMT"
 #> 
 #> 
 #> $raw
@@ -717,15 +785,15 @@ transact(sess)
 #>  [76] 22 43 6f 6e 74 65 6e 74 2d 54 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74
 #> [101] 69 6f 6e 2f 6a 73 6f 6e 22 2c 20 0a 20 20 20 20 22 48 6f 73 74 22 3a 20 22
 #> [126] 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22 58 2d 41 6d 7a
-#> [151] 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 37 33
-#> [176] 61 33 38 65 2d 30 61 38 39 33 65 34 34 33 30 66 30 39 36 34 39 35 65 65 32
-#> [201] 37 63 32 65 22 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22
-#> [226] 38 38 2e 32 30 32 2e 31 33 36 2e 38 33 22 2c 20 0a 20 20 22 75 72 6c 22 3a
-#> [251] 20 22 68 74 74 70 73 3a 2f 2f 68 74 74 70 62 69 6e 2e 6f 72 67 2f 67 65 74
-#> [276] 22 0a 7d 0a
+#> [151] 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 39 65
+#> [176] 61 37 63 33 2d 37 61 61 33 31 61 65 37 30 36 31 33 35 39 33 62 32 63 65 65
+#> [201] 33 30 31 61 22 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22
+#> [226] 32 31 32 2e 33 36 2e 31 37 32 2e 32 30 33 22 2c 20 0a 20 20 22 75 72 6c 22
+#> [251] 3a 20 22 68 74 74 70 73 3a 2f 2f 68 74 74 70 62 69 6e 2e 6f 72 67 2f 67 65
+#> [276] 74 22 0a 7d 0a
 #> 
 #> $data
-#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-6473a38e-0a893e4430f096495ee27c2e\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
+#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-649ea7c3-7aa31ae70613593b2cee301a\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
 ```
 
 [« Back to ToC](#table-of-contents)
@@ -867,7 +935,7 @@ s <- socket(listen = "inproc://stat")
 
 # no active connections (pipes)
 stat(s, "pipes")
-#> [1] 1
+#> [1] 0
 
 s1 <- socket(dial = "inproc://stat")
 
@@ -894,7 +962,7 @@ source even if system installations exist, set the `NANONEXT_LIBS`
 environment variable prior to installation e.g. by
 `Sys.setenv(NANONEXT_LIBS = 1)`.
 
-It is not necessary / recommended to install system libraries, but
+It is neither necessary nor recommended to install system libraries, but
 ‘libnng’ is available as libnng-dev (deb) or nng-devel (rpm), and
 ‘libmbedtls’ is available as libmbedtls-dev (deb) or libmbedtls-devel
 (rpm). The `INCLUDE_DIR` and `LIB_DIR` environment variables may be set
@@ -903,15 +971,7 @@ prior to package installation to specify a custom location for
 
 *Additional requirements for Solaris: (i) the ‘xz’ package - available
 on OpenCSW, and (ii) a more recent version of ‘cmake’ than available on
-OpenCSW - refer to the ‘cmake’ website for the latest source file
-(requiring only a C compiler to build).*
-
-*Note for system ‘libmbedtls’ \>= 3.3.0: MBEDTLS_SSL_DTLS_CONNECTION_ID
-has been enabled by default, which is not compatible with NNG. The
-following lines in the source file ‘include/mbedtls/mbedtls_config.h’
-need to be commented out prior to building the library: (i) \#define
-MBEDTLS_SSL_DTLS_CONNECTION_ID and (ii) \#define
-MBEDTLS_SSL_DTLS_CONNECTION_ID_COMPAT 0.*
+OpenCSW - refer to the ‘cmake’ website for the latest source file.*
 
 #### Windows
 

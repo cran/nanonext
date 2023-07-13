@@ -262,3 +262,36 @@ is_nul_byte <- function(x) .Call(rnng_is_nul_byte, x)
 #' @export
 #'
 status_code <- function(x) .Call(rnng_status_code, x)
+
+#' Terminate NNG
+#'
+#' nng_fini is used to terminate the library, freeing certain global resources.
+#'     This call is unnecessary for most cases, other than debugging. It should
+#'     only be called at the end of a session. It must not be called
+#'     concurrently with any other library function - it is not reentrant or
+#'     threadsafe.
+#'
+#' @return Invisible NULL.
+#'
+#' @keywords internal
+#'
+nng_fini <- function() invisible(.Call(rnng_fini))
+
+#' Concatenate Strings
+#'
+#' A fast implementation that appends one character value after another.
+#'
+#' @param a character value.
+#' @param b character value.
+#'
+#' @return A character vector of length 1.
+#'
+#' @details If either 'a' or 'b' is a vector of length greater than 1, only the
+#'     first element of each is concatenated.
+#'
+#' @examples
+#' strcat("hello ", "world!")
+#'
+#' @export
+#'
+strcat <- function(a, b) .Call(rnng_strcat, a, b)
