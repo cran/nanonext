@@ -29,21 +29,16 @@ SEXP nano_DotcallSymbol;
 SEXP nano_HeadersSymbol;
 SEXP nano_IdSymbol;
 SEXP nano_ListenerSymbol;
-SEXP nano_PipeSymbol;
 SEXP nano_ProtocolSymbol;
 SEXP nano_RawSymbol;
 SEXP nano_ResponseSymbol;
 SEXP nano_ResultSymbol;
-SEXP nano_RtcSymbol;
-SEXP nano_SerialSymbol;
-SEXP nano_SessionSymbol;
 SEXP nano_SocketSymbol;
 SEXP nano_StateSymbol;
 SEXP nano_StatusSymbol;
 SEXP nano_StreamSymbol;
 SEXP nano_TextframesSymbol;
 SEXP nano_TlsSymbol;
-SEXP nano_UnserSymbol;
 SEXP nano_UrlSymbol;
 
 SEXP nano_addRedirect;
@@ -73,21 +68,16 @@ static void RegisterSymbols(void) {
   nano_HeadersSymbol = Rf_install("headers");
   nano_IdSymbol = Rf_install("id");
   nano_ListenerSymbol = Rf_install("listener");
-  nano_PipeSymbol = Rf_install("pipe");
   nano_ProtocolSymbol = Rf_install("protocol");
   nano_RawSymbol = Rf_install("raw");
   nano_ResponseSymbol = Rf_install("response");
   nano_ResultSymbol = Rf_install("result");
-  nano_RtcSymbol = Rf_install("rawToChar");
-  nano_SerialSymbol = Rf_install("serialize");
-  nano_SessionSymbol = Rf_install("session");
   nano_SocketSymbol = Rf_install("socket");
   nano_StateSymbol = Rf_install("state");
   nano_StatusSymbol = Rf_install("status");
   nano_StreamSymbol = Rf_install("stream");
   nano_TextframesSymbol = Rf_install("textframes");
   nano_TlsSymbol = Rf_install("tls");
-  nano_UnserSymbol = Rf_install("unserialize");
   nano_UrlSymbol = Rf_install("url");
 }
 
@@ -166,6 +156,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_base64enc", (DL_FUNC) &rnng_base64enc, 2},
   {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
   {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
+  {"rnng_is_error_value", (DL_FUNC) &rnng_is_error_value, 1},
   {"rnng_is_nul_byte", (DL_FUNC) &rnng_is_nul_byte, 1},
   {"rnng_listen", (DL_FUNC) &rnng_listen, 5},
   {"rnng_listener_close", (DL_FUNC) &rnng_listener_close, 1},
@@ -214,18 +205,13 @@ static const R_CallMethodDef callMethods[] = {
   {NULL, NULL, 0}
 };
 
-static const R_ExternalMethodDef externalMethods[] = {
-  {"rnng_timed_signal", (DL_FUNC) &rnng_timed_signal, -1},
-  {NULL, NULL, 0}
-};
-
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
 #if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
   nng_mtx_alloc(&shr_mtx);
 #endif
-  R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
+  R_registerRoutines(dll, NULL, callMethods, NULL, NULL);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
 }

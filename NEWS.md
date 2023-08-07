@@ -1,3 +1,24 @@
+# nanonext 0.9.2
+
+*This version contains performance enhancements which have resulted in potentially breaking changes; please review carefully and only update when ready.*
+
+#### New Features
+
+* `base64dec()` argument 'convert' now accepts NA as an input, which unserializes back to the original object.
+
+#### Updates
+
+* The argument 'keep.raw' for all receive functions is deprecated. This is as raw vectors are no longer created as part of unserialisation or data conversion.
+* Higher performance send and receive of serialized R objects.
+  + For receive functions, attempting to unserialise a non-serialised message will now error with 'unknown input format' rather than fall back to a raw message vector.
+* `ncurl()` etc. gain higher performance raw to character conversion, resulting in the following changes:
+  + Attempting to convert non-text data with embedded nuls will now error instead of silently returning NULL.
+  + For efficiency, when 'convert' = TRUE, a raw vector is no longer stored at `$raw`.
+* Higher performance cryptographic hash and base64 conversion functions.
+  + Attributes are now taken into account for scalar strings and raw vectors to ensure unique hashes.
+* Experimental threaded function `timed_signal()` removed.
+* Requires R >= 3.5 to ensure R serialization version 3.
+
 # nanonext 0.9.1
 
 #### New Features

@@ -88,9 +88,10 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL)
 #'     For Streams, 'serial' is not an option and the default is 'character'.
 #'     Alternatively, for performance, specify an integer position in the vector
 #'     of choices e.g. 1L for 'serial', 2L for 'character' etc.
-#' @param keep.raw [default FALSE] logical flag whether to keep and return the
-#'     received raw vector along with the converted data. Supplying a non-logical
-#'     value will error.
+#' @param keep.raw [default FALSE] [DEPRECATED - this argument will be removed
+#'     in a future package version] logical flag whether to keep and return the
+#'     received raw vector along with the converted data. Supplying a
+#'     non-logical value will error.
 #' @param n [default 65536L] applicable to Streams only, the maximum number of
 #'     bytes to receive. Can be an over-estimate, but note that a buffer of this
 #'     size is reserved.
@@ -104,9 +105,11 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL)
 #'     distiguishable from an integer message value). This can be verified using
 #'     \code{\link{is_error_value}}.
 #'
-#'     If the raw message was successfully received but an error occurred in
-#'     unserialisation or data conversion (for example if the incorrect mode was
-#'     specified), the received raw vector will always be returned to allow for
+#'     For \code{mode = "serial"}, attempting to unserialise a non-serialised
+#'     message will result in the error 'unknown input format'.
+#'
+#'     For all other modes, if an error occurred in conversion of the data to
+#'     the specified mode, a raw vector will be returned instead to allow for
 #'     the data to be recovered.
 #'
 #' @section Blocking:
@@ -128,10 +131,10 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL)
 #' res <- recv(s2)
 #' res
 #' send(s1, data.frame(a = 1, b = 2))
-#' recv(s2, keep.raw = TRUE)
+#' recv(s2)
 #'
 #' send(s1, c(1.1, 2.2, 3.3), mode = "raw")
-#' res <- recv(s2, mode = "double", block = 100, keep.raw = TRUE)
+#' res <- recv(s2, mode = "double", block = 100)
 #' res
 #' send(s1, "example message", mode = "raw")
 #' recv(s2, mode = "character")

@@ -56,8 +56,10 @@
 #'     This function (optionally) binds a single Dialer and/or Listener to a Socket.
 #'     More complex network topologies may be created by binding further
 #'     Dialers/Listeners to the Socket as required using \code{\link{dial}} and
-#'     \code{\link{listen}}. New contexts can also be created using
-#'     \code{\link{context}} if the protocol supports it.
+#'     \code{\link{listen}}.
+#'
+#'     New contexts may also be created using \code{\link{context}} if the
+#'     protocol supports it.
 #'
 #' @section Protocols:
 #'
@@ -74,9 +76,14 @@
 #'     Please see \link{protocols} for further documentation.
 #'
 #' @examples
-#' socket <- socket("pair")
-#' socket
-#' close(socket)
+#' s <- socket(protocol = "req", listen = "inproc://nanosocket")
+#' s1 <- socket(protocol = "rep", dial = "inproc://nanosocket")
+#'
+#' send(s, "hello world!")
+#' recv(s1)
+#'
+#' close(s1)
+#' close(s)
 #'
 #' @export
 #'

@@ -35,80 +35,39 @@ SEXP rnng_version(void) {
 
 }
 
-// Definitions and Statics -----------------------------------------------------
+// Statics ---------------------------------------------------------------------
 
-#define SHA1_KEY_SIZE 20
-#define SHA224_KEY_SIZE 28
-#define SHA256_KEY_SIZE 32
-#define SHA384_KEY_SIZE 48
-#define SHA512_KEY_SIZE 64
-
-typedef struct nano_hash_s {
-  unsigned char *buf;
-  R_xlen_t sz;
-  SEXP vec;
-} nano_hash;
-
-static nano_hash nano_anytoraw(SEXP x) {
-
-  nano_hash hash;
+static nano_buf nano_anytobuf(SEXP x) {
 
   switch (TYPEOF(x)) {
-  case RAWSXP:
-    hash.buf = RAW(x);
-    hash.sz = Rf_xlength(x);
-    hash.vec = R_NilValue;
-    break;
   case STRSXP:
-    if (Rf_xlength(x) == 1) {
-      hash.sz = Rf_xlength(STRING_ELT(x, 0));
-      hash.vec = Rf_allocVector(RAWSXP, hash.sz);
-      hash.buf = RAW(hash.vec);
-      memcpy(hash.buf, CHAR(STRING_ELT(x, 0)), hash.sz);
-    } else {
-      PROTECT(hash.vec = Rf_lang3(nano_SerialSymbol, x, R_NilValue));
-      hash.vec = Rf_eval(hash.vec, R_BaseEnv);
-      UNPROTECT(1);
-      hash.buf = RAW(hash.vec);
-      hash.sz = Rf_xlength(hash.vec);
+    if (XLENGTH(x) == 1 && ATTRIB(x) == R_NilValue) {
+      nano_buf hash;
+      NANO_INIT(hash, (unsigned char *) CHAR(STRING_ELT(x, 0)), XLENGTH(STRING_ELT(x, 0)));
+      return hash;
     }
     break;
-  case SYMSXP:
-  case LANGSXP:
-    PROTECT(hash.vec = Rf_lang3(nano_SerialSymbol, Rf_lang2(R_QuoteSymbol, x), R_NilValue));
-    hash.vec = Rf_eval(hash.vec, R_BaseEnv);
-    UNPROTECT(1);
-    hash.buf = RAW(hash.vec);
-    hash.sz = Rf_xlength(hash.vec);
-    break;
-  default:
-    PROTECT(hash.vec = Rf_lang3(nano_SerialSymbol, x, R_NilValue));
-    hash.vec = Rf_eval(hash.vec, R_BaseEnv);
-    UNPROTECT(1);
-    hash.buf = RAW(hash.vec);
-    hash.sz = Rf_xlength(hash.vec);
+  case RAWSXP:
+    if (ATTRIB(x) == R_NilValue) {
+      nano_buf hash;
+      NANO_INIT(hash, RAW(x), XLENGTH(x));
+      return hash;
+    }
   }
 
-  return hash;
-}
-
-static SEXP nano_rawToChar(SEXP x) {
-
-  R_xlen_t i, j, nc = Rf_xlength(x);
-  for (i = 0, j = -1; i < nc; i++) if (RAW(x)[i]) j = i;
-  SEXP out = Rf_mkCharLenCE((const char *) RAW(x), j + 1, CE_NATIVE);
-
-  return Rf_ScalarString(out);
+  return nano_serialize(x);
 
 }
 
 static SEXP nano_hashToChar(unsigned char *buf, size_t sz) {
 
-  char out[sz * 2 + 1];
-  for (size_t i = 0; i < sz; i++)
-    snprintf(&out[i * 2], 3, "%.2x", buf[i]);
+  char cbuf[sz + sz + 1];
+  char *cptr = &cbuf[0];
 
-  return Rf_mkString(out);
+  for (size_t i = 0; i < sz; i++)
+    cptr += snprintf(cptr, 3, "%.2x", buf[i]);
+
+  return NANO_STRING(cbuf, sz + sz);
 
 }
 
@@ -124,25 +83,27 @@ SEXP rnng_sha224(SEXP x, SEXP key, SEXP convert) {
   unsigned char output[SHA256_KEY_SIZE];
 #endif
 
-  nano_hash xhash = nano_anytoraw(x);
+  nano_buf xhash = nano_anytobuf(x);
 
   if (key == R_NilValue) {
 
 #if MBEDTLS_VERSION_MAJOR >= 3
-    xc = mbedtls_sha256(xhash.buf, xhash.sz, output, 1);
+    xc = mbedtls_sha256(xhash.buf, xhash.cur, output, 1);
 #elif MBEDTLS_VERSION_MAJOR == 2 && MBEDTLS_VERSION_MINOR >=5
-    xc = mbedtls_sha256_ret(xhash.buf, xhash.sz, output, 1);
+    xc = mbedtls_sha256_ret(xhash.buf, xhash.cur, output, 1);
 #else
-    mbedtls_sha256(xhash.buf, xhash.sz, output, 1);
+    mbedtls_sha256(xhash.buf, xhash.cur, output, 1);
 #endif
   } else {
 
-    nano_hash khash = nano_anytoraw(key);
+    nano_buf khash = nano_anytobuf(key);
     xc = mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA224),
-                         khash.buf, khash.sz, xhash.buf, xhash.sz, output);
+                         khash.buf, khash.cur, xhash.buf, xhash.cur, output);
+    NANO_FREE(khash);
 
   }
 
+  NANO_FREE(xhash);
   if (xc)
     Rf_error("error generating hash");
 
@@ -167,26 +128,28 @@ SEXP rnng_sha256(SEXP x, SEXP key, SEXP convert) {
   int xc = 0;
   unsigned char output[SHA256_KEY_SIZE];
 
-  nano_hash xhash = nano_anytoraw(x);
+  nano_buf xhash = nano_anytobuf(x);
 
   if (key == R_NilValue) {
 
 #if MBEDTLS_VERSION_MAJOR >= 3
-    xc = mbedtls_sha256(xhash.buf, xhash.sz, output, 0);
+    xc = mbedtls_sha256(xhash.buf, xhash.cur, output, 0);
 #elif MBEDTLS_VERSION_MAJOR == 2 && MBEDTLS_VERSION_MINOR >=5
-    xc = mbedtls_sha256_ret(xhash.buf, xhash.sz, output, 0);
+    xc = mbedtls_sha256_ret(xhash.buf, xhash.cur, output, 0);
 #else
-    mbedtls_sha256(xhash.buf, xhash.sz, output, 0);
+    mbedtls_sha256(xhash.buf, xhash.cur, output, 0);
 #endif
 
   } else {
 
-    nano_hash khash = nano_anytoraw(key);
+    nano_buf khash = nano_anytobuf(key);
     xc = mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256),
-                         khash.buf, khash.sz, xhash.buf, xhash.sz, output);
+                         khash.buf, khash.cur, xhash.buf, xhash.cur, output);
+    NANO_FREE(khash);
 
   }
 
+  NANO_FREE(xhash);
   if (xc)
     Rf_error("error generating hash");
 
@@ -215,26 +178,28 @@ SEXP rnng_sha384(SEXP x, SEXP key, SEXP convert) {
   unsigned char output[SHA512_KEY_SIZE];
 #endif
 
-  nano_hash xhash = nano_anytoraw(x);
+  nano_buf xhash = nano_anytobuf(x);
 
   if (key == R_NilValue) {
 
 #if MBEDTLS_VERSION_MAJOR >= 3
-    xc = mbedtls_sha512(xhash.buf, xhash.sz, output, 1);
+    xc = mbedtls_sha512(xhash.buf, xhash.cur, output, 1);
 #elif MBEDTLS_VERSION_MAJOR == 2 && MBEDTLS_VERSION_MINOR >=5
-    xc = mbedtls_sha512_ret(xhash.buf, xhash.sz, output, 1);
+    xc = mbedtls_sha512_ret(xhash.buf, xhash.cur, output, 1);
 #else
-    mbedtls_sha512(xhash.buf, xhash.sz, output, 1);
+    mbedtls_sha512(xhash.buf, xhash.cur, output, 1);
 #endif
 
   } else {
 
-    nano_hash khash = nano_anytoraw(key);
+    nano_buf khash = nano_anytobuf(key);
     xc = mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA384),
-                         khash.buf, khash.sz, xhash.buf, xhash.sz, output);
+                         khash.buf, khash.cur, xhash.buf, xhash.cur, output);
+    NANO_FREE(khash);
 
   }
 
+  NANO_FREE(xhash);
   if (xc)
     Rf_error("error generating hash");
 
@@ -259,26 +224,28 @@ SEXP rnng_sha512(SEXP x, SEXP key, SEXP convert) {
   int xc = 0;
   unsigned char output[SHA512_KEY_SIZE];
 
-  nano_hash xhash = nano_anytoraw(x);
+  nano_buf xhash = nano_anytobuf(x);
 
   if (key == R_NilValue) {
 
 #if MBEDTLS_VERSION_MAJOR >= 3
-    xc = mbedtls_sha512(xhash.buf, xhash.sz, output, 0);
+    xc = mbedtls_sha512(xhash.buf, xhash.cur, output, 0);
 #elif MBEDTLS_VERSION_MAJOR == 2 && MBEDTLS_VERSION_MINOR >=5
-    xc = mbedtls_sha512_ret(xhash.buf, xhash.sz, output, 0);
+    xc = mbedtls_sha512_ret(xhash.buf, xhash.cur, output, 0);
 #else
-    mbedtls_sha512(xhash.buf, xhash.sz, output, 0);
+    mbedtls_sha512(xhash.buf, xhash.cur, output, 0);
 #endif
 
   } else {
 
-    nano_hash khash = nano_anytoraw(key);
+    nano_buf khash = nano_anytobuf(key);
     xc = mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA512),
-                         khash.buf, khash.sz, xhash.buf, xhash.sz, output);
+                         khash.buf, khash.cur, xhash.buf, xhash.cur, output);
+    NANO_FREE(khash);
 
   }
 
+  NANO_FREE(xhash);
   if (xc)
     Rf_error("error generating hash");
 
@@ -303,26 +270,28 @@ SEXP rnng_sha1(SEXP x, SEXP key, SEXP convert) {
   int xc = 0;
   unsigned char output[SHA1_KEY_SIZE];
 
-  nano_hash xhash = nano_anytoraw(x);
+  nano_buf xhash = nano_anytobuf(x);
 
   if (key == R_NilValue) {
 
 #if MBEDTLS_VERSION_MAJOR >= 3
-    xc = mbedtls_sha1(xhash.buf, xhash.sz, output);
+    xc = mbedtls_sha1(xhash.buf, xhash.cur, output);
 #elif MBEDTLS_VERSION_MAJOR == 2 && MBEDTLS_VERSION_MINOR >=5
-    xc = mbedtls_sha1_ret(xhash.buf, xhash.sz, output);
+    xc = mbedtls_sha1_ret(xhash.buf, xhash.cur, output);
 #else
-    mbedtls_sha1(xhash.buf, xhash.sz, output);
+    mbedtls_sha1(xhash.buf, xhash.cur, output);
 #endif
 
   } else {
 
-    nano_hash khash = nano_anytoraw(key);
+    nano_buf khash = nano_anytobuf(key);
     xc = mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA1),
-                         khash.buf, khash.sz, xhash.buf, xhash.sz, output);
+                         khash.buf, khash.cur, xhash.buf, xhash.cur, output);
+    NANO_FREE(khash);
 
   }
 
+  NANO_FREE(xhash);
   if (xc)
     Rf_error("error generating hash");
 
@@ -349,20 +318,23 @@ SEXP rnng_base64enc(SEXP x, SEXP convert) {
   int xc;
   size_t olen;
 
-  nano_hash hash = nano_anytoraw(x);
-  xc = mbedtls_base64_encode(NULL, 0, &olen, hash.buf, hash.sz);
-  PROTECT(out = Rf_allocVector(RAWSXP, olen));
-  xc = mbedtls_base64_encode(RAW(out), olen, &olen, hash.buf, hash.sz);
+  nano_buf hash = nano_anytobuf(x);
+  xc = mbedtls_base64_encode(NULL, 0, &olen, hash.buf, hash.cur);
+  unsigned char *buf = R_Calloc(olen, unsigned char);
+  xc = mbedtls_base64_encode(buf, olen, &olen, hash.buf, hash.cur);
+  NANO_FREE(hash);
   if (xc)
     Rf_error("write buffer insufficient");
 
   if (LOGICAL(convert)[0]) {
-    out = nano_rawToChar(out);
+    out = rawToChar(buf, olen);
   } else {
-    out = Rf_xlengthgets(out, olen);
+    PROTECT(out = Rf_allocVector(RAWSXP, olen));
+    memcpy(RAW(out), buf, olen);
+    UNPROTECT(1);
   }
+  R_Free(buf);
 
-  UNPROTECT(1);
   return out;
 
 }
@@ -371,27 +343,45 @@ SEXP rnng_base64dec(SEXP x, SEXP convert) {
 
   SEXP out;
   int xc;
-  size_t olen;
+  size_t inlen, olen;
+  unsigned char *inbuf;
 
-  nano_hash hash = nano_anytoraw(x);
+  switch (TYPEOF(x)) {
+  case STRSXP:
+    inbuf = (unsigned char *) CHAR(STRING_ELT(x, 0));
+    inlen = XLENGTH(STRING_ELT(x, 0));
+    break;
+  case RAWSXP:
+    inbuf = RAW(x);
+    inlen = XLENGTH(x);
+    break;
+  default:
+    Rf_error("input is not valid base64");
+  }
 
-  xc = mbedtls_base64_decode(NULL, 0, &olen, hash.buf, hash.sz);
+  xc = mbedtls_base64_decode(NULL, 0, &olen, inbuf, inlen);
   if (xc == MBEDTLS_ERR_BASE64_INVALID_CHARACTER)
     Rf_error("input is not valid base64");
-  out = Rf_allocVector(RAWSXP, olen);
-  xc = mbedtls_base64_decode(RAW(out), olen, &olen, hash.buf, hash.sz);
+  unsigned char *buf = R_Calloc(olen, unsigned char);
+  xc = mbedtls_base64_decode(buf, olen, &olen, inbuf, inlen);
   if (xc)
     Rf_error("write buffer insufficient");
 
-  if (LOGICAL(convert)[0]) {
-
-    PROTECT(out);
-    out = nano_rawToChar(out);
+  switch (LOGICAL(convert)[0]) {
+  case 0:
+    PROTECT(out = Rf_allocVector(RAWSXP, olen));
+    memcpy(RAW(out), buf, olen);
     UNPROTECT(1);
-
+    break;
+  case 1:
+    out = rawToChar(buf, olen);
+    break;
+  default:
+    out = nano_unserialize(buf, olen);
   }
+
+  R_Free(buf);
 
   return out;
 
 }
-

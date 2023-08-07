@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# nanonext <a href="https://shikokuchuo.net/nanonext/" alt="nanonext"><img src="man/figures/logo.png" alt="nanonext logo" align="right" width="120"/></a>
+# nanonext <a href="https://shikokuchuo.net/nanonext/" alt="nanonext"><img src="man/figures/logo.png" alt="nanonext logo" align="right" width="120" /></a>
 
 <!-- badges: start -->
 
@@ -47,9 +47,9 @@ Supported transports:
 - WebSocket
 - TLS (over TCP and WebSocket)
 
-Development of the TLS implementation was generously supported by an [R
-Consortium ISC grant
-(2023)](https://www.r-consortium.org/all-projects/awarded-projects/2023-group-1).
+Development of the TLS implementation was generously supported by the
+<a href="https://www.r-consortium.org/all-projects/awarded-projects/2023-group-1" alt="R Consortium ISC Grant 2023"><img src="man/figures/RConsortium.png" alt="R Consortium logo" width="100" /></a>
+.
 
 Web utilities:
 
@@ -75,7 +75,7 @@ Web utilities:
 12. [Cryptographic Hashing](#cryptographic-hashing)
 13. [Options and Statistics](#options-and-statistics)
 14. [Building from Source](#building-from-source)
-15. [Links](#links)
+15. [Acknowledgements and Links](#acknowledgements-and-links)
 
 ### Installation
 
@@ -245,10 +245,9 @@ complete.
 
 ``` r
 # an async receive is requested, but no messages are waiting (yet to be sent)
-msg <- recv_aio(s2, keep.raw = TRUE)
+msg <- recv_aio(s2)
 msg
 #> < recvAio >
-#>  - $raw for raw message
 #>  - $data for message data
 msg$data
 #> 'unresolved' logi NA
@@ -269,24 +268,13 @@ res$result
 message has been accepted by the socket for sending; the message itself
 may still be buffered within the system.*
 
-For a ‘recvAio’ object, the message is stored at `$data`, and the raw
-message at `$raw` (if kept).
+For a ‘recvAio’ object, the message is stored at `$data`.
 
 ``` r
 # now that a message has been sent, the 'recvAio' resolves automatically
 msg$data
 #>   a b
 #> 1 1 2
-msg$raw
-#>   [1] 58 0a 00 00 00 03 00 04 03 01 00 03 05 00 00 00 00 05 55 54 46 2d 38 00 00
-#>  [26] 03 13 00 00 00 02 00 00 00 0e 00 00 00 01 3f f0 00 00 00 00 00 00 00 00 00
-#>  [51] 0e 00 00 00 01 40 00 00 00 00 00 00 00 00 00 04 02 00 00 00 01 00 04 00 09
-#>  [76] 00 00 00 05 6e 61 6d 65 73 00 00 00 10 00 00 00 02 00 04 00 09 00 00 00 01
-#> [101] 61 00 04 00 09 00 00 00 01 62 00 00 04 02 00 00 00 01 00 04 00 09 00 00 00
-#> [126] 05 63 6c 61 73 73 00 00 00 10 00 00 00 01 00 04 00 09 00 00 00 0a 64 61 74
-#> [151] 61 2e 66 72 61 6d 65 00 00 04 02 00 00 00 01 00 04 00 09 00 00 00 09 72 6f
-#> [176] 77 2e 6e 61 6d 65 73 00 00 00 0d 00 00 00 02 80 00 00 00 ff ff ff ff 00 00
-#> [201] 00 fe
 ```
 
 Auxiliary function `unresolved()` may be used in control flow statements
@@ -376,7 +364,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] 0.509 -0.819 -0.305 -0.645 -1.277 ...
+#>  num [1:100000000] 0.165 -1.03 -0.484 0.15 1.194 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -543,7 +531,7 @@ throughout, or alternatively ‘localhost’, but not a mixture of the two.
 cert <- write_cert(cn = "127.0.0.1")
 str(cert)
 #> List of 2
-#>  $ server: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFFTCCAv2gAwIBAgIBATANBgkqhkiG9w0BAQsFADAiMRIwEAYDVQQDDAkxMjcu\nMC4wLjExDDAKBgNV"| __truncated__ "-----BEGIN RSA PRIVATE KEY-----\nMIIJKQIBAAKCAgEAvW8WSk+mqpqy0J8Ii0d/oybhrHn4IG0gkfl+Kp+sPpWlKyBF\nygUjTvbxG8EV"| __truncated__
+#>  $ server: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFFTCCAv2gAwIBAgIBATANBgkqhkiG9w0BAQsFADAiMRIwEAYDVQQDDAkxMjcu\nMC4wLjExDDAKBgNV"| __truncated__ "-----BEGIN RSA PRIVATE KEY-----\nMIIJKAIBAAKCAgEAoyoAZWVYtYAUAfYYG0Vd3ZTGh+FcgMfD9gStfEnlTywtBJHn\ngtA9zq6OZJ23"| __truncated__
 #>  $ client: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFFTCCAv2gAwIBAgIBATANBgkqhkiG9w0BAQsFADAiMRIwEAYDVQQDDAkxMjcu\nMC4wLjExDDAKBgNV"| __truncated__ ""
 
 ser <- tls_config(server = cert$server)
@@ -704,7 +692,7 @@ returning immediately with an ‘ncurlAio’.
 For normal use, it takes just the URL. It can follow redirects.
 
 ``` r
-ncurl("https://httpbin.org/get")
+ncurl("https://postman-echo.com/get")
 #> $status
 #> [1] 200
 #> 
@@ -712,28 +700,21 @@ ncurl("https://httpbin.org/get")
 #> NULL
 #> 
 #> $raw
-#>   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 20 0a 20 20 22 68 65 61 64 65
-#>  [26] 72 73 22 3a 20 7b 0a 20 20 20 20 22 48 6f 73 74 22 3a 20 22 68 74 74 70 62
-#>  [51] 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22 58 2d 41 6d 7a 6e 2d 54 72 61
-#>  [76] 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 39 65 61 37 62 64 2d
-#> [101] 32 39 64 65 31 63 34 38 33 32 64 35 36 64 64 32 37 65 61 66 62 35 65 32 22
-#> [126] 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22 32 31 32 2e 33
-#> [151] 36 2e 31 37 32 2e 32 30 33 22 2c 20 0a 20 20 22 75 72 6c 22 3a 20 22 68 74
-#> [176] 74 70 73 3a 2f 2f 68 74 74 70 62 69 6e 2e 6f 72 67 2f 67 65 74 22 0a 7d 0a
+#> NULL
 #> 
 #> $data
-#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-649ea7bd-29de1c4832d56dd27eafb5e2\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
+#> [1] "{\n  \"args\": {},\n  \"headers\": {\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"host\": \"postman-echo.com\",\n    \"x-amzn-trace-id\": \"Root=1-64cbb085-342dac4b52f4818a5987b9a9\"\n  },\n  \"url\": \"https://postman-echo.com/get\"\n}"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
 
 ``` r
-res <- ncurl("http://httpbin.org/post",
+res <- ncurl("https://postman-echo.com/post",
              async = TRUE,
              method = "POST",
              headers = c(`Content-Type` = "application/json", Authorization = "Bearer APIKEY"),
              data = '{"key": "value"}',
-             response = c("Date", "Server"))
+             response = "date")
 res
 #> < ncurlAio >
 #>  - $status for response status code
@@ -742,14 +723,11 @@ res
 #>  - $data for message data
 
 call_aio(res)$headers
-#> $Date
-#> [1] "Fri, 30 Jun 2023 10:00:35 GMT"
-#> 
-#> $Server
-#> [1] "gunicorn/19.9.0"
+#> $date
+#> [1] "Thu, 03 Aug 2023 13:49:58 GMT"
 
 res$data
-#> [1] "{\n  \"args\": {}, \n  \"data\": \"{\\\"key\\\": \\\"value\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Length\": \"16\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-649ea7c1-1113ec495a7a47f754b97ae5\"\n  }, \n  \"json\": {\n    \"key\": \"value\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"http://httpbin.org/post\"\n}\n"
+#> [1] "{\n  \"args\": {},\n  \"data\": {\n    \"key\": \"value\"\n  },\n  \"files\": {},\n  \"form\": {},\n  \"headers\": {\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"host\": \"postman-echo.com\",\n    \"x-amzn-trace-id\": \"Root=1-64cbb086-59b4a1145957f60535aebdb1\",\n    \"content-length\": \"16\",\n    \"content-type\": \"application/json\",\n    \"authorization\": \"Bearer APIKEY\"\n  },\n  \"json\": {\n    \"key\": \"value\"\n  },\n  \"url\": \"https://postman-echo.com/post\"\n}"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -761,10 +739,15 @@ endpoint. `transact()` is then used to request data multiple times as
 required. This method allows a polling frequency that exceeds a server’s
 new connection limits, where this is permitted.
 
+By specifying `convert = FALSE`, the received binary data is made
+available as a raw vector at `$raw`. This may be fed into ‘json’ parsers
+which can operate directly on such data etc.
+
 ``` r
-sess <- ncurl_session("https://httpbin.org/get",
+sess <- ncurl_session("https://postman-echo.com/get",
+                      convert = FALSE,
                       headers = c(`Content-Type` = "application/json", Authorization = "Bearer APIKEY"),
-                      response = "date")
+                      response = c("Date", "Content-Type"))
 sess
 #> < ncurlSession >
 #>  - use transact() to return data
@@ -774,26 +757,30 @@ transact(sess)
 #> [1] 200
 #> 
 #> $headers
-#> $headers$date
-#> [1] "Fri, 30 Jun 2023 10:00:36 GMT"
+#> $headers$Date
+#> [1] "Thu, 03 Aug 2023 13:49:59 GMT"
+#> 
+#> $headers$`Content-Type`
+#> [1] "application/json; charset=utf-8"
 #> 
 #> 
 #> $raw
-#>   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 20 0a 20 20 22 68 65 61 64 65
-#>  [26] 72 73 22 3a 20 7b 0a 20 20 20 20 22 41 75 74 68 6f 72 69 7a 61 74 69 6f 6e
-#>  [51] 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 2c 20 0a 20 20 20 20
-#>  [76] 22 43 6f 6e 74 65 6e 74 2d 54 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74
-#> [101] 69 6f 6e 2f 6a 73 6f 6e 22 2c 20 0a 20 20 20 20 22 48 6f 73 74 22 3a 20 22
-#> [126] 68 74 74 70 62 69 6e 2e 6f 72 67 22 2c 20 0a 20 20 20 20 22 58 2d 41 6d 7a
-#> [151] 6e 2d 54 72 61 63 65 2d 49 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 34 39 65
-#> [176] 61 37 63 33 2d 37 61 61 33 31 61 65 37 30 36 31 33 35 39 33 62 32 63 65 65
-#> [201] 33 30 31 61 22 0a 20 20 7d 2c 20 0a 20 20 22 6f 72 69 67 69 6e 22 3a 20 22
-#> [226] 32 31 32 2e 33 36 2e 31 37 32 2e 32 30 33 22 2c 20 0a 20 20 22 75 72 6c 22
-#> [251] 3a 20 22 68 74 74 70 73 3a 2f 2f 68 74 74 70 62 69 6e 2e 6f 72 67 2f 67 65
-#> [276] 74 22 0a 7d 0a
+#>   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72
+#>  [26] 73 22 3a 20 7b 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72
+#>  [51] 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72
+#>  [76] 77 61 72 64 65 64 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20
+#> [101] 22 68 6f 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d
+#> [126] 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a
+#> [151] 20 22 52 6f 6f 74 3d 31 2d 36 34 63 62 62 30 38 36 2d 35 37 38 33 37 31 62
+#> [176] 38 30 39 34 33 32 62 39 64 37 35 36 32 37 33 35 37 22 2c 0a 20 20 20 20 22
+#> [201] 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69
+#> [226] 6f 6e 2f 6a 73 6f 6e 22 2c 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74
+#> [251] 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20 20 7d
+#> [276] 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d
+#> [301] 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f 67 65 74 22 0a 7d
 #> 
 #> $data
-#> [1] "{\n  \"args\": {}, \n  \"headers\": {\n    \"Authorization\": \"Bearer APIKEY\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"X-Amzn-Trace-Id\": \"Root=1-649ea7c3-7aa31ae70613593b2cee301a\"\n  }, \n  \"origin\": \"131.111.5.14\", \n  \"url\": \"https://httpbin.org/get\"\n}\n"
+#> NULL
 ```
 
 [« Back to ToC](#table-of-contents)
@@ -952,8 +939,8 @@ stat(s, "pipes")
 
 Installation from source requires ‘libnng’ \>= v1.5.0 and ‘libmbedtls’
 \>= 2 (suitable installations are automatically detected), or else
-‘cmake’ to compile ‘libnng’ v1.6.0 pre-release (8e1836f) and
-‘libmbedtls’ v3.4.0 included within the package sources.
+‘cmake’ to compile ‘libnng’ v1.6.0 alpha (c5e9d8a) and ‘libmbedtls’
+v3.4.0 included within the package sources.
 
 **It is recommended for optimal performance and stability to let the
 package automatically compile bundled versions of ‘libmbedtls’ and
@@ -976,16 +963,40 @@ OpenCSW - refer to the ‘cmake’ website for the latest source file.*
 #### Windows
 
 For R \>= 4.2 using the ‘Rtools42’ or ‘Rtools43’ toolchains, ‘libnng’
-v1.6.0 pre-release (8e1836f) and ‘libmbedtls’ v3.4.0 will be
-automatically compiled from the package sources during installation.
+v1.6.0 alpha (c5e9d8a) and ‘libmbedtls’ v3.4.0 will be automatically
+compiled from the package sources during installation.
 
-For previous R versions, pre-compiled ‘libnng’ v1.6.0 pre-release
-(8e1836f) and ‘libmbedtls’ v3.4.0 libraries are downloaded and used for
+For previous R versions, pre-compiled ‘libnng’ v1.6.0 alpha (c5e9d8a)
+and ‘libmbedtls’ v3.4.0 libraries are downloaded and used for
 installation instead.
 
 [« Back to ToC](#table-of-contents)
 
-### Links
+### Acknowledgements and Links
+
+We would like to acknowledge in particular:
+
+- [Garrett D’Amore](https://github.com/gdamore), author of the NNG
+  library, who has been generous with advice and also implemented a
+  feature request specifically for a more efficient ‘aio’ implementation
+  in {nanonext}.
+- The [R Consortium](https://www.r-consortium.org/) for funding the
+  development of the secure TLS capabilities in the package, and [Henrik
+  Bengtsson](https://github.com/HenrikBengtsson) and [William
+  Landau](https://github.com/wlandau/)’s roles in making this possible.
+- [R Core](https://www.r-project.org/contributors.html) for various
+  auxiliary functions for serialisation and raw / character conversion,
+  which have been adopted by the package.
+- [Luke Tierney](https://homepage.stat.uiowa.edu/~luke/) for documenting
+  R’s serialization mechanism and
+  [mikefc](https://github.com/coolbutuseless) for meticulous annotations
+  in {serializer}, which led to the package’s own implementation of a
+  low-level interface to R serialisation.
+- [Jeroen Ooms](https://github.com/jeroen) - for his ‘Anticonf (tm)’
+  configure script, on which our original ‘configure’ was based,
+  although much modified since.
+
+Links:
 
 `nanonext` website: <https://shikokuchuo.net/nanonext/><br /> `nanonext`
 on CRAN: <https://cran.r-project.org/package=nanonext><br />
