@@ -151,20 +151,17 @@ typedef struct nano_cv_duo_s {
 
 #define ERROR_OUT(xc) Rf_error("%d | %s", xc, nng_strerror(xc))
 #define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
-#define NANO_CHAR(val, len) Rf_mkCharLenCE(val, len, CE_NATIVE)
-#define NANO_STRING(val, len) Rf_ScalarString(NANO_CHAR(val, len))
-#define NANO_ENCODE(buf, data) { SEXP enc = nano_encode(data); NANO_INIT(buf, RAW(enc), XLENGTH(enc)); }
 #define NANONEXT_INIT_BUFSIZE 16384
 #define NANONEXT_SERIAL_VER 3
 #define NANO_ALLOC(x, sz)                                      \
-  x.buf = R_Calloc(sz, unsigned char);                         \
-  x.len = (R_xlen_t) sz;                                       \
-  x.cur = 0;
+  (x)->buf = R_Calloc(sz, unsigned char);                      \
+  (x)->len = (R_xlen_t) sz;                                    \
+  (x)->cur = 0
 #define NANO_INIT(x, ptr, sz)                                  \
-  x.buf = ptr;                                                 \
-  x.len = 0;                                                   \
-  x.cur = (R_xlen_t) sz;
-#define NANO_FREE(x) if (x.len) R_Free(x.buf);
+  (x)->buf = ptr;                                              \
+  (x)->len = 0;                                                \
+  (x)->cur = (R_xlen_t) sz
+#define NANO_FREE(x) if (x.len) R_Free(x.buf)
 
 typedef struct nano_buf_s {
   unsigned char *buf;
@@ -173,19 +170,19 @@ typedef struct nano_buf_s {
 } nano_buf;
 
 extern SEXP mk_error(const int);
-extern SEXP mk_error_recv(const int);
 extern SEXP mk_error_ncurl(const int);
-extern SEXP nano_decode(unsigned char *, size_t, const int, const int);
-extern SEXP nano_encode(SEXP);
-extern int nano_encodes(SEXP);
+extern SEXP nano_decode(unsigned char *, size_t, const int);
+extern void dialer_finalizer(SEXP);
+extern void nano_encode(nano_buf *, SEXP);
+extern void listener_finalizer(SEXP);
+extern Rboolean nano_encodes(SEXP);
 extern int nano_matcharg(SEXP);
 extern int nano_matchargs(SEXP);
-extern nano_buf nano_serialize(SEXP);
-extern SEXP nano_unserialize(unsigned char *, size_t);
-extern SEXP rawToChar(unsigned char *, size_t);
+extern void nano_serialize(nano_buf *, SEXP);
+extern void nano_serialize_xdr(nano_buf *, SEXP);
+extern SEXP nano_unserialize(unsigned char *, const size_t);
+extern SEXP rawToChar(unsigned char *, const size_t);
 extern void socket_finalizer(SEXP);
-extern void dialer_finalizer(SEXP);
-extern void listener_finalizer(SEXP);
 
 extern SEXP nano_AioSymbol;
 extern SEXP nano_ContextSymbol;
@@ -221,10 +218,8 @@ extern SEXP nano_success;
 extern SEXP nano_unresolved;
 
 extern SEXP rnng_aio_call(SEXP);
-extern SEXP rnng_aio_get_msgdata(SEXP);
-extern SEXP rnng_aio_get_msgdata2(SEXP);
-extern SEXP rnng_aio_get_msgraw(SEXP);
-extern SEXP rnng_aio_get_msgraw2(SEXP);
+extern SEXP rnng_aio_get_msg(SEXP);
+extern SEXP rnng_aio_get_msg2(SEXP);
 extern SEXP rnng_aio_http(SEXP, SEXP, SEXP);
 extern SEXP rnng_aio_result(SEXP);
 extern SEXP rnng_aio_stop(SEXP);
@@ -236,18 +231,16 @@ extern SEXP rnng_ctx_close(SEXP);
 extern SEXP rnng_ctx_create(SEXP);
 extern SEXP rnng_ctx_open(SEXP);
 extern SEXP rnng_cv_alloc(void);
-extern SEXP rnng_cv_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_cv_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_cv_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_cv_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_cv_reset(SEXP);
 extern SEXP rnng_cv_signal(SEXP);
 extern SEXP rnng_cv_until(SEXP, SEXP);
 extern SEXP rnng_cv_value(SEXP);
 extern SEXP rnng_cv_wait(SEXP);
-extern SEXP rnng_device(SEXP, SEXP);
 extern SEXP rnng_dial(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_dialer_close(SEXP);
 extern SEXP rnng_dialer_start(SEXP, SEXP);
-extern SEXP rnng_fini(void);
 extern SEXP rnng_get_opt(SEXP, SEXP);
 extern SEXP rnng_is_error_value(SEXP);
 extern SEXP rnng_is_nul_byte(SEXP);
@@ -264,9 +257,9 @@ extern SEXP rnng_ncurl_transact(SEXP);
 extern SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_protocol_open(SEXP, SEXP);
 extern SEXP rnng_random(SEXP);
-extern SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_set_opt(SEXP, SEXP, SEXP);

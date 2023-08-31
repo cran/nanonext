@@ -6,7 +6,6 @@
 \usage{
 ncurl(
   url,
-  async = FALSE,
   convert = TRUE,
   follow = FALSE,
   method = NULL,
@@ -20,17 +19,13 @@ ncurl(
 \arguments{
 \item{url}{the URL address.}
 
-\item{async}{[default FALSE] logical value whether to perform an async request,
-in which case an 'ncurlAio' is returned instead of a list.}
-
 \item{convert}{[default TRUE] logical value whether to attempt conversion of
 the received raw bytes to a character vector. Set to FALSE if downloading
-non-text data. Supplying a non-logical value will error.}
+non-text data.}
 
 \item{follow}{[default FALSE] logical value whether to automatically follow
-redirects (not applicable for async requests). If FALSE (or async), the
-redirect address is returned as response header 'Location'. Supplying
-a non-logical value will error.}
+redirects (not applicable for async requests). If FALSE, the redirect
+address is returned as response header 'Location'.}
 
 \item{method}{(optional) the HTTP method (defaults to 'GET' if not specified).}
 
@@ -53,7 +48,7 @@ Configuration object created by \code{\link{tls_config}}. If missing or
 NULL, certificates are not validated.}
 }
 \value{
-Named list of 4 elements:
+Named list of 3 elements:
     \itemize{
     \item{\code{$status}} {- integer HTTP repsonse status code (200 - OK).
     Use \code{\link{status_code}} for a translation of the meaning.}
@@ -61,25 +56,20 @@ Named list of 4 elements:
     'response', or NULL otherwise. If the status code is within the 300
     range, i.e. a redirect, the response header 'Location' is automatically
     appended to return the redirect address.}
-    \item{\code{$raw}} {- if 'convert' = FALSE, the raw vector of the
-    received resource, or NULL otherwise (use \code{\link{writeBin}} to save
-    to a file).}
-    \item{\code{$data}} {- if 'convert' = TRUE, the converted character
-    string, or NULL otherwise. This may be further parsed as html, json, xml
-    etc. if required.}
+    \item{\code{$data}} {- the response body, as a character string if
+    'convert' = TRUE (may be further parsed as html, json, xml etc. as
+    required), or a raw byte vector if FALSE (use \code{\link{writeBin}} to
+    save as a file).}
     }
-
-    Or else, if 'async' = TRUE, an 'ncurlAio' (object of class 'ncurlAio'
-    and 'recvAio') (invisibly).
 }
 \description{
 nano cURL - a minimalist http(s) client.
 }
 \examples{
-ncurl("https://www.r-project.org/",
+ncurl("https://postman-echo.com/get",
        convert = FALSE,
-       response = c("date", "server"),
-       timeout = 1000L)
+       response = c("date", "content-type"),
+       timeout = 1200L)
 ncurl("https://postman-echo.com/put",
       method = "PUT",
       headers = list(Authorization = "Bearer APIKEY"),
@@ -88,7 +78,11 @@ ncurl("https://postman-echo.com/put",
 ncurl("https://postman-echo.com/post",
       method = "POST",
       headers = c(`Content-Type` = "application/json"),
-      data = '{"k":"v"}',
+      data = '{"key":"value"}',
       timeout = 1500L)
 
+}
+\seealso{
+\code{\link{ncurl_aio}} for asynchronous http requests;
+    \code{\link{ncurl_session}} for persistent connections.
 }

@@ -22,13 +22,13 @@
 #'
 #' @param con a Socket, Context or Stream.
 #' @param data an object (a vector, if mode = 'raw').
-#' @param mode [default 'serial'] for sending serialised R objects, or 'raw' for
-#'     sending vectors of any type (converted to a raw byte vector for sending).
-#'     For Streams, 'raw' is the only option and this argument is ignored. Use
-#'     'serial' to ensure perfect reproducibility within R, although 'raw' must
-#'     be used when interfacing with external applications that do not understand
-#'     R serialisation. Alternatively, for performance, specify an integer
-#'     position in the vector of choices i.e. 1L for 'serial' or 2L for 'raw'.
+#' @param mode [default 'serial'] to send serialised R objects, or 'raw' to send
+#'     atomic vectors of any type as a raw byte vector. For Streams, 'raw' is
+#'     the only option and this argument is ignored. Use 'serial' to ensure
+#'     perfect reproducibility within R, although 'raw' must be used when
+#'     interfacing with external applications which do not understand R
+#'     serialisation. Alternatively, for performance, specify an integer position
+#'     in the vector of choices i.e. 1L for 'serial' or 2L for 'raw'.
 #' @param block [default NULL] which applies the connection default (see section
 #'     'Blocking' below). Specify logical TRUE to block until successful or FALSE
 #'     to return immediately even if unsuccessful (e.g. if no connection is
@@ -51,6 +51,7 @@
 #'     it is recommended to set a positive integer value for \code{block} rather
 #'     than FALSE.
 #'
+#' @seealso \code{\link{send_aio}} for asynchronous send.
 #' @examples
 #' pub <- socket("pub", dial = "inproc://nanonext")
 #'
@@ -82,35 +83,28 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL)
 #'
 #' @param con a Socket, Context or Stream.
 #' @param mode [default 'serial'] mode of vector to be received - one of 'serial',
-#'     'character', 'complex', 'double', 'integer', 'logical', 'numeric', or 'raw'.
-#'     The default 'serial' means a serialised R object, for the other modes,
-#'     the raw vector received will be converted into the respective mode.
-#'     For Streams, 'serial' is not an option and the default is 'character'.
+#'     'character', 'complex', 'double', 'integer', 'logical', 'numeric', 'raw',
+#'     or 'string'. The default 'serial' means a serialised R object, for the
+#'     other modes, the raw vector received will be converted into the respective
+#'     mode. Note that 'string' is defined here as a character scalar and is a
+#'     faster alternative to 'character' for receiving a single string. For
+#'     Streams, 'serial' is not an option and the default is 'character'.
 #'     Alternatively, for performance, specify an integer position in the vector
 #'     of choices e.g. 1L for 'serial', 2L for 'character' etc.
-#' @param keep.raw [default FALSE] [DEPRECATED - this argument will be removed
-#'     in a future package version] logical flag whether to keep and return the
-#'     received raw vector along with the converted data. Supplying a
-#'     non-logical value will error.
 #' @param n [default 65536L] applicable to Streams only, the maximum number of
 #'     bytes to receive. Can be an over-estimate, but note that a buffer of this
 #'     size is reserved.
 #' @inheritParams send
 #'
-#' @return Depending on the value of 'keep.raw': if TRUE, a named list of 2
-#'     elements - \code{$raw} containing the received raw vector and \code{$data}
-#'     containing the converted data, or if FALSE, the converted data.
+#' @return The received data in the 'mode' specified.
 #'
 #' @details In case of an error, an integer 'errorValue' is returned (to be
 #'     distiguishable from an integer message value). This can be verified using
 #'     \code{\link{is_error_value}}.
 #'
-#'     For \code{mode = "serial"}, attempting to unserialise a non-serialised
-#'     message will result in the error 'unknown input format'.
-#'
-#'     For all other modes, if an error occurred in conversion of the data to
-#'     the specified mode, a raw vector will be returned instead to allow for
-#'     the data to be recovered.
+#'     If an error occurred in unserialization or conversion of the message data
+#'     to the specified mode, a raw vector will be returned instead to allow
+#'     recovery (accompanied by a warning).
 #'
 #' @section Blocking:
 #'
@@ -123,6 +117,7 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL)
 #'     implementation uses an asynchronous send with a wait, it is recommended
 #'     to set a positive integer value for \code{block} rather than FALSE.
 #'
+#' @seealso \code{\link{recv_aio}} for asynchronous receive.
 #' @examples
 #' s1 <- socket("pair", listen = "inproc://nanonext")
 #' s2 <- socket("pair", dial = "inproc://nanonext")
@@ -160,8 +155,7 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL)
 #'
 recv <- function(con,
                  mode = c("serial", "character", "complex", "double",
-                          "integer", "logical", "numeric", "raw"),
+                          "integer", "logical", "numeric", "raw", "string"),
                  block = NULL,
-                 keep.raw = FALSE,
                  n = 65536L)
-  .Call(rnng_recv, con, mode, block, keep.raw, n)
+  .Call(rnng_recv, con, mode, block, n)

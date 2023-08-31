@@ -33,7 +33,7 @@
 #'
 #'     For a 'sendAio', the send result is available at \code{$result}. An
 #'     'unresolved' logical NA is returned if the async operation is yet to
-#'     complete, The resolved value will be zero on success, or else an integer
+#'     complete. The resolved value will be zero on success, or else an integer
 #'     error code.
 #'
 #'     To wait for and check the result of the send operation, use
@@ -70,9 +70,9 @@ send_aio <- function(con, data, mode = c("serial", "raw"), timeout = NULL)
 #' @details Async receive is always non-blocking and returns a 'recvAio'
 #'     immediately.
 #'
-#'     For a 'recvAio', the received message is available at \code{$data}, and
-#'     the raw message at \code{$raw} (if kept). An 'unresolved' logical NA is
-#'     returned if the async operation is yet to complete.
+#'     For a 'recvAio', the received message is available at \code{$data}. An
+#'     'unresolved' logical NA is returned if the async operation is yet to
+#'     complete.
 #'
 #'     To wait for the async operation to complete and retrieve the received
 #'     message, use \code{\link{call_aio}} on the returned 'recvAio' object.
@@ -80,15 +80,12 @@ send_aio <- function(con, data, mode = c("serial", "raw"), timeout = NULL)
 #'     Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
 #'
 #'     In case of an error, an integer 'errorValue' is returned (to be
-#'     distiguishable from an integer message value). This can be verified using
+#'     distiguishable from an integer message value). This can be checked using
 #'     \code{\link{is_error_value}}.
 #'
-#'     For \code{mode = "serial"}, attempting to unserialise a non-serialised
-#'     message will result in the error 'unknown input format'.
-#'
-#'     For all other modes, if an error occurred in conversion of the data to
-#'     the specified mode, a raw vector will be returned at \code{$data} instead
-#'     to allow for the data to be recovered.
+#'     If an error occurred in unserialization or conversion of the message data
+#'     to the specified mode, a raw vector will be returned instead to allow
+#'     recovery (accompanied by a warning).
 #'
 #' @examples
 #' s1 <- socket("pair", listen = "inproc://nanonext")
@@ -102,13 +99,11 @@ send_aio <- function(con, data, mode = c("serial", "raw"), timeout = NULL)
 #' res <- send_aio(s1, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
 #' msg <- recv_aio(s2, mode = "double", timeout = 100)
 #' msg
-#' msg$raw
 #' msg$data
 #'
 #' res <- send_aio(s1, "example message", mode = "raw", timeout = 100)
 #' msg <- recv_aio(s2, mode = "character", timeout = 100)
 #' call_aio(msg)
-#' msg$raw
 #' msg$data
 #'
 #' close(s1)
@@ -118,19 +113,18 @@ send_aio <- function(con, data, mode = c("serial", "raw"), timeout = NULL)
 #'
 recv_aio <- function(con,
                      mode = c("serial", "character", "complex", "double",
-                              "integer", "logical", "numeric", "raw"),
+                              "integer", "logical", "numeric", "raw", "string"),
                      timeout = NULL,
-                     keep.raw = FALSE,
                      n = 65536L)
-  data <- .Call(rnng_recv_aio, con, mode, timeout, keep.raw, n, environment())
+  data <- .Call(rnng_recv_aio, con, mode, timeout, n, environment())
 
 #' Receive Async and Signal a Condition
 #'
 #' A signalling version of the function takes a 'conditionVariable' as an
 #'     additional argument and signals it when the async receive is complete.
 #'
-#' @param cv \strong{For the signalling version}: a 'conditionVariable' that
-#'     should be signalled when the async receive is complete.
+#' @param cv \strong{For the signalling version}: a 'conditionVariable' to
+#'     signal when the async receive is complete.
 #'
 #' @details \strong{For the signalling version}: when the receive is complete,
 #'     the supplied 'conditionVariable' is signalled by incrementing its value
@@ -157,12 +151,11 @@ recv_aio <- function(con,
 #'
 recv_aio_signal <- function(con,
                             mode = c("serial", "character", "complex", "double",
-                                     "integer", "logical", "numeric", "raw"),
+                                     "integer", "logical", "numeric", "raw", "string"),
                             timeout = NULL,
-                            keep.raw = FALSE,
                             n = 65536L,
                             cv)
-  data <- .Call(rnng_cv_recv_aio, con, mode, timeout, keep.raw, n, cv, environment())
+  data <- .Call(rnng_cv_recv_aio, con, mode, timeout, n, cv, environment())
 
 # Core aio functions -----------------------------------------------------------
 
@@ -175,9 +168,7 @@ recv_aio_signal <- function(con,
 #'
 #' @return The passed object (invisibly).
 #'
-#' @details For a 'recvAio', the received raw vector may be retrieved at \code{$raw}
-#'     (unless 'keep.raw' was set to FALSE when receiving), and the converted R
-#'     object at \code{$data}.
+#' @details For a 'recvAio', the received value may be retrieved at \code{$data}.
 #'
 #'     For a 'sendAio', the send result may be retrieved at \code{$result}. This
 #'     will be zero on success, or else an integer error code.
@@ -185,9 +176,9 @@ recv_aio_signal <- function(con,
 #'     To access the values directly, use for example on a 'recvAio' \code{x}:
 #'     \code{call_aio(x)$data}.
 #'
-#'     For a 'recvAio', in case of an error in unserialisation or data conversion
-#'     (for example if the incorrect mode was specified), the received raw vector
-#'     will be stored at \code{$data} to allow for the data to be recovered.
+#'     For a 'recvAio', if an error occurred in unserialization or conversion of
+#'     the message data to the specified mode, a raw vector will be returned
+#'     instead to allow recovery (accompanied by a warning).
 #'
 #'     Once the value has been successfully retrieved, the Aio is deallocated
 #'     and only the value is stored in the Aio object.
@@ -198,9 +189,9 @@ recv_aio_signal <- function(con,
 #' @section Alternatively:
 #'
 #'     Aio values may be accessed directly at \code{$result} for a 'sendAio',
-#'     and \code{$raw} or \code{$data} for a 'recvAio'. If the Aio operation is
-#'     yet to complete, an 'unresolved' logical NA will be returned. Once
-#'     complete, the resolved value will be returned instead.
+#'     and \code{$data} for a 'recvAio'. If the Aio operation is yet to complete,
+#'     an 'unresolved' logical NA will be returned. Once complete, the resolved
+#'     value will be returned instead.
 #'
 #'     \code{\link{unresolved}} may also be used, which returns TRUE only if an
 #'     Aio or Aio value has yet to resolve and FALSE otherwise. This is suitable
@@ -252,7 +243,7 @@ stop_aio <- function(aio) invisible(.Call(rnng_aio_stop, aio))
 #'     \code{\link{call_aio}}, this function does not wait for completion.
 #'
 #' @param aio an Aio (object of class 'sendAio' or 'recvAio'), or Aio value
-#'     stored in \code{$result}, \code{$raw} or \code{$data} as the case may be.
+#'     stored in \code{$result} or \code{$data} as the case may be.
 #'
 #' @return Logical TRUE if 'aio' is an unresolved Aio or Aio value, or FALSE
 #'     otherwise.

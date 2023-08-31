@@ -20,6 +20,23 @@
 #define NANONEXT_SUPPLEMENTALS
 #include "nanonext.h"
 
+// internals -------------------------------------------------------------------
+
+SEXP mk_error_ncurl(const int xc) {
+
+  const char *names[] = {"status", "headers", "data", ""};
+  SEXP out = PROTECT(Rf_mkNamed(VECSXP, names));
+  SEXP err = Rf_ScalarInteger(xc);
+  SET_ATTRIB(err, nano_error);
+  SET_OBJECT(err, 1);
+  SET_VECTOR_ELT(out, 0, err);
+  SET_VECTOR_ELT(out, 1, err);
+  SET_VECTOR_ELT(out, 2, err);
+  UNPROTECT(1);
+  return out;
+
+}
+
 // finalizers ------------------------------------------------------------------
 
 static void stream_finalizer(SEXP xptr) {
@@ -155,22 +172,6 @@ SEXP rnng_url_parse(SEXP url) {
 
 }
 
-SEXP rnng_device(SEXP s1, SEXP s2) {
-
-  if (R_ExternalPtrTag(s1) != nano_SocketSymbol)
-    Rf_error("'s1' is not a valid Socket");
-  if (R_ExternalPtrTag(s2) != nano_SocketSymbol)
-    Rf_error("'s2' is not a valid Socket");
-
-  const int xc = nng_device(*(nng_socket *) R_ExternalPtrAddr(s1),
-                            *(nng_socket *) R_ExternalPtrAddr(s2));
-  if (xc)
-    ERROR_OUT(xc);
-
-  return R_NilValue;
-
-}
-
 SEXP rnng_is_nul_byte(SEXP x) {
 
   return Rf_ScalarLogical(TYPEOF(x) == RAWSXP && XLENGTH(x) == 1 && RAW(x)[0] == 0);
@@ -231,8 +232,9 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
     }
   }
   if (data != R_NilValue) {
-    SEXP enc = nano_encode(data);
-    if ((xc = nng_http_req_set_data(req, RAW(enc), (size_t) XLENGTH(enc) - 1)))
+    nano_buf enc;
+    nano_encode(&enc, data);
+    if ((xc = nng_http_req_set_data(req, enc.buf, enc.cur - 1)))
       goto exitlevel4;
   }
 
@@ -277,17 +279,17 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
     nng_tls_config_free(cfg);
   nng_aio_free(aio);
 
-  code = nng_http_res_get_status(res), relo = code >= 300 && code < 400 ? 1 : 0;
+  code = nng_http_res_get_status(res), relo = code >= 300 && code < 400;
 
   if (relo && LOGICAL(follow)[0]) {
     SET_STRING_ELT(nano_addRedirect, 0, Rf_mkChar(nng_http_res_get_header(res, "Location")));
     return rnng_ncurl(nano_addRedirect, convert, follow, method, headers, data, response, timeout, tls);
   }
 
-  SEXP out, vec, cvec, rvec;
+  SEXP out, vec, rvec;
   void *dat;
   size_t sz;
-  const char *names[] = {"status", "headers", "raw", "data", ""};
+  const char *names[] = {"status", "headers", "data", ""};
 
   PROTECT(out = Rf_mkNamed(VECSXP, names));
 
@@ -298,61 +300,56 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
     switch (TYPEOF(response)) {
     case STRSXP:
       PROTECT(response = Rf_lengthgets(response, rlen + 1));
-      SET_STRING_ELT(response, rlen, NANO_CHAR("Location", 8));
+      SET_STRING_ELT(response, rlen, Rf_mkChar("Location"));
       break;
     case VECSXP:
       PROTECT(response = Rf_lengthgets(response, rlen + 1));
-      SET_VECTOR_ELT(response, rlen, NANO_STRING("Location", 8));
+      SET_VECTOR_ELT(response, rlen, Rf_mkString("Location"));
       break;
     default:
-      PROTECT(response = NANO_STRING("Location", 8));
+      PROTECT(response = Rf_mkString("Location"));
     }
   }
 
   if (response != R_NilValue) {
     const R_xlen_t rlen = Rf_xlength(response);
-    PROTECT(rvec = Rf_allocVector(VECSXP, rlen));
+    rvec = Rf_allocVector(VECSXP, rlen);
+    SET_VECTOR_ELT(out, 1, rvec);
     switch (TYPEOF(response)) {
     case STRSXP:
+      Rf_namesgets(rvec, response);
       for (R_xlen_t i = 0; i < rlen; i++) {
         const char *r = nng_http_res_get_header(res, CHAR(STRING_ELT(response, i)));
         SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
       }
-      Rf_namesgets(rvec, response);
       break;
     case VECSXP: ;
-      SEXP rnames;
-      PROTECT(rnames = Rf_allocVector(STRSXP, rlen));
+      SEXP rnames = Rf_allocVector(STRSXP, rlen);
+      Rf_namesgets(rvec, rnames);
       for (R_xlen_t i = 0; i < rlen; i++) {
         SEXP rname = STRING_ELT(VECTOR_ELT(response, i), 0);
         SET_STRING_ELT(rnames, i, rname);
         const char *r = nng_http_res_get_header(res, CHAR(rname));
         SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
       }
-      Rf_namesgets(rvec, rnames);
-      UNPROTECT(1);
       break;
     }
-    UNPROTECT(1);
   } else {
     rvec = R_NilValue;
+    SET_VECTOR_ELT(out, 1, rvec);
   }
-  SET_VECTOR_ELT(out, 1, rvec);
   if (relo) UNPROTECT(1);
 
   nng_http_res_get_data(res, &dat, &sz);
 
   if (conv) {
-    vec = R_NilValue;
+    vec = rawToChar(dat, sz);
   } else {
     vec = Rf_allocVector(RAWSXP, sz);
     if (dat != NULL)
-      memcpy(RAW(vec), dat, sz);
+      memcpy(STDVEC_DATAPTR(vec), dat, sz);
   }
   SET_VECTOR_ELT(out, 2, vec);
-
-  cvec = conv ? rawToChar(dat, sz) : R_NilValue;
-  SET_VECTOR_ELT(out, 3, cvec);
 
   nng_http_res_free(res);
   nng_http_req_free(req);
@@ -453,12 +450,12 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP tls) {
   Rf_setAttrib(st, nano_UrlSymbol, url);
   Rf_setAttrib(st, nano_TextframesSymbol, Rf_ScalarLogical(frames));
 
-  PROTECT(klass = Rf_allocVector(STRSXP, 2));
-  SET_STRING_ELT(klass, 0, NANO_CHAR("nanoStream", 10));
-  SET_STRING_ELT(klass, 1, NANO_CHAR("nano", 4));
+  klass = Rf_allocVector(STRSXP, 2);
   Rf_classgets(st, klass);
+  SET_STRING_ELT(klass, 0, Rf_mkChar("nanoStream"));
+  SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
 
-  UNPROTECT(3);
+  UNPROTECT(2);
   return st;
 
   exitlevel5:
@@ -548,12 +545,12 @@ SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP tls) {
   Rf_setAttrib(st, nano_UrlSymbol, url);
   Rf_setAttrib(st, nano_TextframesSymbol, Rf_ScalarLogical(frames));
 
-  PROTECT(klass = Rf_allocVector(STRSXP, 2));
-  SET_STRING_ELT(klass, 0, NANO_CHAR("nanoStream", 10));
-  SET_STRING_ELT(klass, 1, NANO_CHAR("nano", 4));
+  klass = Rf_allocVector(STRSXP, 2);
   Rf_classgets(st, klass);
+  SET_STRING_ELT(klass, 0, Rf_mkChar("nanoStream"));
+  SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
 
-  UNPROTECT(3);
+  UNPROTECT(2);
   return st;
 
   exitlevel5:
@@ -718,16 +715,16 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
 
   PROTECT(xp = R_MakeExternalPtr(cfg, nano_TlsSymbol, R_NilValue));
   R_RegisterCFinalizerEx(xp, tls_finalizer, TRUE);
-  Rf_classgets(xp, NANO_STRING("tlsConfig", 9));
+  Rf_classgets(xp, Rf_mkString("tlsConfig"));
   if (client != R_NilValue) {
-    Rf_setAttrib(xp, R_SpecSymbol, NANO_STRING("client", 6));
-    Rf_setAttrib(xp, R_ModeSymbol, NANO_STRING(mod == NNG_TLS_AUTH_MODE_REQUIRED ? "required" : "optional", 8));
+    Rf_setAttrib(xp, R_SpecSymbol, Rf_mkString("client"));
+    Rf_setAttrib(xp, R_ModeSymbol, Rf_mkString(mod == NNG_TLS_AUTH_MODE_REQUIRED ? "required" : "optional"));
   } else if (server != R_NilValue) {
-    Rf_setAttrib(xp, R_SpecSymbol, NANO_STRING("server", 6));
-    Rf_setAttrib(xp, R_ModeSymbol, NANO_STRING(mod == NNG_TLS_AUTH_MODE_REQUIRED ? "required" : "optional", 8));
+    Rf_setAttrib(xp, R_SpecSymbol, Rf_mkString("server"));
+    Rf_setAttrib(xp, R_ModeSymbol, Rf_mkString(mod == NNG_TLS_AUTH_MODE_REQUIRED ? "required" : "optional"));
   } else {
-    Rf_setAttrib(xp, R_SpecSymbol, NANO_STRING("client", 6));
-    Rf_setAttrib(xp, R_ModeSymbol, NANO_STRING("none", 4));
+    Rf_setAttrib(xp, R_SpecSymbol, Rf_mkString("client"));
+    Rf_setAttrib(xp, R_ModeSymbol, Rf_mkString("none"));
   }
 
   UNPROTECT(1);

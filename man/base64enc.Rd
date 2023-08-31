@@ -16,8 +16,7 @@ base64dec(x, convert = TRUE)
 to a character string or FALSE to a raw vector.\cr
 For \strong{base64dec}: [default TRUE] logical TRUE to convert back to a
 character string, FALSE to convert back to a raw vector or NA to decode
-and then unserialize back to the original object. Supplying a non-logical
-value will error.}
+and then unserialize back to the original object.}
 }
 \value{
 For \strong{base64enc}: A character string or raw vector depending on
@@ -31,7 +30,8 @@ Encodes / decodes a character string or arbitrary R object to base64 encoding.
 }
 \details{
 For encoding: a scalar string or raw vector (with no attributes) is
-    encoded directly, whilst all other objects are first serialised.
+    encoded directly, whilst all other objects are first serialised (using R
+    serialisation version 3, big-endian representation).
 
     For decoding: the value of 'convert' should be set to TRUE, FALSE or NA
     to be the analogue of the above 3 cases in order to return the original

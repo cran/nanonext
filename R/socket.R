@@ -38,8 +38,8 @@
 #'     connection is not immediately possible, but avoids subtle errors from
 #'     attempting to use the socket before an asynchronous dial has completed.
 #' @param raw [default FALSE] whether to open raw mode sockets. Note: not for
-#'     general use - do not enable unless you have a specific need, such as for
-#'     use with \code{\link{device}} (refer to NNG documentation).
+#'     general use - do not enable unless you have a specific need (refer to NNG
+#'     documentation).
 #' @inheritParams dial
 #'
 #' @return A Socket (object of class 'nanoSocket' and 'nano').
@@ -77,7 +77,9 @@
 #'
 #' @examples
 #' s <- socket(protocol = "req", listen = "inproc://nanosocket")
+#' s
 #' s1 <- socket(protocol = "rep", dial = "inproc://nanosocket")
+#' s1
 #'
 #' send(s, "hello world!")
 #' recv(s1)

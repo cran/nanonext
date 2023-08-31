@@ -84,17 +84,14 @@ static void RegisterSymbols(void) {
 static void PreserveObjects(void) {
   R_PreserveObject(nano_addRedirect = Rf_allocVector(STRSXP, 1));
   R_PreserveObject(nano_aioFormals = Rf_cons(nano_AioSymbol, R_NilValue));
-  R_PreserveObject(nano_aioFuncs = Rf_allocVector(LISTSXP, 5));
+  R_PreserveObject(nano_aioFuncs = Rf_allocVector(LISTSXP, 3));
   SETCAR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
-  SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata"), nano_DataSymbol));
-  SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw"), nano_DataSymbol));
-  SETCADDDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgdata2"), nano_DataSymbol));
-  SETCAD4R(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msgraw2"), nano_DataSymbol));
-  R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 4));
+  SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg"), nano_DataSymbol));
+  SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg2"), nano_DataSymbol));
+  R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 3));
   SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(1)));
   SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(2)));
   SETCADDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(3)));
-  SETCADDDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(4)));
   R_PreserveObject(nano_error = Rf_cons(Rf_mkString("errorValue"), R_NilValue));
   SET_TAG(nano_error, R_ClassSymbol);
   R_PreserveObject(nano_ncurlAio = Rf_cons(Rf_allocVector(STRSXP, 2), R_NilValue));
@@ -128,10 +125,8 @@ static void ReleaseObjects(void) {
 
 static const R_CallMethodDef callMethods[] = {
   {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
-  {"rnng_aio_get_msgdata", (DL_FUNC) &rnng_aio_get_msgdata, 1},
-  {"rnng_aio_get_msgdata2", (DL_FUNC) &rnng_aio_get_msgdata2, 1},
-  {"rnng_aio_get_msgraw", (DL_FUNC) &rnng_aio_get_msgraw, 1},
-  {"rnng_aio_get_msgraw2", (DL_FUNC) &rnng_aio_get_msgraw2, 1},
+  {"rnng_aio_get_msg", (DL_FUNC) &rnng_aio_get_msg, 1},
+  {"rnng_aio_get_msg2", (DL_FUNC) &rnng_aio_get_msg2, 1},
   {"rnng_aio_http", (DL_FUNC) &rnng_aio_http, 3},
   {"rnng_aio_result", (DL_FUNC) &rnng_aio_result, 1},
   {"rnng_aio_stop", (DL_FUNC) &rnng_aio_stop, 1},
@@ -141,20 +136,18 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_ctx_create", (DL_FUNC) &rnng_ctx_create, 1},
   {"rnng_ctx_open", (DL_FUNC) &rnng_ctx_open, 1},
   {"rnng_cv_alloc", (DL_FUNC) &rnng_cv_alloc, 0},
-  {"rnng_cv_recv_aio", (DL_FUNC) &rnng_cv_recv_aio, 7},
-  {"rnng_cv_request", (DL_FUNC) &rnng_cv_request, 8},
+  {"rnng_cv_recv_aio", (DL_FUNC) &rnng_cv_recv_aio, 6},
+  {"rnng_cv_request", (DL_FUNC) &rnng_cv_request, 7},
   {"rnng_cv_reset", (DL_FUNC) &rnng_cv_reset, 1},
   {"rnng_cv_signal", (DL_FUNC) &rnng_cv_signal, 1},
   {"rnng_cv_until", (DL_FUNC) &rnng_cv_until, 2},
   {"rnng_cv_value", (DL_FUNC) &rnng_cv_value, 1},
   {"rnng_cv_wait", (DL_FUNC) &rnng_cv_wait, 1},
-  {"rnng_device", (DL_FUNC) &rnng_device, 2},
   {"rnng_dial", (DL_FUNC) &rnng_dial, 5},
   {"rnng_dialer_close", (DL_FUNC) &rnng_dialer_close, 1},
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
   {"rnng_base64dec", (DL_FUNC) &rnng_base64dec, 2},
   {"rnng_base64enc", (DL_FUNC) &rnng_base64enc, 2},
-  {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
   {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
   {"rnng_is_error_value", (DL_FUNC) &rnng_is_error_value, 1},
   {"rnng_is_nul_byte", (DL_FUNC) &rnng_is_nul_byte, 1},
@@ -162,7 +155,6 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_listener_close", (DL_FUNC) &rnng_listener_close, 1},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
-  {"rnng_messenger_thread_create", (DL_FUNC) &rnng_messenger_thread_create, 1},
   {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 9},
   {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 8},
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
@@ -171,9 +163,9 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 2},
   {"rnng_random", (DL_FUNC) &rnng_random, 1},
-  {"rnng_recv", (DL_FUNC) &rnng_recv, 5},
-  {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 6},
-  {"rnng_request", (DL_FUNC) &rnng_request, 7},
+  {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
+  {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 5},
+  {"rnng_request", (DL_FUNC) &rnng_request, 6},
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},
@@ -205,13 +197,18 @@ static const R_CallMethodDef callMethods[] = {
   {NULL, NULL, 0}
 };
 
+static const R_ExternalMethodDef externalMethods[] = {
+  {"rnng_messenger_thread_create", (DL_FUNC) &rnng_messenger_thread_create, -1},
+  {NULL, NULL, 0}
+};
+
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
 #if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
   nng_mtx_alloc(&shr_mtx);
 #endif
-  R_registerRoutines(dll, NULL, callMethods, NULL, NULL);
+  R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
 }

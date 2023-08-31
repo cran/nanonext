@@ -47,7 +47,7 @@
 #'     certificate is validated if presented by the peer, but the session
 #'     allowed to proceed otherwise. If neither 'client' nor 'server' are
 #'     supplied, then no authentication is performed and this argument has no
-#'     effect. Supplying a non-logical value will error.
+#'     effect.
 #'
 #' @return A 'tlsConfig' object.
 #'
@@ -84,15 +84,14 @@ tls_config <- function(client = NULL, server = NULL, pass = NULL, auth = is.null
 #' @param key (optional) supply a secret key to generate an HMAC. If missing or
 #'     NULL, the SHA-256/224/384/512 hash of 'x' is returned.
 #' @param convert [default TRUE] logical value whether to convert the output to
-#'     a character string or keep as a raw vector. Supplying a non-logical value
-#'     will error.
+#'     a character string or keep as a raw vector.
 #'
 #' @return A raw vector or character string depending on 'convert', of byte
 #'     length 32 for SHA-256, 28 for SHA-224, 48 for SHA-384, and 64 for SHA-512.
 #'
 #' @details For arguments 'x' and 'key', a scalar string or raw vector (with no
-#'     attributes) is hashed directly, whilst all other objects are serialised
-#'     first.
+#'     attributes) is hashed directly, whilst all other objects are first
+#'     serialised (using R serialisation version 3, big-endian representation).
 #'
 #'     The result of hashing is always a raw vector, which is translated to a
 #'     character string if 'convert' is TRUE, or returned directly if 'convert'
@@ -164,8 +163,8 @@ sha512 <- function(x, key = NULL, convert = TRUE) .Call(rnng_sha512, x, key, con
 #'     length 20.
 #'
 #' @details For arguments 'x' and 'key', a scalar string or raw vector (with no
-#'     attributes) is hashed directly, whilst all other objects are serialised
-#'     first.
+#'     attributes) is hashed directly, whilst all other objects are first
+#'     serialised (using R serialisation version 3, big-endian representation).
 #'
 #'     The result of hashing is always a raw vector, which is translated to a
 #'     character string if 'convert' is TRUE, or returned directly if 'convert'
@@ -196,8 +195,7 @@ sha1 <- function(x, key = NULL, convert = TRUE) .Call(rnng_sha1, x, key, convert
 #'     to a character string or FALSE to a raw vector.\cr
 #'     For \strong{base64dec}: [default TRUE] logical TRUE to convert back to a
 #'     character string, FALSE to convert back to a raw vector or NA to decode
-#'     and then unserialize back to the original object. Supplying a non-logical
-#'     value will error.
+#'     and then unserialize back to the original object.
 #'
 #' @return For \strong{base64enc}: A character string or raw vector depending on
 #'     the value of 'convert'.
@@ -206,7 +204,8 @@ sha1 <- function(x, key = NULL, convert = TRUE) .Call(rnng_sha1, x, key, convert
 #'     depending on the value of 'convert'.
 #'
 #' @details For encoding: a scalar string or raw vector (with no attributes) is
-#'     encoded directly, whilst all other objects are first serialised.
+#'     encoded directly, whilst all other objects are first serialised (using R
+#'     serialisation version 3, big-endian representation).
 #'
 #'     For decoding: the value of 'convert' should be set to TRUE, FALSE or NA
 #'     to be the analogue of the above 3 cases in order to return the original

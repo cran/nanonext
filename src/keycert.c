@@ -78,7 +78,7 @@ static int parse_serial_decimal_format(unsigned char *obuf, size_t obufmax,
 SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
   uint8_t failed = 1;
-  int interactive = LOGICAL(inter)[0];
+  const int interactive = LOGICAL(inter)[0];
   mbedtls_pk_context key;
   mbedtls_entropy_context entropyk;
   mbedtls_ctr_drbg_context ctr_drbgk;
@@ -109,9 +109,7 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
   mbedtls_pk_context loaded_issuer_key;
   mbedtls_pk_context *issuer_key = &loaded_issuer_key;
   char buf[1024];
-#if defined(MBEDTLS_X509_CSR_PARSE_C)
-  mbedtls_x509_csr csr;
-#endif
+  mbedtls_x509_csr csr; // #if defined(MBEDTLS_X509_CSR_PARSE_C)
   mbedtls_x509write_cert crt;
   mbedtls_entropy_context entropy;
   mbedtls_ctr_drbg_context ctr_drbg;
@@ -123,9 +121,7 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
   mbedtls_pk_init(&loaded_issuer_key);
   mbedtls_ctr_drbg_init(&ctr_drbg);
   mbedtls_entropy_init(&entropy);
-#if defined(MBEDTLS_X509_CSR_PARSE_C)
-  mbedtls_x509_csr_init(&csr);
-#endif
+  mbedtls_x509_csr_init(&csr); // #if defined(MBEDTLS_X509_CSR_PARSE_C)
   mbedtls_x509_crt_init(&issuer_crt);
   memset(buf, 0, sizeof(buf));
   unsigned char output_buf[4096];
@@ -188,11 +184,9 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
       (ret = mbedtls_x509write_crt_set_basic_constraints(&crt, is_ca, max_pathlen)))
     goto exitlevel1;
 
-#if defined(MBEDTLS_SHA1_C)
-    if ((ret = mbedtls_x509write_crt_set_subject_key_identifier(&crt)) ||
-        (ret = mbedtls_x509write_crt_set_authority_key_identifier(&crt)))
-      goto exitlevel1;
-#endif /* MBEDTLS_SHA1_C */
+  if ((ret = mbedtls_x509write_crt_set_subject_key_identifier(&crt)) ||
+      (ret = mbedtls_x509write_crt_set_authority_key_identifier(&crt)))
+    goto exitlevel1; // #if defined(MBEDTLS_SHA1_C)
 
   ret = mbedtls_x509write_crt_pem(&crt, output_buf, 4096, mbedtls_ctr_drbg_random, &ctr_drbg);
   if (ret < 0)
@@ -217,13 +211,11 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
   exitlevel1:
 
-#if defined(MBEDTLS_X509_CSR_PARSE_C)
-  mbedtls_x509_csr_free(&csr);
-#endif /* MBEDTLS_X509_CSR_PARSE_C */
+  mbedtls_x509_csr_free(&csr); // #if defined(MBEDTLS_X509_CSR_PARSE_C)
   mbedtls_x509_crt_free(&issuer_crt);
   mbedtls_x509write_crt_free(&crt);
   mbedtls_pk_free(&loaded_issuer_key);
-#if MBEDTLS_VERSION_MAJOR == 3 && MBEDTLS_VERSION_MINOR < 4 || MBEDTLS_VERSION_MAJOR <= 2
+#if MBEDTLS_VERSION_MAJOR == 3 && MBEDTLS_VERSION_MINOR < 4 || MBEDTLS_VERSION_MAJOR < 3
   mbedtls_mpi_free(&serial);
 #endif
   mbedtls_ctr_drbg_free(&ctr_drbg);

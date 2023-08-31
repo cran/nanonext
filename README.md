@@ -364,7 +364,7 @@ aio
 #> < recvAio >
 #>  - $data for message data
 aio$data |> str()
-#>  num [1:100000000] 0.165 -1.03 -0.484 0.15 1.194 ...
+#>  num [1:100000000] 0.09 -1.688 -0.754 2.307 -1.046 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative
@@ -387,8 +387,8 @@ RPC model.
 
 ### Synchronisation Primitives
 
-`nanonext` implements synchronisation primitives provided by the NNG
-library for cross-platform use.
+`nanonext` implements cross-platform synchronisation primitives provided
+by the NNG library.
 
 As the R interpreter runs on a single thread, synchronisation primitives
 such as mutexes and condition variables are not natively implemented in
@@ -531,7 +531,7 @@ throughout, or alternatively ‘localhost’, but not a mixture of the two.
 cert <- write_cert(cn = "127.0.0.1")
 str(cert)
 #> List of 2
-#>  $ server: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFFTCCAv2gAwIBAgIBATANBgkqhkiG9w0BAQsFADAiMRIwEAYDVQQDDAkxMjcu\nMC4wLjExDDAKBgNV"| __truncated__ "-----BEGIN RSA PRIVATE KEY-----\nMIIJKAIBAAKCAgEAoyoAZWVYtYAUAfYYG0Vd3ZTGh+FcgMfD9gStfEnlTywtBJHn\ngtA9zq6OZJ23"| __truncated__
+#>  $ server: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFFTCCAv2gAwIBAgIBATANBgkqhkiG9w0BAQsFADAiMRIwEAYDVQQDDAkxMjcu\nMC4wLjExDDAKBgNV"| __truncated__ "-----BEGIN RSA PRIVATE KEY-----\nMIIJKQIBAAKCAgEAlQhHQ/iwBIyKoHW/gjQqVvwPRENOdGOyt68nboQ0fTaUqe5O\nj6xNjZlqNtwz"| __truncated__
 #>  $ client: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFFTCCAv2gAwIBAgIBATANBgkqhkiG9w0BAQsFADAiMRIwEAYDVQQDDAkxMjcu\nMC4wLjExDDAKBgNV"| __truncated__ ""
 
 ser <- tls_config(server = cert$server)
@@ -686,7 +686,7 @@ values.
 
 `ncurl()` is a minimalist http(s) client.
 
-By setting `async = TRUE`, it performs requests asynchronously,
+`ncurl_aio()` is the async edition, performing requests asynchronously,
 returning immediately with an ‘ncurlAio’.
 
 For normal use, it takes just the URL. It can follow redirects.
@@ -699,35 +699,30 @@ ncurl("https://postman-echo.com/get")
 #> $headers
 #> NULL
 #> 
-#> $raw
-#> NULL
-#> 
 #> $data
-#> [1] "{\n  \"args\": {},\n  \"headers\": {\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"host\": \"postman-echo.com\",\n    \"x-amzn-trace-id\": \"Root=1-64cbb085-342dac4b52f4818a5987b9a9\"\n  },\n  \"url\": \"https://postman-echo.com/get\"\n}"
+#> [1] "{\n  \"args\": {},\n  \"headers\": {\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"host\": \"postman-echo.com\",\n    \"x-amzn-trace-id\": \"Root=1-64e9dbb0-242f5ff34eeaea7e173df056\"\n  },\n  \"url\": \"https://postman-echo.com/get\"\n}"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
 
 ``` r
-res <- ncurl("https://postman-echo.com/post",
-             async = TRUE,
-             method = "POST",
-             headers = c(`Content-Type` = "application/json", Authorization = "Bearer APIKEY"),
-             data = '{"key": "value"}',
-             response = "date")
+res <- ncurl_aio("https://postman-echo.com/post",
+                 method = "POST",
+                 headers = c(`Content-Type` = "application/json", Authorization = "Bearer APIKEY"),
+                 data = '{"key": "value"}',
+                 response = "date")
 res
 #> < ncurlAio >
 #>  - $status for response status code
 #>  - $headers for response headers
-#>  - $raw for raw message
 #>  - $data for message data
 
 call_aio(res)$headers
 #> $date
-#> [1] "Thu, 03 Aug 2023 13:49:58 GMT"
+#> [1] "Sat, 26 Aug 2023 11:02:09 GMT"
 
 res$data
-#> [1] "{\n  \"args\": {},\n  \"data\": {\n    \"key\": \"value\"\n  },\n  \"files\": {},\n  \"form\": {},\n  \"headers\": {\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"host\": \"postman-echo.com\",\n    \"x-amzn-trace-id\": \"Root=1-64cbb086-59b4a1145957f60535aebdb1\",\n    \"content-length\": \"16\",\n    \"content-type\": \"application/json\",\n    \"authorization\": \"Bearer APIKEY\"\n  },\n  \"json\": {\n    \"key\": \"value\"\n  },\n  \"url\": \"https://postman-echo.com/post\"\n}"
+#> [1] "{\n  \"args\": {},\n  \"data\": {\n    \"key\": \"value\"\n  },\n  \"files\": {},\n  \"form\": {},\n  \"headers\": {\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"host\": \"postman-echo.com\",\n    \"x-amzn-trace-id\": \"Root=1-64e9dbb1-79ac77fb6ced5ec43dbcf33d\",\n    \"content-length\": \"16\",\n    \"content-type\": \"application/json\",\n    \"authorization\": \"Bearer APIKEY\"\n  },\n  \"json\": {\n    \"key\": \"value\"\n  },\n  \"url\": \"https://postman-echo.com/post\"\n}"
 ```
 
 In this respect, it may be used as a performant and lightweight method
@@ -758,29 +753,26 @@ transact(sess)
 #> 
 #> $headers
 #> $headers$Date
-#> [1] "Thu, 03 Aug 2023 13:49:59 GMT"
+#> [1] "Sat, 26 Aug 2023 11:02:09 GMT"
 #> 
 #> $headers$`Content-Type`
 #> [1] "application/json; charset=utf-8"
 #> 
 #> 
-#> $raw
+#> $data
 #>   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72
 #>  [26] 73 22 3a 20 7b 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72
 #>  [51] 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72
 #>  [76] 77 61 72 64 65 64 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20
 #> [101] 22 68 6f 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d
 #> [126] 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a
-#> [151] 20 22 52 6f 6f 74 3d 31 2d 36 34 63 62 62 30 38 36 2d 35 37 38 33 37 31 62
-#> [176] 38 30 39 34 33 32 62 39 64 37 35 36 32 37 33 35 37 22 2c 0a 20 20 20 20 22
+#> [151] 20 22 52 6f 6f 74 3d 31 2d 36 34 65 39 64 62 62 31 2d 35 64 64 64 39 36 31
+#> [176] 38 37 39 35 30 65 37 62 66 32 32 32 32 34 38 32 64 22 2c 0a 20 20 20 20 22
 #> [201] 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69
 #> [226] 6f 6e 2f 6a 73 6f 6e 22 2c 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74
 #> [251] 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20 20 7d
 #> [276] 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d
 #> [301] 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f 67 65 74 22 0a 7d
-#> 
-#> $data
-#> NULL
 ```
 
 [« Back to ToC](#table-of-contents)
@@ -938,7 +930,7 @@ stat(s, "pipes")
 #### Linux / Mac / Solaris
 
 Installation from source requires ‘libnng’ \>= v1.5.0 and ‘libmbedtls’
-\>= 2 (suitable installations are automatically detected), or else
+\>= 2.5.0 (suitable installations are automatically detected), or else
 ‘cmake’ to compile ‘libnng’ v1.6.0 alpha (c5e9d8a) and ‘libmbedtls’
 v3.4.0 included within the package sources.
 

@@ -8,18 +8,16 @@
 recv_aio(
   con,
   mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
-    "raw"),
+    "raw", "string"),
   timeout = NULL,
-  keep.raw = FALSE,
   n = 65536L
 )
 
 recv_aio_signal(
   con,
   mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric",
-    "raw"),
+    "raw", "string"),
   timeout = NULL,
-  keep.raw = FALSE,
   n = 65536L,
   cv
 )
@@ -28,27 +26,24 @@ recv_aio_signal(
 \item{con}{a Socket, Context or Stream.}
 
 \item{mode}{[default 'serial'] mode of vector to be received - one of 'serial',
-'character', 'complex', 'double', 'integer', 'logical', 'numeric', or 'raw'.
-The default 'serial' means a serialised R object, for the other modes,
-the raw vector received will be converted into the respective mode.
-For Streams, 'serial' is not an option and the default is 'character'.
+'character', 'complex', 'double', 'integer', 'logical', 'numeric', 'raw',
+or 'string'. The default 'serial' means a serialised R object, for the
+other modes, the raw vector received will be converted into the respective
+mode. Note that 'string' is defined here as a character scalar and is a
+faster alternative to 'character' for receiving a single string. For
+Streams, 'serial' is not an option and the default is 'character'.
 Alternatively, for performance, specify an integer position in the vector
 of choices e.g. 1L for 'serial', 2L for 'character' etc.}
 
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
 applies a socket-specific default, usually the same as no timeout.}
 
-\item{keep.raw}{[default FALSE] [DEPRECATED - this argument will be removed
-in a future package version] logical flag whether to keep and return the
-received raw vector along with the converted data. Supplying a
-non-logical value will error.}
-
 \item{n}{[default 65536L] applicable to Streams only, the maximum number of
 bytes to receive. Can be an over-estimate, but note that a buffer of this
 size is reserved.}
 
-\item{cv}{\strong{For the signalling version}: a 'conditionVariable' that
-should be signalled when the async receive is complete.}
+\item{cv}{\strong{For the signalling version}: a 'conditionVariable' to
+signal when the async receive is complete.}
 }
 \value{
 A 'recvAio' (object of class 'recvAio') (invisibly).
@@ -63,9 +58,9 @@ A signalling version of the function takes a 'conditionVariable' as an
 Async receive is always non-blocking and returns a 'recvAio'
     immediately.
 
-    For a 'recvAio', the received message is available at \code{$data}, and
-    the raw message at \code{$raw} (if kept). An 'unresolved' logical NA is
-    returned if the async operation is yet to complete.
+    For a 'recvAio', the received message is available at \code{$data}. An
+    'unresolved' logical NA is returned if the async operation is yet to
+    complete.
 
     To wait for the async operation to complete and retrieve the received
     message, use \code{\link{call_aio}} on the returned 'recvAio' object.
@@ -73,15 +68,12 @@ Async receive is always non-blocking and returns a 'recvAio'
     Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
 
     In case of an error, an integer 'errorValue' is returned (to be
-    distiguishable from an integer message value). This can be verified using
+    distiguishable from an integer message value). This can be checked using
     \code{\link{is_error_value}}.
 
-    For \code{mode = "serial"}, attempting to unserialise a non-serialised
-    message will result in the error 'unknown input format'.
-
-    For all other modes, if an error occurred in conversion of the data to
-    the specified mode, a raw vector will be returned at \code{$data} instead
-    to allow for the data to be recovered.
+    If an error occurred in unserialization or conversion of the message data
+    to the specified mode, a raw vector will be returned instead to allow
+    recovery (accompanied by a warning).
 
 \strong{For the signalling version}: when the receive is complete,
     the supplied 'conditionVariable' is signalled by incrementing its value
@@ -100,13 +92,11 @@ msg$data
 res <- send_aio(s1, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
 msg <- recv_aio(s2, mode = "double", timeout = 100)
 msg
-msg$raw
 msg$data
 
 res <- send_aio(s1, "example message", mode = "raw", timeout = 100)
 msg <- recv_aio(s2, mode = "character", timeout = 100)
 call_aio(msg)
-msg$raw
 msg$data
 
 close(s1)

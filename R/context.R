@@ -41,6 +41,7 @@
 #'     For nano objects, use the \code{$context_open()} method, which will
 #'     attach a new context at \code{$context}. See \code{\link{nano}}.
 #'
+#' @seealso \code{\link{request}} and \code{\link{reply}} for use with contexts.
 #' @examples
 #' s <- socket("req", listen = "inproc://nanonext")
 #' ctx <- context(s)
@@ -100,20 +101,20 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #' @param execute a function which takes the received (converted) data as its
 #'     first argument. Can be an anonymous function of the form \code{function(x) do(x)}.
 #'     Additional arguments can also be passed in through '...'.
-#' @param send_mode [default 'serial'] whether data will be sent serialized or
-#'     as a raw vector. Use 'serial' for sending and receiving within R to ensure
-#'     perfect reproducibility. Use 'raw' for sending vectors of any type
-#'     (converted to a raw byte vector for sending) - essential when interfacing
-#'     with external applications. Alternatively, for performance, specify an
-#'     integer position in the vector of choices i.e. 1L for 'serial' or 2L for
-#'     'raw'.
+#' @param send_mode [default 'serial'] to send serialised R objects, or 'raw' to
+#'     send atomic vectors of any type as a raw byte vector. Use 'serial' to
+#'     ensure perfect reproducibility within R, although 'raw' must be used when
+#'     interfacing with external applications which do not understand R
+#'     serialisation. Alternatively, for performance, specify an integer position
+#'     in the vector of choices i.e. 1L for 'serial' or 2L for 'raw'.
 #' @param recv_mode [default 'serial'] mode of vector to be received - one of
 #'     'serial', 'character', 'complex', 'double', 'integer', 'logical',
-#'     'numeric', or 'raw'. The default 'serial' means a serialised R object,
-#'     for the other modes, the raw vector received will be converted into the
-#'     respective mode. Alternatively, for performance, specify an integer
-#'     position in the vector of choices e.g. 1L for 'serial', 2L for 'character'
-#'     etc.
+#'     'numeric', 'raw', or 'string'. The default 'serial' means a serialised R
+#'     object, for the other modes, the raw vector received will be converted
+#'     into the respective mode. Note that 'string' is defined here as a character
+#'     scalar and is a faster alternative to 'character' for receiving a single
+#'     string. Alternatively, for performance, specify an integer position in
+#'     the vector of choices e.g. 1L for 'serial', 2L for 'character' etc.
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout. Note
 #'     that this applies to receiving the request. The total elapsed time would
@@ -196,8 +197,7 @@ reply <- function(context,
 #'     for) the result.
 #'
 #'     If an error occured in the server process, a nul byte \code{00} will be
-#'     received (as \code{$data} if 'recv_mode' = 'serial', as \code{$raw}
-#'     otherwise). This allows an error to be easily distinguished from a NULL
+#'     received. This allows an error to be easily distinguished from a NULL
 #'     return value. \code{\link{is_nul_byte}} can be used to test for a nul byte.
 #'
 #'     It is recommended to use a new context for each request to ensure
@@ -223,11 +223,10 @@ request <- function(context,
                     data,
                     send_mode = c("serial", "raw"),
                     recv_mode = c("serial", "character", "complex", "double",
-                                  "integer", "logical", "numeric", "raw"),
-                    timeout = NULL,
-                    keep.raw = FALSE)
+                                  "integer", "logical", "numeric", "raw", "string"),
+                    timeout = NULL)
   data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout,
-                keep.raw, environment())
+                environment())
 
 #' Request over Context and Signal a Condition Variable
 #'
@@ -264,9 +263,8 @@ request_signal <- function(context,
                            data,
                            send_mode = c("serial", "raw"),
                            recv_mode = c("serial", "character", "complex", "double",
-                                         "integer", "logical", "numeric", "raw"),
+                                         "integer", "logical", "numeric", "raw", "string"),
                            timeout = NULL,
-                           keep.raw = FALSE,
                            cv)
-  data <- .Call(rnng_cv_request, context, data, send_mode, recv_mode, timeout,
-                keep.raw, cv, environment())
+  data <- .Call(rnng_cv_request, context, data, send_mode, recv_mode, timeout, cv,
+                environment())
