@@ -8,20 +8,21 @@
 request(
   context,
   data,
-  send_mode = c("serial", "raw"),
+  send_mode = c("serial", "raw", "next"),
   recv_mode = c("serial", "character", "complex", "double", "integer", "logical",
     "numeric", "raw", "string"),
-  timeout = NULL
+  timeout = NULL,
+  ack = FALSE
 )
 
 request_signal(
   context,
   data,
-  send_mode = c("serial", "raw"),
+  cv,
+  send_mode = c("serial", "raw", "next"),
   recv_mode = c("serial", "character", "complex", "double", "integer", "logical",
     "numeric", "raw", "string"),
-  timeout = NULL,
-  cv
+  timeout = NULL
 )
 }
 \arguments{
@@ -29,12 +30,13 @@ request_signal(
 
 \item{data}{an object (if send_mode = 'raw', a vector).}
 
-\item{send_mode}{[default 'serial'] to send serialised R objects, or 'raw' to
-send atomic vectors of any type as a raw byte vector. Use 'serial' to
-ensure perfect reproducibility within R, although 'raw' must be used when
+\item{send_mode}{[default 'serial'] one of 'serial' to send serialised R objects,
+'raw' to send atomic vectors of any type as a raw byte vector, or 'next'
+to send in a new R-compatible serialisation format. Use 'serial' to ensure
+perfect reproducibility within R, although 'raw' must be used when
 interfacing with external applications which do not understand R
 serialisation. Alternatively, for performance, specify an integer position
-in the vector of choices i.e. 1L for 'serial' or 2L for 'raw'.}
+in the vector of choices e.g. 1L for 'serial' or 2L for 'raw' etc.}
 
 \item{recv_mode}{[default 'serial'] mode of vector to be received - one of
 'serial', 'character', 'complex', 'double', 'integer', 'logical',
@@ -47,6 +49,10 @@ the vector of choices e.g. 1L for 'serial', 2L for 'character' etc.}
 
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
 applies a socket-specific default, usually the same as no timeout.}
+
+\item{ack}{[default FALSE] logical value whether to send an ack(nowledgement)
+back to the rep node (consisting of an empty message) when the async
+receive is complete.}
 
 \item{cv}{\strong{For the signalling version}: a 'conditionVariable' to
 signal when the async receive is complete.}

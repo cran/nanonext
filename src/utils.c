@@ -18,6 +18,7 @@
 
 #define NANONEXT_PROTOCOLS
 #define NANONEXT_SUPPLEMENTALS
+#define NANONEXT_MBED
 #include "nanonext.h"
 
 // internals -------------------------------------------------------------------
@@ -115,32 +116,6 @@ SEXP rnng_sleep(SEXP msec) {
 
 }
 
-SEXP rnng_random(SEXP n) {
-
-  SEXP vec;
-  R_xlen_t vlen;
-
-  switch (TYPEOF(n)) {
-  case INTSXP:
-  case LGLSXP:
-    vlen = (R_xlen_t) INTEGER(n)[0];
-    break;
-  case REALSXP:
-    vlen = (R_xlen_t) Rf_asInteger(n);
-    break;
-  default:
-    Rf_error("'n' must be integer or coercible to integer");
-  }
-
-  vec = Rf_allocVector(REALSXP, vlen);
-  double *pvec = REAL(vec);
-  for (R_xlen_t i = 0; i < vlen; i++)
-    pvec[i] = (double) nng_random();
-
-  return vec;
-
-}
-
 SEXP rnng_url_parse(SEXP url) {
 
   const char *up = CHAR(STRING_ELT(url, 0));
@@ -190,6 +165,7 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
                 SEXP data, SEXP response, SEXP timeout, SEXP tls) {
 
   const int conv = LOGICAL(convert)[0];
+  const char *addr = CHAR(STRING_ELT(http, 0));
   nng_url *url;
   nng_http_client *client;
   nng_http_req *req;
@@ -199,8 +175,11 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
   int xc;
   uint16_t code, relo;
 
-  if ((xc = nng_url_parse(&url, CHAR(STRING_ELT(http, 0)))))
+  if ((xc = nng_url_parse(&url, addr)))
     goto exitlevel1;
+
+  relocall:
+
   if ((xc = nng_http_client_alloc(&client, url)))
     goto exitlevel2;
   if ((xc = nng_http_req_alloc(&req, url)))
@@ -282,8 +261,9 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
   code = nng_http_res_get_status(res), relo = code >= 300 && code < 400;
 
   if (relo && LOGICAL(follow)[0]) {
-    SET_STRING_ELT(nano_addRedirect, 0, Rf_mkChar(nng_http_res_get_header(res, "Location")));
-    return rnng_ncurl(nano_addRedirect, convert, follow, method, headers, data, response, timeout, tls);
+    if ((xc = nng_url_parse(&url, nng_http_res_get_header(res, "Location"))))
+      goto exitlevel5;
+    goto relocall;
   }
 
   SEXP out, vec, rvec;
@@ -734,5 +714,56 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
     nng_tls_config_free(cfg);
   exitlevel1:
     ERROR_OUT(xc);
+
+}
+
+// Mbed TLS Random Data Generator ----------------------------------------------
+
+SEXP rnng_random(SEXP n, SEXP convert) {
+
+  int sz, xc;
+  switch (TYPEOF(n)) {
+  case INTSXP:
+  case LGLSXP:
+    sz = INTEGER(n)[0];
+    break;
+  case REALSXP:
+    sz = Rf_asInteger(n);
+    break;
+  default:
+    Rf_error("'n' must be integer or coercible to integer");
+  }
+
+  SEXP out;
+  unsigned char buf[sz];
+  char errbuf[1024];
+  mbedtls_entropy_context entropy;
+  mbedtls_ctr_drbg_context ctr_drbg;
+  const char *pers = "r-nanonext-rng";
+
+  mbedtls_entropy_init(&entropy);
+  mbedtls_ctr_drbg_init(&ctr_drbg);
+
+  if ((xc = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers))) ||
+      (xc = mbedtls_ctr_drbg_random(&ctr_drbg, buf, sz)))
+    goto exitlevel1;
+
+  mbedtls_ctr_drbg_free(&ctr_drbg);
+  mbedtls_entropy_free(&entropy);
+
+  if (LOGICAL(convert)[0]) {
+    out = nano_hashToChar(buf, sz);
+  } else {
+    out = Rf_allocVector(RAWSXP, sz);
+    memcpy(STDVEC_DATAPTR(out), buf, sz);
+  }
+
+  return out;
+
+  exitlevel1:
+  mbedtls_ctr_drbg_free(&ctr_drbg);
+  mbedtls_entropy_free(&entropy);
+  mbedtls_strerror(xc, errbuf, sizeof(errbuf));
+  Rf_error("%d | %s", xc, errbuf);
 
 }

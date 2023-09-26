@@ -4,20 +4,21 @@
 \alias{send}
 \title{Send}
 \usage{
-send(con, data, mode = c("serial", "raw"), block = NULL)
+send(con, data, mode = c("serial", "raw", "next"), block = NULL)
 }
 \arguments{
 \item{con}{a Socket, Context or Stream.}
 
 \item{data}{an object (a vector, if mode = 'raw').}
 
-\item{mode}{[default 'serial'] to send serialised R objects, or 'raw' to send
-atomic vectors of any type as a raw byte vector. For Streams, 'raw' is
+\item{mode}{[default 'serial'] one of 'serial' to send serialised R objects,
+'raw' to send atomic vectors of any type as a raw byte vector, or 'next'
+to send in a new R-compatible serialisation format. For Streams, 'raw' is
 the only option and this argument is ignored. Use 'serial' to ensure
 perfect reproducibility within R, although 'raw' must be used when
 interfacing with external applications which do not understand R
 serialisation. Alternatively, for performance, specify an integer position
-in the vector of choices i.e. 1L for 'serial' or 2L for 'raw'.}
+in the vector of choices e.g. 1L for 'serial' or 2L for 'raw' etc.}
 
 \item{block}{[default NULL] which applies the connection default (see section
 'Blocking' below). Specify logical TRUE to block until successful or FALSE
@@ -39,12 +40,15 @@ Send data over a connection (Socket, Context or Stream).
     queued for sending. Certain protocol / transport combinations may limit
     the number of messages that can be queued if they have yet to be received.
 
-    For Contexts and Streams: the default behaviour is blocking with
-    \code{block = TRUE}. This will wait until the send has completed. Set a
-    timeout in this case to ensure that the function returns under all scenarios.
-    As the underlying implementation uses an asynchronous send with a wait,
-    it is recommended to set a positive integer value for \code{block} rather
-    than FALSE.
+    For Contexts: the default behaviour is blocking with \code{block = TRUE}.
+    This will wait until the send has completed. Set to FALSE or an integer
+    timeout to ensure that the function returns under all scenarios.
+
+    For Streams: the default behaviour is blocking with \code{block = TRUE}.
+    This will wait until the send has completed. Set a timeout to ensure that
+    the function returns under all scenarios. As the underlying implementation
+    uses an asynchronous send with a wait, it is recommended to set a positive
+    integer value for \code{block} rather than FALSE.
 }
 
 \examples{

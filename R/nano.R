@@ -134,7 +134,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
     }
   }
 
-  nano[["close"]] <- function() close(.subset2(nano, "socket"))
+  nano[["close"]] <- function() reap(.subset2(nano, "socket"))
 
   nano[["dial"]] <- function(url = "inproc://nanonext", tls = NULL, autostart = TRUE) {
     r <- dial(socket, url = url, tls = tls, autostart = autostart)
@@ -171,19 +171,19 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
   }
 
   nano[["recv"]] <- function(mode = c("serial", "character", "complex", "double",
-                                      "integer", "logical", "numeric", "raw"),
+                                      "integer", "logical", "numeric", "raw", "string"),
                              block = NULL)
     recv(socket, mode = mode, block = block)
 
   nano[["recv_aio"]] <- function(mode = c("serial", "character", "complex", "double",
-                                          "integer", "logical", "numeric", "raw"),
+                                          "integer", "logical", "numeric", "raw", "string"),
                                  timeout = NULL)
     recv_aio(socket, mode = mode, timeout = timeout)
 
-  nano[["send"]] <- function(data, mode = c("serial", "raw"), block = NULL)
+  nano[["send"]] <- function(data, mode = c("serial", "raw", "next"), block = NULL)
     send(socket, data = data, mode = mode, block = block)
 
-  nano[["send_aio"]] <- function(data, mode = c("serial", "raw"), timeout = NULL)
+  nano[["send_aio"]] <- function(data, mode = c("serial", "raw", "next"), timeout = NULL)
     send_aio(socket, data = data, mode = mode, timeout = timeout)
 
   nano[["opt"]] <- function(name, value)
@@ -198,7 +198,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
            nano[["context_open"]] <- function() {
              if (is.null(sock2)) sock2 <<- socket
              nano[["context_close"]] <- function() if (length(sock2)) {
-               r <- close(socket)
+               r <- reap(socket)
                socket <<- sock2
                sock2 <<- NULL
                rm(list = c("context", "context_close"), envir = nano)
@@ -211,7 +211,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
            nano[["context_open"]] <- function() {
              if (is.null(sock2)) sock2 <<- socket
              nano[["context_close"]] <- function() if (length(sock2)) {
-               r <- close(socket)
+               r <- reap(socket)
                socket <<- sock2
                sock2 <<- NULL
                rm(list = c("context", "context_close"), envir = nano)
@@ -228,7 +228,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
            nano[["context_open"]] <- function() {
              if (is.null(sock2)) sock2 <<- socket
              nano[["context_close"]] <- function() if (length(sock2)) {
-               r <- close(socket)
+               r <- reap(socket)
                socket <<- sock2
                sock2 <<- NULL
                rm(list = c("context", "context_close"), envir = nano)
@@ -243,7 +243,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
            nano[["context_open"]] <- function() {
              if (is.null(sock2)) sock2 <<- socket
              nano[["context_close"]] <- function() if (length(sock2)) {
-               r <- close(socket)
+               r <- reap(socket)
                socket <<- sock2
                sock2 <<- NULL
                rm(list = c("context", "context_close"), envir = nano)

@@ -94,8 +94,12 @@ typedef struct nano_cv_s {
 } nano_cv;
 
 typedef struct nano_cv_aio_s {
+  nng_aio *aio;
+  nano_aio_typ type;
+  int mode;
+  int result;
+  void *data;
   nano_cv *cv;
-  nano_aio *aio;
 } nano_cv_aio;
 
 typedef struct nano_cv_duo_s {
@@ -123,6 +127,12 @@ typedef struct nano_cv_duo_s {
 #define SHA384_KEY_SIZE 48
 #define SHA512_KEY_SIZE 64
 
+#endif
+
+#ifdef NANONEXT_MBED
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/error.h>
 #endif
 
 #ifdef NANONEXT_KEYCERT
@@ -175,12 +185,14 @@ extern SEXP nano_decode(unsigned char *, size_t, const int);
 extern void dialer_finalizer(SEXP);
 extern void nano_encode(nano_buf *, SEXP);
 extern void listener_finalizer(SEXP);
-extern Rboolean nano_encodes(SEXP);
+extern int nano_encodes(SEXP);
 extern int nano_matcharg(SEXP);
 extern int nano_matchargs(SEXP);
 extern void nano_serialize(nano_buf *, SEXP);
+extern void nano_serialize_next(nano_buf *, SEXP);
 extern void nano_serialize_xdr(nano_buf *, SEXP);
 extern SEXP nano_unserialize(unsigned char *, const size_t);
+extern SEXP nano_hashToChar(unsigned char *, const size_t);
 extern SEXP rawToChar(unsigned char *, const size_t);
 extern void socket_finalizer(SEXP);
 
@@ -204,8 +216,8 @@ extern SEXP nano_StreamSymbol;
 extern SEXP nano_TextframesSymbol;
 extern SEXP nano_TlsSymbol;
 extern SEXP nano_UrlSymbol;
+extern SEXP nano_ValueSymbol;
 
-extern SEXP nano_addRedirect;
 extern SEXP nano_aioFormals;
 extern SEXP nano_aioFuncs;
 extern SEXP nano_aioNFuncs;
@@ -256,10 +268,11 @@ extern SEXP rnng_ncurl_session_close(SEXP);
 extern SEXP rnng_ncurl_transact(SEXP);
 extern SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_protocol_open(SEXP, SEXP);
-extern SEXP rnng_random(SEXP);
+extern SEXP rnng_random(SEXP, SEXP);
+extern SEXP rnng_reap(SEXP);
 extern SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_set_opt(SEXP, SEXP, SEXP);

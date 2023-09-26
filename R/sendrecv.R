@@ -22,13 +22,14 @@
 #'
 #' @param con a Socket, Context or Stream.
 #' @param data an object (a vector, if mode = 'raw').
-#' @param mode [default 'serial'] to send serialised R objects, or 'raw' to send
-#'     atomic vectors of any type as a raw byte vector. For Streams, 'raw' is
+#' @param mode [default 'serial'] one of 'serial' to send serialised R objects,
+#'     'raw' to send atomic vectors of any type as a raw byte vector, or 'next'
+#'     to send in a new R-compatible serialisation format. For Streams, 'raw' is
 #'     the only option and this argument is ignored. Use 'serial' to ensure
 #'     perfect reproducibility within R, although 'raw' must be used when
 #'     interfacing with external applications which do not understand R
 #'     serialisation. Alternatively, for performance, specify an integer position
-#'     in the vector of choices i.e. 1L for 'serial' or 2L for 'raw'.
+#'     in the vector of choices e.g. 1L for 'serial' or 2L for 'raw' etc.
 #' @param block [default NULL] which applies the connection default (see section
 #'     'Blocking' below). Specify logical TRUE to block until successful or FALSE
 #'     to return immediately even if unsuccessful (e.g. if no connection is
@@ -44,12 +45,15 @@
 #'     queued for sending. Certain protocol / transport combinations may limit
 #'     the number of messages that can be queued if they have yet to be received.
 #'
-#'     For Contexts and Streams: the default behaviour is blocking with
-#'     \code{block = TRUE}. This will wait until the send has completed. Set a
-#'     timeout in this case to ensure that the function returns under all scenarios.
-#'     As the underlying implementation uses an asynchronous send with a wait,
-#'     it is recommended to set a positive integer value for \code{block} rather
-#'     than FALSE.
+#'     For Contexts: the default behaviour is blocking with \code{block = TRUE}.
+#'     This will wait until the send has completed. Set to FALSE or an integer
+#'     timeout to ensure that the function returns under all scenarios.
+#'
+#'     For Streams: the default behaviour is blocking with \code{block = TRUE}.
+#'     This will wait until the send has completed. Set a timeout to ensure that
+#'     the function returns under all scenarios. As the underlying implementation
+#'     uses an asynchronous send with a wait, it is recommended to set a positive
+#'     integer value for \code{block} rather than FALSE.
 #'
 #' @seealso \code{\link{send_aio}} for asynchronous send.
 #' @examples
@@ -74,7 +78,7 @@
 #'
 #' @export
 #'
-send <- function(con, data, mode = c("serial", "raw"), block = NULL)
+send <- function(con, data, mode = c("serial", "raw", "next"), block = NULL)
   .Call(rnng_send, con, data, mode, block)
 
 #' Receive
@@ -86,11 +90,11 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL)
 #'     'character', 'complex', 'double', 'integer', 'logical', 'numeric', 'raw',
 #'     or 'string'. The default 'serial' means a serialised R object, for the
 #'     other modes, the raw vector received will be converted into the respective
-#'     mode. Note that 'string' is defined here as a character scalar and is a
-#'     faster alternative to 'character' for receiving a single string. For
-#'     Streams, 'serial' is not an option and the default is 'character'.
-#'     Alternatively, for performance, specify an integer position in the vector
-#'     of choices e.g. 1L for 'serial', 2L for 'character' etc.
+#'     mode. Note that 'string' is a faster alternative to 'character' for
+#'     receiving a character vector of length 1. For Streams, 'serial' is not an
+#'     option and the default is 'character'. Alternatively, for performance,
+#'     specify an integer position in the vector of choices e.g. 1L for 'serial',
+#'     2L for 'character' etc.
 #' @param n [default 65536L] applicable to Streams only, the maximum number of
 #'     bytes to receive. Can be an over-estimate, but note that a buffer of this
 #'     size is reserved.
@@ -111,11 +115,15 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL)
 #'     For Sockets: the default behaviour is non-blocking with \code{block = FALSE}.
 #'     This will return immediately with an error if no messages are available.
 #'
-#'     For Contexts and Streams: the default behaviour is blocking with \code{block = TRUE}.
-#'     This will wait until a message is received. Set a timeout in this case to
-#'     ensure that the function returns under all scenarios. As the underlying
-#'     implementation uses an asynchronous send with a wait, it is recommended
-#'     to set a positive integer value for \code{block} rather than FALSE.
+#'     For Contexts: the default behaviour is blocking with \code{block = TRUE}.
+#'     This will wait until a message is received. Set to FALSE or an integer
+#'     timeout to ensure that the function returns under all scenarios.
+#'
+#'     For Streams: the default behaviour is blocking with \code{block = TRUE}.
+#'     This will wait until a message is received. Set a timeout to ensure that
+#'     the function returns under all scenarios. As the underlying implementation
+#'     uses an asynchronous send with a wait, it is recommended to set a positive
+#'     integer value for \code{block} rather than FALSE.
 #'
 #' @seealso \code{\link{recv_aio}} for asynchronous receive.
 #' @examples

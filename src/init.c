@@ -40,6 +40,7 @@ SEXP nano_StreamSymbol;
 SEXP nano_TextframesSymbol;
 SEXP nano_TlsSymbol;
 SEXP nano_UrlSymbol;
+SEXP nano_ValueSymbol;
 
 SEXP nano_addRedirect;
 SEXP nano_aioFormals;
@@ -59,7 +60,6 @@ nng_mtx *shr_mtx;
 
 static void RegisterSymbols(void) {
   nano_AioSymbol = Rf_install("aio");
-  nano_AioHttpSymbol = Rf_install("rnng_aio_http");
   nano_ContextSymbol = Rf_install("context");
   nano_CvSymbol = Rf_install("cv");
   nano_DataSymbol = Rf_install("data");
@@ -79,19 +79,19 @@ static void RegisterSymbols(void) {
   nano_TextframesSymbol = Rf_install("textframes");
   nano_TlsSymbol = Rf_install("tls");
   nano_UrlSymbol = Rf_install("url");
+  nano_ValueSymbol = Rf_install("value");
 }
 
 static void PreserveObjects(void) {
-  R_PreserveObject(nano_addRedirect = Rf_allocVector(STRSXP, 1));
   R_PreserveObject(nano_aioFormals = Rf_cons(nano_AioSymbol, R_NilValue));
   R_PreserveObject(nano_aioFuncs = Rf_allocVector(LISTSXP, 3));
   SETCAR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
   SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg"), nano_DataSymbol));
   SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg2"), nano_DataSymbol));
   R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 3));
-  SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(1)));
-  SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(2)));
-  SETCADDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, nano_AioHttpSymbol, nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarInteger(3)));
+  SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(0)));
+  SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(1)));
+  SETCADDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(NA_LOGICAL)));
   R_PreserveObject(nano_error = Rf_cons(Rf_mkString("errorValue"), R_NilValue));
   SET_TAG(nano_error, R_ClassSymbol);
   R_PreserveObject(nano_ncurlAio = Rf_cons(Rf_allocVector(STRSXP, 2), R_NilValue));
@@ -120,7 +120,6 @@ static void ReleaseObjects(void) {
   R_ReleaseObject(nano_aioNFuncs);
   R_ReleaseObject(nano_aioFuncs);
   R_ReleaseObject(nano_aioFormals);
-  R_ReleaseObject(nano_addRedirect);
 }
 
 static const R_CallMethodDef callMethods[] = {
@@ -162,10 +161,11 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 2},
-  {"rnng_random", (DL_FUNC) &rnng_random, 1},
+  {"rnng_random", (DL_FUNC) &rnng_random, 2},
+  {"rnng_reap", (DL_FUNC) &rnng_reap, 1},
   {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
   {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 5},
-  {"rnng_request", (DL_FUNC) &rnng_request, 6},
+  {"rnng_request", (DL_FUNC) &rnng_request, 7},
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},

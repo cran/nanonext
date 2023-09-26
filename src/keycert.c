@@ -77,19 +77,19 @@ static int parse_serial_decimal_format(unsigned char *obuf, size_t obufmax,
 
 SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
-  uint8_t failed = 1;
+  const char *common = CHAR(STRING_ELT(cn, 0));
   const int interactive = LOGICAL(inter)[0];
+  mbedtls_entropy_context entropy;
+  mbedtls_ctr_drbg_context ctr_drbg;
   mbedtls_pk_context key;
-  mbedtls_entropy_context entropyk;
-  mbedtls_ctr_drbg_context ctr_drbgk;
-  const char *persk = "gen_key";
+  const char *pers = "r-nanonext-key";
 
   unsigned char key_buf[16000];
   memset(key_buf, 0, 16000);
 
+  mbedtls_entropy_init(&entropy);
+  mbedtls_ctr_drbg_init(&ctr_drbg);
   mbedtls_pk_init(&key);
-  mbedtls_ctr_drbg_init(&ctr_drbgk);
-  mbedtls_entropy_init(&entropyk);
 
   const char *serialvalue = "1";          /* serial number string (decimal)     */
   const char *not_before = "20010101000000";  /* validity period not before   */
@@ -99,28 +99,22 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
   const int version = 2;                /* CRT version                        */
   const mbedtls_md_type_t md = MBEDTLS_MD_SHA256;   /* Hash used for signing  */
 
-  R_xlen_t clen = Rf_xlength(cn);
-  char issuer_name[clen + 18];          /* issuer name for certificate        */
-  snprintf(issuer_name, clen + 18, "CN=%s,O=Hibiki,C=JP", CHAR(STRING_ELT(cn, 0)));
+  size_t clen = strlen(common) + 20;
+  char issuer_name[clen];          /* issuer name for certificate        */
+  snprintf(issuer_name, clen, "CN=%s,O=Nanonext,C=JP", common);
 
-  int ret = 1;
-  if (interactive) REprintf("Generating key and certificate [    ]");
+  int ret, exit = 1;
+  if (interactive) REprintf("Generating key + certificate [    ]");
   mbedtls_x509_crt issuer_crt;
   mbedtls_pk_context loaded_issuer_key;
   mbedtls_pk_context *issuer_key = &loaded_issuer_key;
   char buf[1024];
   mbedtls_x509_csr csr; // #if defined(MBEDTLS_X509_CSR_PARSE_C)
   mbedtls_x509write_cert crt;
-  mbedtls_entropy_context entropy;
-  mbedtls_ctr_drbg_context ctr_drbg;
-  const char *pers = "crt example app";
-
-  if (interactive) REprintf("\b\b\b\b\b.   ]");
+  const char *persn = "certificate";
 
   mbedtls_x509write_crt_init(&crt);
   mbedtls_pk_init(&loaded_issuer_key);
-  mbedtls_ctr_drbg_init(&ctr_drbg);
-  mbedtls_entropy_init(&entropy);
   mbedtls_x509_csr_init(&csr); // #if defined(MBEDTLS_X509_CSR_PARSE_C)
   mbedtls_x509_crt_init(&issuer_crt);
   memset(buf, 0, sizeof(buf));
@@ -136,13 +130,15 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
   mbedtls_mpi_init(&serial);
 #endif
 
-  if ((ret = mbedtls_ctr_drbg_seed(&ctr_drbgk, mbedtls_entropy_func, &entropyk, (const unsigned char *) persk, strlen(persk))) ||
+  if (interactive) REprintf("\b\b\b\b\b.   ]");
+
+  if ((ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers))) ||
       (ret = mbedtls_pk_setup(&key, mbedtls_pk_info_from_type((mbedtls_pk_type_t) MBEDTLS_PK_RSA))))
     goto exitlevel1;
 
   if (interactive) REprintf("\b\b\b\b\b..  ]");
 
-  if ((ret = mbedtls_rsa_gen_key(mbedtls_pk_rsa(key), mbedtls_ctr_drbg_random, &ctr_drbgk, 4096, 65537)))
+  if ((ret = mbedtls_rsa_gen_key(mbedtls_pk_rsa(key), mbedtls_ctr_drbg_random, &ctr_drbg, 4096, 65537)))
     goto exitlevel1;
 
   if (interactive) REprintf("\b\b\b\b\b... ]");
@@ -152,7 +148,7 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
   size_t klen = strlen((char *) key_buf);
 
-  if ((ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers))) ||
+  if ((ret = mbedtls_ctr_drbg_reseed(&ctr_drbg, (const unsigned char *) persn, strlen(persn))) ||
 #if MBEDTLS_VERSION_MAJOR == 3 && MBEDTLS_VERSION_MINOR >= 4 || MBEDTLS_VERSION_MAJOR >= 4
       (ret = parse_serial_decimal_format(serial, sizeof(serial), serialvalue, &serial_len)) ||
 #else
@@ -181,18 +177,11 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
   if ((ret = mbedtls_x509write_crt_set_serial(&crt, &serial)) ||
 #endif
       (ret = mbedtls_x509write_crt_set_validity(&crt, not_before, not_after)) ||
-      (ret = mbedtls_x509write_crt_set_basic_constraints(&crt, is_ca, max_pathlen)))
+      (ret = mbedtls_x509write_crt_set_basic_constraints(&crt, is_ca, max_pathlen)) ||
+      (ret = mbedtls_x509write_crt_set_subject_key_identifier(&crt)) ||
+      (ret = mbedtls_x509write_crt_set_authority_key_identifier(&crt)) ||
+      (ret = mbedtls_x509write_crt_pem(&crt, output_buf, 4096, mbedtls_ctr_drbg_random, &ctr_drbg)))
     goto exitlevel1;
-
-  if ((ret = mbedtls_x509write_crt_set_subject_key_identifier(&crt)) ||
-      (ret = mbedtls_x509write_crt_set_authority_key_identifier(&crt)))
-    goto exitlevel1; // #if defined(MBEDTLS_SHA1_C)
-
-  ret = mbedtls_x509write_crt_pem(&crt, output_buf, 4096, mbedtls_ctr_drbg_random, &ctr_drbg);
-  if (ret < 0)
-    goto exitlevel1;
-
-  if (interactive) REprintf("\b\b\b\b\b....]");
 
   SEXP vec, kcstr, cstr;
   const char *names[] = {"server", "client", ""};
@@ -206,8 +195,8 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
   SET_STRING_ELT(cstr, 0, Rf_mkChar((char *) &output_buf));
   SET_STRING_ELT(cstr, 1, R_BlankString);
 
-  failed = 0;
   if (interactive) REprintf("\b\b\b\b\bdone]\n");
+  exit = 0;
 
   exitlevel1:
 
@@ -218,14 +207,11 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 #if MBEDTLS_VERSION_MAJOR == 3 && MBEDTLS_VERSION_MINOR < 4 || MBEDTLS_VERSION_MAJOR < 3
   mbedtls_mpi_free(&serial);
 #endif
+  mbedtls_pk_free(&key);
   mbedtls_ctr_drbg_free(&ctr_drbg);
   mbedtls_entropy_free(&entropy);
 
-  mbedtls_pk_free(&key);
-  mbedtls_ctr_drbg_free(&ctr_drbgk);
-  mbedtls_entropy_free(&entropyk);
-
-  if (failed) {
+  if (exit) {
     mbedtls_strerror(ret, buf, sizeof(buf));
     Rf_error("%d | %s", ret, buf);
   }

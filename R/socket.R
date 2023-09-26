@@ -75,6 +75,19 @@
 #'
 #'     Please see \link{protocols} for further documentation.
 #'
+#' @section Transports:
+#'
+#'     The following communications transports may be used:
+#'     \itemize{
+#'     \item{Inproc (in-process) - url: 'inproc://'}
+#'     \item{IPC (inter-process communications) - url: 'ipc://' (or 'abstract://'
+#'     on Linux)}
+#'     \item{TCP and TLS over TCP - url: 'tcp://' and 'tls+tcp://'}
+#'     \item{WebSocket and TLS over WebSocket - url: 'ws://' and 'wss://'}
+#'     }
+#'
+#'     Please see \link{transports} for further documentation.
+#'
 #' @examples
 #' s <- socket(protocol = "req", listen = "inproc://nanosocket")
 #' s
@@ -133,6 +146,8 @@ socket <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
 #'     will be terminated and any new operations will fail after the connection
 #'     is closed.
 #'
+#' @seealso \code{\link{reap}}
+#'
 #' @name close
 #' @rdname close
 #'
@@ -143,3 +158,32 @@ NULL
 #' @export
 #'
 close.nanoSocket <- function(con, ...) invisible(.Call(rnng_close, con))
+
+#' Reap
+#'
+#' A faster alternative to \code{close} for Sockets, Contexts, Listeners and
+#'     Dialers avoiding S3 method dispatch.
+#'
+#' @param con a Socket, Context, Listener or Dialer.
+#'
+#' @return Invisibly, an integer exit code (zero on success).
+#'
+#' @details May be used on unclassed external pointers e.g. those created by
+#'     \code{\link{.context}}.
+#'
+#' @seealso \code{\link{close}}
+#'
+#' @examples
+#' s <- socket("req")
+#' listen(s)
+#' dial(s)
+#' ctx <- .context(s)
+#'
+#' reap(ctx)
+#' reap(s[["dialer"]][[1]])
+#' reap(s[["listener"]][[1]])
+#' reap(s)
+#'
+#' @export
+#'
+reap <- function(con) .Call(rnng_reap, con)

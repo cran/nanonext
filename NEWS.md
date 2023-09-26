@@ -1,3 +1,20 @@
+# nanonext 0.10.1
+
+#### New Features
+
+* `request()` adds logical argument 'ack', which sends an ack(nowledgement) back to the rep node upon a successful async message receive.
+* `reap()` implemented as a faster alternative to `close()` for Sockets, Contexts, Listeners and Dialers - avoiding S3 method dispatch, hence works for unclassed external pointers created by `.context()`.
+* `random()` updated to use the Mbed TLS library to generate random bytes. Adds a 'convert' argument for specifying whether to return a raw vector or character string.
+* Adds 'next' as a mode for send functions, as a 100% compatible R serialisation format (may be received using mode 'serial').
+
+#### Updates
+
+* `write_cert()` has been optimised for higher efficiency and faster operation.
+* `send()` and `recv()` over contexts now use more efficient synchronous methods where available.
+* Fixes package installation failures where the R default C compiler command contains additional flags (thanks @potash #16).
+* Performance improvements due to simplification of the internal structure of 'aio' objects.
+* Rolls forward bundled 'libnng' to v1.6.0 alpha (a54820f).
+
 # nanonext 0.10.0
 
 #### New Features
