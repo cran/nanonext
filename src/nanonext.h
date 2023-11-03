@@ -86,27 +86,6 @@ typedef struct nano_handle_s {
   nng_tls_config *cfg;
 } nano_handle;
 
-typedef struct nano_cv_s {
-  int condition;
-  uint8_t flag;
-  nng_mtx *mtx;
-  nng_cv *cv;
-} nano_cv;
-
-typedef struct nano_cv_aio_s {
-  nng_aio *aio;
-  nano_aio_typ type;
-  int mode;
-  int result;
-  void *data;
-  nano_cv *cv;
-} nano_cv_aio;
-
-typedef struct nano_cv_duo_s {
-  nano_cv *cv;
-  nano_cv *cv2;
-} nano_cv_duo;
-
 #endif
 
 #ifdef NANONEXT_TIME
@@ -120,12 +99,6 @@ typedef struct nano_cv_duo_s {
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
 #include <mbedtls/version.h>
-
-#define SHA1_KEY_SIZE 20
-#define SHA224_KEY_SIZE 28
-#define SHA256_KEY_SIZE 32
-#define SHA384_KEY_SIZE 48
-#define SHA512_KEY_SIZE 64
 
 #endif
 
@@ -163,6 +136,8 @@ typedef struct nano_cv_duo_s {
 #define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
 #define NANONEXT_INIT_BUFSIZE 16384
 #define NANONEXT_SERIAL_VER 3
+#define NANONEXT_INT_STRLEN 12
+#define NANONEXT_ACK_MS 100
 #define NANO_ALLOC(x, sz)                                      \
   (x)->buf = R_Calloc(sz, unsigned char);                      \
   (x)->len = (R_xlen_t) sz;                                    \
@@ -225,6 +200,8 @@ extern SEXP nano_error;
 extern SEXP nano_ncurlAio;
 extern SEXP nano_ncurlSession;
 extern SEXP nano_recvAio;
+extern SEXP nano_refHook;
+extern SEXP nano_refList;
 extern SEXP nano_sendAio;
 extern SEXP nano_success;
 extern SEXP nano_unresolved;
@@ -248,11 +225,13 @@ extern SEXP rnng_cv_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_cv_reset(SEXP);
 extern SEXP rnng_cv_signal(SEXP);
 extern SEXP rnng_cv_until(SEXP, SEXP);
+extern SEXP rnng_cv_until2(SEXP, SEXP);
 extern SEXP rnng_cv_value(SEXP);
 extern SEXP rnng_cv_wait(SEXP);
 extern SEXP rnng_dial(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_dialer_close(SEXP);
 extern SEXP rnng_dialer_start(SEXP, SEXP);
+extern void rnng_fini(void);
 extern SEXP rnng_get_opt(SEXP, SEXP);
 extern SEXP rnng_is_error_value(SEXP);
 extern SEXP rnng_is_nul_byte(SEXP);
@@ -266,13 +245,14 @@ extern SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_ncurl_session(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_ncurl_session_close(SEXP);
 extern SEXP rnng_ncurl_transact(SEXP);
+extern SEXP rnng_next_mode(SEXP, SEXP, SEXP);
 extern SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_protocol_open(SEXP, SEXP);
 extern SEXP rnng_random(SEXP, SEXP);
 extern SEXP rnng_reap(SEXP);
 extern SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP rnng_set_opt(SEXP, SEXP, SEXP);

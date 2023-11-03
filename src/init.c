@@ -50,6 +50,8 @@ SEXP nano_error;
 SEXP nano_ncurlAio;
 SEXP nano_ncurlSession;
 SEXP nano_recvAio;
+SEXP nano_refHook;
+SEXP nano_refList;
 SEXP nano_sendAio;
 SEXP nano_success;
 SEXP nano_unresolved;
@@ -92,8 +94,10 @@ static void PreserveObjects(void) {
   SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(0)));
   SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(1)));
   SETCADDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(NA_LOGICAL)));
-  R_PreserveObject(nano_error = Rf_cons(Rf_mkString("errorValue"), R_NilValue));
+  R_PreserveObject(nano_error = Rf_cons(Rf_allocVector(STRSXP, 2), R_NilValue));
   SET_TAG(nano_error, R_ClassSymbol);
+  SET_STRING_ELT(CAR(nano_error), 0, Rf_mkChar("errorValue"));
+  SET_STRING_ELT(CAR(nano_error), 1, Rf_mkChar("try-error"));
   R_PreserveObject(nano_ncurlAio = Rf_cons(Rf_allocVector(STRSXP, 2), R_NilValue));
   SET_TAG(nano_ncurlAio, R_ClassSymbol);
   SET_STRING_ELT(CAR(nano_ncurlAio), 0, Rf_mkChar("ncurlAio"));
@@ -102,6 +106,7 @@ static void PreserveObjects(void) {
   SET_TAG(nano_ncurlSession, R_ClassSymbol);
   R_PreserveObject(nano_recvAio = Rf_cons(Rf_mkString("recvAio"), R_NilValue));
   SET_TAG(nano_recvAio, R_ClassSymbol);
+  R_PreserveObject(nano_refHook = Rf_list2(R_NilValue, R_NilValue));
   R_PreserveObject(nano_sendAio = Rf_cons(Rf_mkString("sendAio"), R_NilValue));
   SET_TAG(nano_sendAio, R_ClassSymbol);
   R_PreserveObject(nano_success = Rf_ScalarInteger(0));
@@ -113,6 +118,7 @@ static void ReleaseObjects(void) {
   R_ReleaseObject(nano_unresolved);
   R_ReleaseObject(nano_success);
   R_ReleaseObject(nano_sendAio);
+  R_ReleaseObject(nano_refHook);
   R_ReleaseObject(nano_recvAio);
   R_ReleaseObject(nano_ncurlSession);
   R_ReleaseObject(nano_ncurlAio);
@@ -121,6 +127,11 @@ static void ReleaseObjects(void) {
   R_ReleaseObject(nano_aioFuncs);
   R_ReleaseObject(nano_aioFormals);
 }
+
+static const R_CMethodDef cMethods[] = {
+  {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
+  {NULL, NULL, 0, NULL}
+};
 
 static const R_CallMethodDef callMethods[] = {
   {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
@@ -140,6 +151,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_cv_reset", (DL_FUNC) &rnng_cv_reset, 1},
   {"rnng_cv_signal", (DL_FUNC) &rnng_cv_signal, 1},
   {"rnng_cv_until", (DL_FUNC) &rnng_cv_until, 2},
+  {"rnng_cv_until2", (DL_FUNC) &rnng_cv_until2, 2},
   {"rnng_cv_value", (DL_FUNC) &rnng_cv_value, 1},
   {"rnng_cv_wait", (DL_FUNC) &rnng_cv_wait, 1},
   {"rnng_dial", (DL_FUNC) &rnng_dial, 5},
@@ -159,13 +171,14 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
   {"rnng_ncurl_session_close", (DL_FUNC) &rnng_ncurl_session_close, 1},
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
+  {"rnng_next_mode", (DL_FUNC) &rnng_next_mode, 3},
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 2},
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
   {"rnng_reap", (DL_FUNC) &rnng_reap, 1},
   {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
   {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 5},
-  {"rnng_request", (DL_FUNC) &rnng_request, 7},
+  {"rnng_request", (DL_FUNC) &rnng_request, 6},
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},
@@ -205,10 +218,11 @@ static const R_ExternalMethodDef externalMethods[] = {
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
+  nano_refList = R_NilValue;
 #if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
   nng_mtx_alloc(&shr_mtx);
 #endif
-  R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
+  R_registerRoutines(dll, cMethods, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
 }

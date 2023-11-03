@@ -1,3 +1,18 @@
+# nanonext 0.10.4
+
+#### New Features
+
+* `nextmode()` configures settings for send mode 'next'. Registers hook functions for custom serialization and unserialization of reference objects (such as those accessed via an external pointer).
+* `.until()` contains revised behaviour for this synchronisation primitive, returning FALSE instead of TRUE if the timeout has been reached. This function will replace `until()` in a future package version.
+
+#### Updates
+
+* `lock()` supplying 'cv' has improved behaviour which locks the socket whilst allowing for both initial connections and re-connections (when the 'cv' is registered for both add and remove pipe events).
+* Improves listener / dialer logic for TLS connections, allowing *inter alia* synchronous dials.
+* `request()` argument 'ack' removed due to stability considerations.
+* Fixes memory leaks detected with valgrind.
+* Upgrades bundled 'libmbedtls' to v 3.5.0.
+
 # nanonext 0.10.2
 
 #### Updates

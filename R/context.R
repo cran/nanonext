@@ -101,21 +101,19 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #' @param execute a function which takes the received (converted) data as its
 #'     first argument. Can be an anonymous function of the form \code{function(x) do(x)}.
 #'     Additional arguments can also be passed in through '...'.
-#' @param send_mode [default 'serial'] one of 'serial' to send serialised R objects,
-#'     'raw' to send atomic vectors of any type as a raw byte vector, or 'next'
-#'     to send in a new R-compatible serialisation format. Use 'serial' to ensure
-#'     perfect reproducibility within R, although 'raw' must be used when
-#'     interfacing with external applications which do not understand R
-#'     serialisation. Alternatively, for performance, specify an integer position
-#'     in the vector of choices e.g. 1L for 'serial' or 2L for 'raw' etc.
+#' @param send_mode [default 'serial'] one of 'serial' to send serialised R
+#'     objects, 'raw' to send atomic vectors of any type as a raw byte vector,
+#'     or 'next' (see 'Send Modes' section below). Alternatively, specify an
+#'     integer position in the vector of choices e.g. 1L for 'serial' or 2L for
+#'     'raw' etc.
 #' @param recv_mode [default 'serial'] mode of vector to be received - one of
 #'     'serial', 'character', 'complex', 'double', 'integer', 'logical',
 #'     'numeric', 'raw', or 'string'. The default 'serial' means a serialised R
 #'     object, for the other modes, the raw vector received will be converted
-#'     into the respective mode. Note that 'string' is defined here as a character
-#'     scalar and is a faster alternative to 'character' for receiving a single
-#'     string. Alternatively, for performance, specify an integer position in
-#'     the vector of choices e.g. 1L for 'serial', 2L for 'character' etc.
+#'     into the respective mode. 'string' is a faster alternative to 'character'
+#'     for receiving a length 1 character string. Alternatively, specify an
+#'     integer position in the vector of choices e.g. 1L for 'serial', 2L for
+#'     'character' etc.
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout. Note
 #'     that this applies to receiving the request. The total elapsed time would
@@ -135,6 +133,8 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #'     nul byte) will be sent in reply to the client to signal an error. This is
 #'     to be distinguishable from a possible return value. \code{\link{is_nul_byte}}
 #'     can be used to test for a nul byte.
+#'
+#' @inheritSection send Send Modes
 #'
 #' @examples
 #' req <- socket("req", listen = "tcp://127.0.0.1:6546")
@@ -184,9 +184,6 @@ reply <- function(context,
 #' @param data an object (if send_mode = 'raw', a vector).
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout.
-#' @param ack [default FALSE] logical value whether to send an ack(nowledgement)
-#'     back to the rep node (consisting of an empty message) when the async
-#'     receive is complete.
 #'
 #' @return A 'recvAio' (object of class 'recvAio') (invisibly).
 #'
@@ -209,6 +206,8 @@ reply <- function(context,
 #'     is closed when all references to the returned 'recvAio' are removed and
 #'     the object is garbage collected.
 #'
+#' @inheritSection send Send Modes
+#'
 #' @examples
 #' req <- socket("req", listen = "tcp://127.0.0.1:6546")
 #' rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
@@ -228,10 +227,8 @@ request <- function(context,
                     send_mode = c("serial", "raw", "next"),
                     recv_mode = c("serial", "character", "complex", "double",
                                   "integer", "logical", "numeric", "raw", "string"),
-                    timeout = NULL,
-                    ack = FALSE)
-  data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, ack,
-                environment())
+                    timeout = NULL)
+  data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, environment())
 
 #' Request over Context and Signal a Condition Variable
 #'
@@ -271,5 +268,4 @@ request_signal <- function(context,
                            recv_mode = c("serial", "character", "complex", "double",
                                          "integer", "logical", "numeric", "raw", "string"),
                            timeout = NULL)
-  data <- .Call(rnng_cv_request, context, data, cv, send_mode, recv_mode, timeout,
-                environment())
+  data <- .Call(rnng_cv_request, context, data, cv, send_mode, recv_mode, timeout, environment())

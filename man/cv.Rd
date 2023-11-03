@@ -4,6 +4,7 @@
 \alias{cv}
 \alias{wait}
 \alias{until}
+\alias{.until}
 \alias{cv_value}
 \alias{cv_reset}
 \alias{cv_signal}
@@ -14,6 +15,8 @@ cv()
 wait(cv)
 
 until(cv, msec)
+
+.until(cv, msec)
 
 cv_value(cv)
 
@@ -33,6 +36,9 @@ For \strong{cv}: a 'conditionVariable' object.
     For \strong{wait} and \strong{until}: (invisibly) logical TRUE, or else
     FALSE if a flag has been set.
 
+    For \strong{.until}: (invisibly) logical TRUE if signalled, or else FALSE
+    if the timeout was reached.
+
     For \strong{cv_value}: integer value of the condition variable.
 
     For \strong{cv_reset} and \strong{cv_signal}: zero (invisibly).
@@ -42,10 +48,10 @@ For \strong{cv}: a 'conditionVariable' object.
     the object).
 
 \code{wait} waits on a condition being signalled by completion of an
-    asynchronous receive.
+    asynchronous receive or pipe event.
 
 \code{until} waits until a future time on a condition being signalled by
-    completion of an asynchronous receive.
+    completion of an asynchronous receive or pipe event.
 
 \code{cv_value} inspects the internal value of a condition variable.
 
@@ -87,8 +93,8 @@ Pass the 'conditionVariable' to the signalling forms of the
 
     The condition variable also contains a flag that certain signalling
     functions such as \code{\link{pipe_notify}} can set. When this flag has
-    been set, all subsequent \code{wait} or \code{until} calls will return
-    logical FALSE instead of TRUE.
+    been set, all subsequent \code{wait} calls will return logical FALSE
+    instead of TRUE.
 
     Note that the flag is not automatically reset, but may be reset manually
     using \code{cv_reset}.

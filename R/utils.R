@@ -130,24 +130,26 @@ random <- function(n = 1L, convert = TRUE) .Call(rnng_random, n, convert)
 #'
 #' @param url character string containing a URL.
 #'
-#' @return A named character vector of length 10, comprising: \itemize{
-#'     \item{\code{rawurl}} {- the unparsed URL string.}
-#'     \item{\code{scheme}} {- the URL scheme, such as "http" or "inproc"
-#'     (always lower case).}
-#'     \item{\code{userinfo}} {- the username and password if supplied in the
-#'     URL string.}
-#'     \item{\code{host}} {- the full host part of the URL, including the port
-#'     if present (separated by a colon).}
-#'     \item{\code{hostname}} {- the name of the host.}
-#'     \item{\code{port}} {- the port (if not specified, the default port if
-#'     defined by the scheme).}
-#'     \item{\code{path}} {- the path, typically used with HTTP or WebSocket.}
-#'     \item{\code{query}} {- the query info (typically following ? in the URL).}
-#'     \item{\code{fragment}} {- used for specifying an anchor, the part after #
-#'     in a URL.}
-#'     \item{\code{requri}} {- the full Request-URI (path[?query][#fragment]).}
+#' @return A named character vector of length 10, comprising:
+#'     \itemize{
+#'     \item \code{rawurl} - the unparsed URL string.
+#'     \item \code{scheme} - the URL scheme, such as "http" or "inproc"
+#'     (always lower case).
+#'     \item \code{userinfo} - the username and password if supplied in the
+#'     URL string.
+#'     \item \code{host} - the full host part of the URL, including the port
+#'     if present (separated by a colon).
+#'     \item \code{hostname} - the name of the host.
+#'     \item \code{port} - the port (if not specified, the default port if
+#'     defined by the scheme).
+#'     \item \code{path} - the path, typically used with HTTP or WebSocket.
+#'     \item \code{query} - the query info (typically following ? in the URL).
+#'     \item \code{fragment} - used for specifying an anchor, the part after #
+#'     in a URL.
+#'     \item \code{requri} - the full Request-URI (path[?query][#fragment]).
 #'     }
-#'     Values that cannot be determined are represented by an empty string \code{''}.
+#'     Values that cannot be determined are represented by an empty string
+#'     \code{''}.
 #'
 #' @examples
 #' parse_url("https://user:password@w3.org:8080/type/path?q=info#intro")
@@ -256,12 +258,12 @@ status_code <- function(x) .Call(rnng_status_code, x)
 
 #' Concatenate Strings
 #'
-#' A fast implementation that appends one character value after another.
+#' A fast implementation that combines two character values into a single string.
 #'
 #' @param a character value.
 #' @param b character value.
 #'
-#' @return A character vector of length 1.
+#' @return A character string.
 #'
 #' @details If either 'a' or 'b' is a vector of length greater than 1, only the
 #'     first element of each is concatenated.
@@ -272,3 +274,106 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #' @export
 #'
 strcat <- function(a, b) .Call(rnng_strcat, a, b)
+
+# nanonext - Weak References ---------------------------------------------------
+
+#' Weak References
+#'
+#' \code{weakref} creates a new weak reference, a special type of R object that
+#'     associates a value with a key. The value is kept alive for as long as the
+#'     key remains reachable (i.e. has yet to be garbage collected), even if the
+#'     value itself is no longer referenced.
+#'
+#' @param key a reference object (such as an environment or external pointer).
+#' @param value an object.
+#'
+#' @return For \code{weakref}: a weak reference.
+#'
+#'     For \code{weakref_key} and \code{weakref_value}: the key or value
+#'     associated with the weak reference, or NULL if no longer reachable.
+#'
+#' @examples
+#' k <- new.env()
+#' v <- "value"
+#'
+#' w <- weakref(k, v)
+#' w
+#' typeof(w)
+#'
+#' @export
+#'
+weakref <- function(key, value) .Call(rnng_weakref_make, key, value)
+
+#' Weakref Key
+#'
+#' \code{weakref_key} retrieves the key associated with a weak reference.
+#'
+#' @param w a weak reference.
+#'
+#' @examples
+#' key <- weakref_key(w)
+#' identical(key, k)
+#'
+#' @rdname weakref
+#' @export
+#'
+weakref_key <- function(w) .Call(rnng_weakref_key, w)
+
+#' Weakref Value
+#'
+#' \code{weakref_value} retrieves the value associated with a weak reference.
+#'
+#' @examples
+#' value <- weakref_value(w)
+#' identical(value, v)
+#'
+#' rm(v)
+#' weakref_value(w)
+#'
+#' @rdname weakref
+#' @export
+#'
+weakref_value <- function(w) .Call(rnng_weakref_value, w)
+
+#' Next Mode Settings
+#'
+#' Configures send mode 'next'. By registering 'refhook' functions for
+#'     serialization and unserialization, allows sending and receiving reference
+#'     objects, such as those accessed via an external pointer, between
+#'     different R sessions.
+#'
+#' @param inhook a function (for custom serialization). The signature for this
+#'     function must accept a list and return a raw vector, e.g.
+#'     \code{safetensors::safe_serialize}, or else NULL to reset.
+#' @param outhook a function (for custom unserialization). The signature for
+#'     this function must accept a raw vector and return a list, e.g.
+#'     \code{safetensors::safe_load_file}, or else NULL to reset.
+#' @param mark [default FALSE] (for advanced use only) logical value, whether to
+#'     mark serialized data with a special bit.
+#'
+#' @return Invisibly, a pairlist comprising the currently-registered 'refhook'
+#'     functions.
+#'
+#' @details Calling this function without any arguments returns (invisibly) the
+#'     currently-registered 'refhook' functions (and resets 'mark' to FALSE).
+#'
+#' @section Refhook:
+#'
+#'     The 'refhook' functions are a native feature of R's serialization
+#'     mechanism and apply to all non-system reference objects (external
+#'     pointers, weak references, and all environments other than namespace and
+#'     package environments and the Global Environment).
+#'
+#' @examples
+#' cfg <- nextmode(inhook = function(x) serialize(x, NULL),
+#'                 outhook = unserialize,
+#'                 mark = TRUE)
+#' cfg
+#'
+#' nextmode(NULL, NULL)
+#' print(nextmode())
+#'
+#' @export
+#'
+nextmode <- function(inhook, outhook, mark = FALSE)
+  invisible(.Call(rnng_next_mode, if (missing(inhook)) "" else inhook, if (missing(outhook)) "" else outhook, mark))
