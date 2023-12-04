@@ -165,11 +165,11 @@ SEXP rnng_reap(SEXP con) {
   int xc;
   const SEXP ptrtag = R_ExternalPtrTag(con);
 
-  if (ptrtag == nano_SocketSymbol) {
-    xc = nng_close(*(nng_socket *) R_ExternalPtrAddr(con));
-
-  } else if (ptrtag == nano_ContextSymbol) {
+  if (ptrtag == nano_ContextSymbol) {
     xc = nng_ctx_close(*(nng_ctx *) R_ExternalPtrAddr(con));
+
+  } else if (ptrtag == nano_SocketSymbol) {
+    xc = nng_close(*(nng_socket *) R_ExternalPtrAddr(con));
 
   } else if (ptrtag == nano_ListenerSymbol) {
     xc = nng_listener_close(*(nng_listener *) R_ExternalPtrAddr(con));
@@ -178,13 +178,12 @@ SEXP rnng_reap(SEXP con) {
     xc = nng_dialer_close(*(nng_dialer *) R_ExternalPtrAddr(con));
 
   } else {
-    Rf_error("'con' is not a valid Socket, Context, Listener or Dialer");
+    xc = 3;
   }
 
   if (xc)
-    ERROR_RET(xc);
+    return mk_error(xc);
 
-  Rf_setAttrib(con, nano_StateSymbol, Rf_mkString("closed"));
   return nano_success;
 
 }

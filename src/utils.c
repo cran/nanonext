@@ -23,6 +23,16 @@
 
 // internals -------------------------------------------------------------------
 
+typedef struct nano_stream_listener_s {
+  nng_stream_listener *list;
+  nng_tls_config *tls;
+} nano_stream_listener;
+
+typedef struct nano_stream_dialer_s {
+  nng_stream_dialer *dial;
+  nng_tls_config *tls;
+} nano_stream_dialer;
+
 SEXP mk_error_ncurl(const int xc) {
 
   const char *names[] = {"status", "headers", "data", ""};
@@ -261,16 +271,20 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
   code = nng_http_res_get_status(res), relo = code >= 300 && code < 400;
 
   if (relo && LOGICAL(follow)[0]) {
-    nng_url_free(url);
-    xc = nng_url_parse(&url, nng_http_res_get_header(res, "Location"));
+    const char *location = nng_http_res_get_header(res, "Location");
+    if (location == NULL) goto resume;
+    nng_url *oldurl = url;
+    xc = nng_url_parse(&url, location);
+    if (xc) goto resume;
     nng_http_res_free(res);
     nng_http_req_free(req);
     nng_http_client_free(client);
-    if (xc)
-      mk_error_ncurl(xc);
+    nng_url_free(oldurl);
     cfg = NULL;
     goto relocall;
   }
+
+  resume: ;
 
   SEXP out, vec, rvec;
   void *dat;
@@ -285,11 +299,11 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
     const R_xlen_t rlen = Rf_xlength(response);
     switch (TYPEOF(response)) {
     case STRSXP:
-      PROTECT(response = Rf_lengthgets(response, rlen + 1));
+      PROTECT(response = Rf_xlengthgets(response, rlen + 1));
       SET_STRING_ELT(response, rlen, Rf_mkChar("Location"));
       break;
     case VECSXP:
-      PROTECT(response = Rf_lengthgets(response, rlen + 1));
+      PROTECT(response = Rf_xlengthgets(response, rlen + 1));
       SET_VECTOR_ELT(response, rlen, Rf_mkString("Location"));
       break;
     default:

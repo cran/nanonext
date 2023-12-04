@@ -1,3 +1,27 @@
+# nanonext 0.11.0
+
+*This is a major stability release bundling the 'libnng' v1.6.0 source code.*
+
+#### New Features
+
+* Introduces `call_aio_()`, a user-interruptible version of `call_aio()` suitable for interactive use.
+* Introduces `wait_()` and `until_()` user-interruptible versions of `wait()` and `until()` suitable for interactive use.
+* Implements `%~>%` signal forwarder from one 'conditionVariable' to another.
+
+#### Updates
+
+* `next_config()` replaces `nextmode()` with the following improvements:
+  + simplified 'refhook' argument takes a pair of serialization and unserialization functions as a list.
+  + registered 'refhook' functions apply to external pointer type objects only.
+  + no longer returns invisibly for easier confimation that the correct functions have been registered.
+* `until()` updated to be identical to `.until()`, returning FALSE instead of TRUE if the timeout has been reached.
+* `reap()` updated to no longer warn in cases it returns an 'errorValue'.
+* `pipe_notify()` arguments 'add', 'remove' and 'flag' now default to FALSE instead of TRUE for easier selective specification of the events to signal.
+* Fixes regression in release 0.10.4 that caused a potential segfault using `ncurl()` with 'follow' set to TRUE when the server returns a missing or invalid relocation address.
+* The weak references interface is removed as 'non-core'.
+* Upgrades bundled 'libnng' to v1.6.0 release.
+* Upgrades bundled 'libmbedtls' to v 3.5.1.
+
 # nanonext 0.10.4
 
 #### New Features

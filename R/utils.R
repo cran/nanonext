@@ -275,105 +275,35 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #'
 strcat <- function(a, b) .Call(rnng_strcat, a, b)
 
-# nanonext - Weak References ---------------------------------------------------
-
-#' Weak References
+#' Configure Next Mode
 #'
-#' \code{weakref} creates a new weak reference, a special type of R object that
-#'     associates a value with a key. The value is kept alive for as long as the
-#'     key remains reachable (i.e. has yet to be garbage collected), even if the
-#'     value itself is no longer referenced.
+#' Configures send mode 'next' by registering functions for custom serialization
+#'     and unserialization of external pointer objects, allowing these to be
+#'     sent and received between different R sessions.
 #'
-#' @param key a reference object (such as an environment or external pointer).
-#' @param value an object.
-#'
-#' @return For \code{weakref}: a weak reference.
-#'
-#'     For \code{weakref_key} and \code{weakref_value}: the key or value
-#'     associated with the weak reference, or NULL if no longer reachable.
-#'
-#' @examples
-#' k <- new.env()
-#' v <- "value"
-#'
-#' w <- weakref(k, v)
-#' w
-#' typeof(w)
-#'
-#' @export
-#'
-weakref <- function(key, value) .Call(rnng_weakref_make, key, value)
-
-#' Weakref Key
-#'
-#' \code{weakref_key} retrieves the key associated with a weak reference.
-#'
-#' @param w a weak reference.
-#'
-#' @examples
-#' key <- weakref_key(w)
-#' identical(key, k)
-#'
-#' @rdname weakref
-#' @export
-#'
-weakref_key <- function(w) .Call(rnng_weakref_key, w)
-
-#' Weakref Value
-#'
-#' \code{weakref_value} retrieves the value associated with a weak reference.
-#'
-#' @examples
-#' value <- weakref_value(w)
-#' identical(value, v)
-#'
-#' rm(v)
-#' weakref_value(w)
-#'
-#' @rdname weakref
-#' @export
-#'
-weakref_value <- function(w) .Call(rnng_weakref_value, w)
-
-#' Next Mode Settings
-#'
-#' Configures send mode 'next'. By registering 'refhook' functions for
-#'     serialization and unserialization, allows sending and receiving reference
-#'     objects, such as those accessed via an external pointer, between
-#'     different R sessions.
-#'
-#' @param inhook a function (for custom serialization). The signature for this
-#'     function must accept a list and return a raw vector, e.g.
-#'     \code{safetensors::safe_serialize}, or else NULL to reset.
-#' @param outhook a function (for custom unserialization). The signature for
-#'     this function must accept a raw vector and return a list, e.g.
-#'     \code{safetensors::safe_load_file}, or else NULL to reset.
+#' @param refhook \strong{either} a list of two functions: the signature for the
+#'     first must accept a list of external pointer objects and return a raw
+#'     vector, e.g. \code{torch::torch_serialize}, and the second must accept a
+#'     raw vector and return a list of external pointer objects, e.g.
+#'     \code{torch::torch_load},\cr \strong{or else} NULL to reset.
 #' @param mark [default FALSE] (for advanced use only) logical value, whether to
 #'     mark serialized data with a special bit.
 #'
-#' @return Invisibly, a pairlist comprising the currently-registered 'refhook'
-#'     functions.
+#' @return A list comprising the currently-registered 'refhook' functions.
 #'
-#' @details Calling this function without any arguments returns (invisibly) the
+#' @details Calling this function without any arguments returns a list of the
 #'     currently-registered 'refhook' functions (and resets 'mark' to FALSE).
 #'
-#' @section Refhook:
-#'
-#'     The 'refhook' functions are a native feature of R's serialization
-#'     mechanism and apply to all non-system reference objects (external
-#'     pointers, weak references, and all environments other than namespace and
-#'     package environments and the Global Environment).
-#'
 #' @examples
-#' cfg <- nextmode(inhook = function(x) serialize(x, NULL),
-#'                 outhook = unserialize,
-#'                 mark = TRUE)
-#' cfg
+#' g <- next_config(refhook = list(function(x) serialize(x, NULL), unserialize),
+#'                  mark = TRUE)
+#' next_config()
+#' next_config(g)
 #'
-#' nextmode(NULL, NULL)
-#' print(nextmode())
+#' next_config(NULL)
+#' next_config()
 #'
 #' @export
 #'
-nextmode <- function(inhook, outhook, mark = FALSE)
-  invisible(.Call(rnng_next_mode, if (missing(inhook)) "" else inhook, if (missing(outhook)) "" else outhook, mark))
+next_config <- function(refhook = list(), mark = FALSE)
+  .Call(rnng_next_config, refhook, mark)

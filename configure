@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Library versions
-LIB_VER="a54820f"
-TLS_VER="1ec6906"
+LIB_VER="a6de76c"
+TLS_VER="edb8fec"
 
 # Initialise
 PKG_CFLAGS=""

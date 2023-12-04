@@ -50,13 +50,14 @@ SEXP nano_error;
 SEXP nano_ncurlAio;
 SEXP nano_ncurlSession;
 SEXP nano_recvAio;
-SEXP nano_refHook;
+SEXP nano_refHookIn;
+SEXP nano_refHookOut;
 SEXP nano_refList;
 SEXP nano_sendAio;
 SEXP nano_success;
 SEXP nano_unresolved;
 
-#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
+#ifdef NANONEXT_LEGACY_NNG
 nng_mtx *shr_mtx;
 #endif
 
@@ -106,19 +107,26 @@ static void PreserveObjects(void) {
   SET_TAG(nano_ncurlSession, R_ClassSymbol);
   R_PreserveObject(nano_recvAio = Rf_cons(Rf_mkString("recvAio"), R_NilValue));
   SET_TAG(nano_recvAio, R_ClassSymbol);
-  R_PreserveObject(nano_refHook = Rf_list2(R_NilValue, R_NilValue));
   R_PreserveObject(nano_sendAio = Rf_cons(Rf_mkString("sendAio"), R_NilValue));
   SET_TAG(nano_sendAio, R_ClassSymbol);
   R_PreserveObject(nano_success = Rf_ScalarInteger(0));
   R_PreserveObject(nano_unresolved = Rf_shallow_duplicate(Rf_ScalarLogical(NA_LOGICAL)));
   Rf_classgets(nano_unresolved, Rf_mkString("unresolvedValue"));
+  nano_refHookIn = R_NilValue;
+  nano_refHookOut = R_NilValue;
+  nano_refList = R_NilValue;
 }
 
 static void ReleaseObjects(void) {
+  if (nano_refList != R_NilValue)
+    R_ReleaseObject(nano_refList);
+  if (nano_refHookOut != R_NilValue)
+    R_ReleaseObject(nano_refHookOut);
+  if (nano_refHookIn != R_NilValue)
+    R_ReleaseObject(nano_refHookIn);
   R_ReleaseObject(nano_unresolved);
   R_ReleaseObject(nano_success);
   R_ReleaseObject(nano_sendAio);
-  R_ReleaseObject(nano_refHook);
   R_ReleaseObject(nano_recvAio);
   R_ReleaseObject(nano_ncurlSession);
   R_ReleaseObject(nano_ncurlAio);
@@ -127,11 +135,6 @@ static void ReleaseObjects(void) {
   R_ReleaseObject(nano_aioFuncs);
   R_ReleaseObject(nano_aioFormals);
 }
-
-static const R_CMethodDef cMethods[] = {
-  {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
-  {NULL, NULL, 0, NULL}
-};
 
 static const R_CallMethodDef callMethods[] = {
   {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
@@ -151,9 +154,10 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_cv_reset", (DL_FUNC) &rnng_cv_reset, 1},
   {"rnng_cv_signal", (DL_FUNC) &rnng_cv_signal, 1},
   {"rnng_cv_until", (DL_FUNC) &rnng_cv_until, 2},
-  {"rnng_cv_until2", (DL_FUNC) &rnng_cv_until2, 2},
+  {"rnng_cv_until_safe", (DL_FUNC) &rnng_cv_until_safe, 2},
   {"rnng_cv_value", (DL_FUNC) &rnng_cv_value, 1},
   {"rnng_cv_wait", (DL_FUNC) &rnng_cv_wait, 1},
+  {"rnng_cv_wait_safe", (DL_FUNC) &rnng_cv_wait_safe, 1},
   {"rnng_dial", (DL_FUNC) &rnng_dial, 5},
   {"rnng_dialer_close", (DL_FUNC) &rnng_dialer_close, 1},
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
@@ -171,7 +175,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
   {"rnng_ncurl_session_close", (DL_FUNC) &rnng_ncurl_session_close, 1},
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
-  {"rnng_next_mode", (DL_FUNC) &rnng_next_mode, 3},
+  {"rnng_next_config", (DL_FUNC) &rnng_next_config, 2},
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 2},
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
@@ -187,6 +191,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_sha256", (DL_FUNC) &rnng_sha256, 3},
   {"rnng_sha384", (DL_FUNC) &rnng_sha384, 3},
   {"rnng_sha512", (DL_FUNC) &rnng_sha512, 3},
+  {"rnng_signal_thread_create", (DL_FUNC) &rnng_signal_thread_create, 2},
   {"rnng_sleep", (DL_FUNC) &rnng_sleep, 1},
   {"rnng_socket_lock", (DL_FUNC) &rnng_socket_lock, 2},
   {"rnng_socket_unlock", (DL_FUNC) &rnng_socket_unlock, 1},
@@ -203,9 +208,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_unresolved2", (DL_FUNC) &rnng_unresolved2, 1},
   {"rnng_url_parse", (DL_FUNC) &rnng_url_parse, 1},
   {"rnng_version", (DL_FUNC) &rnng_version, 0},
-  {"rnng_weakref_make", (DL_FUNC) &rnng_weakref_make, 2},
-  {"rnng_weakref_key", (DL_FUNC) &rnng_weakref_key, 1},
-  {"rnng_weakref_value", (DL_FUNC) &rnng_weakref_value, 1},
+  {"rnng_wait_thread_create", (DL_FUNC) &rnng_wait_thread_create, 1},
   {"rnng_write_cert", (DL_FUNC) &rnng_write_cert, 3},
   {NULL, NULL, 0}
 };
@@ -218,18 +221,17 @@ static const R_ExternalMethodDef externalMethods[] = {
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
-  nano_refList = R_NilValue;
-#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
+#ifdef NANONEXT_LEGACY_NNG
   nng_mtx_alloc(&shr_mtx);
 #endif
-  R_registerRoutines(dll, cMethods, callMethods, NULL, externalMethods);
+  R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
 }
 
 void attribute_visible R_unload_nanonext(DllInfo *info) {
   ReleaseObjects();
-#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
+#ifdef NANONEXT_LEGACY_NNG
   nng_mtx_free(shr_mtx);
 #endif
 }

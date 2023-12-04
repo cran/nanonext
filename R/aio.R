@@ -163,10 +163,10 @@ recv_aio_signal <- function(con,
 
 #' Call the Value of an Asynchronous Aio Operation
 #'
-#' Retrieve the value of an asynchronous Aio operation, waiting for the
-#'     operation to complete if still in progress.
+#' \code{call_aio} retrieves the value of an asynchronous Aio operation, waiting
+#'     for the operation to complete if still in progress.
 #'
-#' @param aio an Aio (object of class 'sendAio' or 'recvAio').
+#' @param aio an Aio (object of class 'sendAio', 'recvAio' or 'ncurlAio').
 #'
 #' @return The passed object (invisibly).
 #'
@@ -210,7 +210,7 @@ recv_aio_signal <- function(con,
 #'
 #' msg <- recv_aio(s2, timeout = 100)
 #' msg
-#' call_aio(msg)$data
+#' call_aio_(msg)$data
 #'
 #' close(s1)
 #' close(s2)
@@ -218,6 +218,16 @@ recv_aio_signal <- function(con,
 #' @export
 #'
 call_aio <- function(aio) invisible(.Call(rnng_aio_call, aio))
+
+#' Call the Value of an Asynchronous Aio Operation
+#'
+#' \code{call_aio_} is a variant that allows user interrupts, suitable for
+#'     interactive use.
+#'
+#' @rdname call_aio
+#' @export
+#'
+call_aio_ <- function(aio) invisible(.Call(rnng_wait_thread_create, aio))
 
 #' Stop Asynchronous Aio Operation
 #'

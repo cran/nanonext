@@ -3,8 +3,9 @@
 \name{cv}
 \alias{cv}
 \alias{wait}
+\alias{wait_}
 \alias{until}
-\alias{.until}
+\alias{until_}
 \alias{cv_value}
 \alias{cv_reset}
 \alias{cv_signal}
@@ -14,9 +15,11 @@ cv()
 
 wait(cv)
 
+wait_(cv)
+
 until(cv, msec)
 
-.until(cv, msec)
+until_(cv, msec)
 
 cv_value(cv)
 
@@ -33,10 +36,10 @@ to be signalled.}
 \value{
 For \strong{cv}: a 'conditionVariable' object.
 
-    For \strong{wait} and \strong{until}: (invisibly) logical TRUE, or else
-    FALSE if a flag has been set.
+    For \strong{wait}: (invisibly) logical TRUE, or else FALSE if a flag has
+    been set.
 
-    For \strong{.until}: (invisibly) logical TRUE if signalled, or else FALSE
+    For \strong{until}: (invisibly) logical TRUE if signalled, or else FALSE
     if the timeout was reached.
 
     For \strong{cv_value}: integer value of the condition variable.
@@ -48,10 +51,12 @@ For \strong{cv}: a 'conditionVariable' object.
     the object).
 
 \code{wait} waits on a condition being signalled by completion of an
-    asynchronous receive or pipe event.
+    asynchronous receive or pipe event. \cr \code{wait_} is a variant that
+    allows user interrupts, suitable for interactive use.
 
 \code{until} waits until a future time on a condition being signalled by
-    completion of an asynchronous receive or pipe event.
+    completion of an asynchronous receive or pipe event. \cr \code{until_} is
+    a variant that allows user interrupts, suitable for interactive use.
 
 \code{cv_value} inspects the internal value of a condition variable.
 
@@ -104,8 +109,10 @@ Pass the 'conditionVariable' to the signalling forms of the
 cv <- cv()
 
 # wait(cv) # uncommenting will block until the cv is signalled
+# wait_(cv) # block until the cv is signalled or interrupted
 
 until(cv, 10L)
+until_(cv, 10L)
 
 cv_value(cv)
 
