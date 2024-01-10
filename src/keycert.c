@@ -1,4 +1,4 @@
-// Copyright (C) 2023 Hibiki AI Limited <info@hibiki-ai.com>
+// Copyright (C) 2023-2024 Hibiki AI Limited <info@hibiki-ai.com>
 //
 // This file is part of nanonext.
 //
@@ -60,7 +60,8 @@ static int parse_serial_decimal_format(unsigned char *obuf, size_t obufmax,
 SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
   const char *common = CHAR(STRING_ELT(cn, 0));
-  const int interactive = LOGICAL(inter)[0];
+  const char *validuntil = CHAR(STRING_ELT(valid, 0));
+  const int interactive = *NANO_INTEGER(inter);
   mbedtls_entropy_context entropy;
   mbedtls_ctr_drbg_context ctr_drbg;
   mbedtls_pk_context key;
@@ -75,7 +76,7 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
   const char *serialvalue = "1";          /* serial number string (decimal)     */
   const char *not_before = "20010101000000";  /* validity period not before   */
-  const char *not_after = CHAR(STRING_ELT(valid, 0)); /* validity period not after */
+  const char *not_after = validuntil; /* validity period not after */
   const int is_ca = 1;                  /* is a CA certificate                */
   const int max_pathlen = 0;            /* maximum CA path length             */
   const int version = 2;                /* CRT version                        */
@@ -85,7 +86,7 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
   char issuer_name[clen];          /* issuer name for certificate        */
   snprintf(issuer_name, clen, "CN=%s,O=Nanonext,C=JP", common);
 
-  int ret, exit = 1;
+  int xc, exit = 1;
   if (interactive) REprintf("Generating key + certificate [    ]");
   mbedtls_x509_crt issuer_crt;
   mbedtls_pk_context loaded_issuer_key;
@@ -114,55 +115,55 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
   if (interactive) REprintf("\b\b\b\b\b.   ]");
 
-  if ((ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers))) ||
-      (ret = mbedtls_pk_setup(&key, mbedtls_pk_info_from_type((mbedtls_pk_type_t) MBEDTLS_PK_RSA))))
+  if ((xc = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers))) ||
+      (xc = mbedtls_pk_setup(&key, mbedtls_pk_info_from_type((mbedtls_pk_type_t) MBEDTLS_PK_RSA))))
     goto exitlevel1;
 
   if (interactive) REprintf("\b\b\b\b\b..  ]");
 
-  if ((ret = mbedtls_rsa_gen_key(mbedtls_pk_rsa(key), mbedtls_ctr_drbg_random, &ctr_drbg, 4096, 65537)))
+  if ((xc = mbedtls_rsa_gen_key(mbedtls_pk_rsa(key), mbedtls_ctr_drbg_random, &ctr_drbg, 4096, 65537)))
     goto exitlevel1;
 
   if (interactive) REprintf("\b\b\b\b\b... ]");
 
-  if ((ret = mbedtls_pk_write_key_pem(&key, key_buf, 16000)))
+  if ((xc = mbedtls_pk_write_key_pem(&key, key_buf, 16000)))
     goto exitlevel1;
 
   size_t klen = strlen((char *) key_buf);
 
-  if ((ret = mbedtls_ctr_drbg_reseed(&ctr_drbg, (const unsigned char *) persn, strlen(persn))) ||
+  if ((xc = mbedtls_ctr_drbg_reseed(&ctr_drbg, (const unsigned char *) persn, strlen(persn))) ||
 #if MBEDTLS_VERSION_MAJOR == 3 && MBEDTLS_VERSION_MINOR >= 4 || MBEDTLS_VERSION_MAJOR >= 4
-      (ret = parse_serial_decimal_format(serial, sizeof(serial), serialvalue, &serial_len)) ||
+      (xc = parse_serial_decimal_format(serial, sizeof(serial), serialvalue, &serial_len)) ||
 #else
-      (ret = mbedtls_mpi_read_string(&serial, 10, serialvalue)) ||
+      (xc = mbedtls_mpi_read_string(&serial, 10, serialvalue)) ||
 #endif
 #if MBEDTLS_VERSION_MAJOR >= 3
-      (ret = mbedtls_pk_parse_key(&loaded_issuer_key, key_buf, klen + 1, NULL, 0, mbedtls_ctr_drbg_random, &ctr_drbg)))
+      (xc = mbedtls_pk_parse_key(&loaded_issuer_key, key_buf, klen + 1, NULL, 0, mbedtls_ctr_drbg_random, &ctr_drbg)))
 #else
-      (ret = mbedtls_pk_parse_key(&loaded_issuer_key, key_buf, klen + 1, NULL, 0)))
+      (xc = mbedtls_pk_parse_key(&loaded_issuer_key, key_buf, klen + 1, NULL, 0)))
 #endif
     goto exitlevel1;
 
   mbedtls_x509write_crt_set_subject_key(&crt, issuer_key);
   mbedtls_x509write_crt_set_issuer_key(&crt, issuer_key);
 
-  if ((ret = mbedtls_x509write_crt_set_subject_name(&crt, issuer_name)) ||
-      (ret = mbedtls_x509write_crt_set_issuer_name(&crt, issuer_name)))
+  if ((xc = mbedtls_x509write_crt_set_subject_name(&crt, issuer_name)) ||
+      (xc = mbedtls_x509write_crt_set_issuer_name(&crt, issuer_name)))
     goto exitlevel1;
 
   mbedtls_x509write_crt_set_version(&crt, version);
   mbedtls_x509write_crt_set_md_alg(&crt, md);
 
 #if MBEDTLS_VERSION_MAJOR == 3 && MBEDTLS_VERSION_MINOR >= 4 || MBEDTLS_VERSION_MAJOR >= 4
-  if ((ret = mbedtls_x509write_crt_set_serial_raw(&crt, serial, serial_len)) ||
+  if ((xc = mbedtls_x509write_crt_set_serial_raw(&crt, serial, serial_len)) ||
 #else
-  if ((ret = mbedtls_x509write_crt_set_serial(&crt, &serial)) ||
+  if ((xc = mbedtls_x509write_crt_set_serial(&crt, &serial)) ||
 #endif
-      (ret = mbedtls_x509write_crt_set_validity(&crt, not_before, not_after)) ||
-      (ret = mbedtls_x509write_crt_set_basic_constraints(&crt, is_ca, max_pathlen)) ||
-      (ret = mbedtls_x509write_crt_set_subject_key_identifier(&crt)) ||
-      (ret = mbedtls_x509write_crt_set_authority_key_identifier(&crt)) ||
-      (ret = mbedtls_x509write_crt_pem(&crt, output_buf, 4096, mbedtls_ctr_drbg_random, &ctr_drbg)))
+      (xc = mbedtls_x509write_crt_set_validity(&crt, not_before, not_after)) ||
+      (xc = mbedtls_x509write_crt_set_basic_constraints(&crt, is_ca, max_pathlen)) ||
+      (xc = mbedtls_x509write_crt_set_subject_key_identifier(&crt)) ||
+      (xc = mbedtls_x509write_crt_set_authority_key_identifier(&crt)) ||
+      (xc = mbedtls_x509write_crt_pem(&crt, output_buf, 4096, mbedtls_ctr_drbg_random, &ctr_drbg)))
     goto exitlevel1;
 
   SEXP vec, kcstr, cstr;
@@ -194,8 +195,8 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
   mbedtls_entropy_free(&entropy);
 
   if (exit) {
-    mbedtls_strerror(ret, buf, sizeof(buf));
-    Rf_error("%d | %s", ret, buf);
+    mbedtls_strerror(xc, buf, sizeof(buf));
+    Rf_error("%d | %s", xc, buf);
   }
 
   UNPROTECT(1);

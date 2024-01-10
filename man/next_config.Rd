@@ -7,32 +7,31 @@
 next_config(refhook = list(), mark = FALSE)
 }
 \arguments{
-\item{refhook}{\strong{either} a list of two functions: the signature for the
-first must accept a list of external pointer objects and return a raw
-vector, e.g. \code{torch::torch_serialize}, and the second must accept a
-raw vector and return a list of external pointer objects, e.g.
-\code{torch::torch_load},\cr \strong{or else} NULL to reset.}
+\item{refhook}{\strong{either} a list or pairlist of two functions: the
+signature for the first must accept a list of external pointer objects
+and return a raw vector, e.g. \code{torch::torch_serialize}, and the
+second must accept a raw vector and return a list of external pointer
+objects, e.g. \code{torch::torch_load},\cr \strong{or else} NULL to reset.}
 
 \item{mark}{[default FALSE] (for advanced use only) logical value, whether to
 mark serialized data with a special bit.}
 }
 \value{
-A list comprising the currently-registered 'refhook' functions.
+A pairlist comprising the currently-registered 'refhook' functions.
 }
 \description{
 Configures send mode 'next' by registering functions for custom serialization
-    and unserialization of external pointer objects, allowing these to be
-    sent and received between different R sessions.
+    and unserialization of external pointer reference objects, allowing these
+    to be sent and received between different R sessions.
 }
 \details{
-Calling this function without any arguments returns a list of the
+Calling this function without any arguments returns the pairlist of
     currently-registered 'refhook' functions (and resets 'mark' to FALSE).
 }
 \examples{
-g <- next_config(refhook = list(function(x) serialize(x, NULL), unserialize),
-                 mark = TRUE)
+g <- next_config(refhook = list(function(x) serialize(x, NULL), unserialize))
 next_config()
-next_config(g)
+next_config(g, mark = TRUE)
 
 next_config(NULL)
 next_config()

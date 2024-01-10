@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+# Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
 #
 # This file is part of nanonext.
 #
@@ -321,11 +321,8 @@ print.nanoListener <- function(x, ...) {
 #'
 print.nanoStream <- function(x, ...) {
 
-  if (length(attr(x, "dialer")))
-    cat(sprintf("< nanoStream >\n - type: dialer\n - url: %s\n - textframes: %s\n", attr(x, "url"), attr(x, "textframes")), file = stdout()) else
-      if (length(attr(x, "listener")))
-        cat(sprintf("< nanoStream >\n - type: listener\n - url: %s\n - textframes: %s\n", attr(x, "url"), attr(x, "textframes")), file = stdout()) else
-          cat("< nanoStream >\n - not active\n", file = stdout())
+  cat(sprintf("< nanoStream >\n - mode: %s\n - state: %s\n - url: %s\n",
+              attr(x, "mode"), attr(x, "state"), attr(x, "url")), file = stdout())
   invisible(x)
 
 }
@@ -334,7 +331,7 @@ print.nanoStream <- function(x, ...) {
 #'
 print.recvAio <- function(x, ...) {
 
-  cat("< recvAio >\n - $data for message data\n", file = stdout())
+  cat("< recvAio | $data >\n", file = stdout())
   invisible(x)
 
 }
@@ -343,7 +340,7 @@ print.recvAio <- function(x, ...) {
 #'
 print.sendAio <- function(x, ...) {
 
-  cat("< sendAio >\n - $result for send result\n", file = stdout())
+  cat("< sendAio | $result >\n", file = stdout())
   invisible(x)
 
 }
@@ -352,7 +349,7 @@ print.sendAio <- function(x, ...) {
 #'
 print.ncurlAio <- function(x, ...) {
 
-  cat("< ncurlAio >\n - $status for response status code\n - $headers for response headers\n - $data for message data\n", file = stdout())
+  cat("< ncurlAio | $status $headers $data >\n", file = stdout())
   invisible(x)
 
 }
@@ -361,7 +358,7 @@ print.ncurlAio <- function(x, ...) {
 #'
 print.ncurlSession <- function(x, ...) {
 
-  cat(sprintf("< ncurlSession >\n - %s\n", if (length(attr(x, "aio"))) "use transact() to return data" else "not active"), file = stdout())
+  cat(sprintf("< ncurlSession > - %s\n", if (length(attr(x, "aio"))) "transact() to return data" else "not active"), file = stdout())
   invisible(x)
 
 }
@@ -397,7 +394,7 @@ print.conditionVariable <- function(x, ...) {
 #'
 print.tlsConfig <- function(x, ...) {
 
-  cat(sprintf("< TLS %s configuration >\n - auth mode: %s\n", attr(x, "spec"), attr(x, "mode")), file = stdout())
+  cat(sprintf("< TLS %s config | auth mode: %s >\n", attr(x, "spec"), attr(x, "mode")), file = stdout())
   invisible(x)
 
 }

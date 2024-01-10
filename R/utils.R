@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+# Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
 #
 # This file is part of nanonext.
 #
@@ -102,7 +102,7 @@ msleep <- function(time) invisible(.Call(rnng_sleep, time))
 #'     and an entropy collector combining entropy from multiple sources
 #'     including at least one strong entropy source.
 #'
-#' @param n [default 1L] integer random bytes to generate.
+#' @param n [default 1L] integer random bytes to generate (from 0 to 1024).
 #' @param convert [default TRUE] logical FALSE to return a raw vector, or TRUE
 #'     to return the hex representation of the bytes as a character string.
 #'
@@ -278,27 +278,26 @@ strcat <- function(a, b) .Call(rnng_strcat, a, b)
 #' Configure Next Mode
 #'
 #' Configures send mode 'next' by registering functions for custom serialization
-#'     and unserialization of external pointer objects, allowing these to be
-#'     sent and received between different R sessions.
+#'     and unserialization of external pointer reference objects, allowing these
+#'     to be sent and received between different R sessions.
 #'
-#' @param refhook \strong{either} a list of two functions: the signature for the
-#'     first must accept a list of external pointer objects and return a raw
-#'     vector, e.g. \code{torch::torch_serialize}, and the second must accept a
-#'     raw vector and return a list of external pointer objects, e.g.
-#'     \code{torch::torch_load},\cr \strong{or else} NULL to reset.
+#' @param refhook \strong{either} a list or pairlist of two functions: the
+#'     signature for the first must accept a list of external pointer objects
+#'     and return a raw vector, e.g. \code{torch::torch_serialize}, and the
+#'     second must accept a raw vector and return a list of external pointer
+#'     objects, e.g. \code{torch::torch_load},\cr \strong{or else} NULL to reset.
 #' @param mark [default FALSE] (for advanced use only) logical value, whether to
 #'     mark serialized data with a special bit.
 #'
-#' @return A list comprising the currently-registered 'refhook' functions.
+#' @return A pairlist comprising the currently-registered 'refhook' functions.
 #'
-#' @details Calling this function without any arguments returns a list of the
+#' @details Calling this function without any arguments returns the pairlist of
 #'     currently-registered 'refhook' functions (and resets 'mark' to FALSE).
 #'
 #' @examples
-#' g <- next_config(refhook = list(function(x) serialize(x, NULL), unserialize),
-#'                  mark = TRUE)
+#' g <- next_config(refhook = list(function(x) serialize(x, NULL), unserialize))
 #' next_config()
-#' next_config(g)
+#' next_config(g, mark = TRUE)
 #'
 #' next_config(NULL)
 #' next_config()

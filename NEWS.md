@@ -1,3 +1,23 @@
+# nanonext 0.12.0
+
+*This is a major performance and stability release bundling the 'libnng' v1.7.0 source code.*
+
+#### New Features
+
+* `pipe_notify()` argument 'flag' allows supplying a signal to be raised on a flag being set upon a pipe event.
+
+#### Updates
+
+* More compact print methods for 'recvAio', 'sendAio', 'ncurlAio', 'ncurlSession' and 'tlsConfig' objects.
+* `random()` now explicitly limits argument 'n' to values between 0 and 1024.
+* `next_config()` now returns a pairlist (of the registered serialization functions) rather than a list (for efficiency).
+* Using mode 'next', serialization functions with incorrect signatures are now simply ignored rather than raise errors.
+* 'nanoStream' objects simplified internally with updated attributes 'mode' and 'state'.
+* Deprecated function `.until()` is removed.
+* Eliminates potential memory leaks along certain error paths.
+* Fixes bug which prevented much higher TLS performance when using the bundled 'libnng' source.
+* Upgrades bundled 'libnng' to v1.7.0 release.
+
 # nanonext 0.11.0
 
 *This is a major stability release bundling the 'libnng' v1.6.0 source code.*
@@ -20,7 +40,7 @@
 * Fixes regression in release 0.10.4 that caused a potential segfault using `ncurl()` with 'follow' set to TRUE when the server returns a missing or invalid relocation address.
 * The weak references interface is removed as 'non-core'.
 * Upgrades bundled 'libnng' to v1.6.0 release.
-* Upgrades bundled 'libmbedtls' to v 3.5.1.
+* Upgrades bundled 'libmbedtls' to v3.5.1.
 
 # nanonext 0.10.4
 
@@ -35,7 +55,7 @@
 * Improves listener / dialer logic for TLS connections, allowing *inter alia* synchronous dials.
 * `request()` argument 'ack' removed due to stability considerations.
 * Fixes memory leaks detected with valgrind.
-* Upgrades bundled 'libmbedtls' to v 3.5.0.
+* Upgrades bundled 'libmbedtls' to v3.5.0.
 
 # nanonext 0.10.2
 

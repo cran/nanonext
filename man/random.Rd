@@ -7,7 +7,7 @@
 random(n = 1L, convert = TRUE)
 }
 \arguments{
-\item{n}{[default 1L] integer random bytes to generate.}
+\item{n}{[default 1L] integer random bytes to generate (from 0 to 1024).}
 
 \item{convert}{[default TRUE] logical FALSE to return a raw vector, or TRUE
 to return the hex representation of the bytes as a character string.}

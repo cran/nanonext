@@ -159,19 +159,6 @@ cv_reset <- function(cv) invisible(.Call(rnng_cv_reset, cv))
 #'
 cv_signal <- function(cv) invisible(.Call(rnng_cv_signal, cv))
 
-#' Condition Variables - Until
-#'
-#' This function is identical to \code{\link{until}} and deprecated.
-#'
-#' @inheritParams until
-#'
-#' @return (invisibly) logical TRUE if signalled, or else FALSE if the timeout
-#'     was reached.
-#'
-#' @export
-#'
-.until <- until
-
 #' Pipe Notify
 #'
 #' Signals a 'conditionVariable' whenever pipes (individual connections) are
@@ -189,7 +176,9 @@ cv_signal <- function(cv) invisible(.Call(rnng_cv_signal, cv))
 #' @param flag [default FALSE] logical value whether to also set a flag in the
 #'     'conditionVariable'. This can help distinguish between different types of
 #'     signal, and causes any subsequent \code{\link{wait}} to return FALSE
-#'     instead of TRUE.
+#'     instead of TRUE. If a signal from the \pkg{tools} package, e.g.
+#'     \code{tools::SIGINT}, or an equivalent integer value is supplied, this
+#'     sets a flag and additionally raises this signal upon the flag being set.
 #'
 #' @details For add: this event occurs after the pipe is fully added to the
 #'     socket. Prior to this time, it is not possible to communicate over the

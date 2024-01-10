@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>nanonext - NNG Lightweight Messaging Library</title>
+<style type="text/css">
+/**
+ * Prism.s theme ported from highlight.js's xcode style
+ */
+pre code {
+  padding: 1em;
+}
+.token.comment {
+  color: #007400;
+}
+.token.punctuation {
+  color: #999;
+}
+.token.tag,
+.token.selector {
+  color: #aa0d91;
+}
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol {
+  color: #1c00cf;
+}
+.token.property,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin {
+  color: #c41a16;
+}
+.token.inserted {
+  background-color: #ccffd8;
+}
+.token.deleted {
+  background-color: #ffebe9;
+}
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #9a6e3a;
+}
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #836c28;
+}
+.token.function,
+.token.class-name {
+  color: #DD4A68;
+}
+.token.regex,
+.token.important,
+.token.variable {
+  color: #5c2699;
+}
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+.token.italic {
+  font-style: italic;
+}
+</style>
+<style type="text/css">
+body {
+  font-family: sans-serif;
+  max-width: 800px;
+  margin: auto;
+  padding: 1em;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+body, .footnotes, code { font-size: .9em; }
+li li { font-size: .95em; }
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+pre, img { max-width: 100%; }
+pre, pre:hover {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+pre code {
+  display: block;
+  overflow-x: auto;
+}
+code { font-family: 'DejaVu Sans Mono', 'Droid Sans Mono', 'Lucida Console', Consolas, Monaco, monospace; }
+:not(pre) > code, code[class] { background-color: #F8F8F8; }
+code.language-undefined, pre > code:not([class]) {
+  background-color: inherit;
+  border: 1px solid #eee;
+}
+table {
+  margin: auto;
+  border-top: 1px solid #666;
+}
+table thead th { border-bottom: 1px solid #ddd; }
+th, td { padding: 5px; }
+thead, tfoot, tr:nth-child(even) { background: #eee; }
+blockquote {
+  color: #666;
+  margin: 0;
+  padding-left: 1em;
+  border-left: 0.5em solid #eee;
+}
+hr, .footnotes::before { border: 1px dashed #ddd; }
+.frontmatter { text-align: center; }
+#TOC .numbered li { list-style: none; }
+#TOC .numbered { padding-left: 0; }
+#TOC .numbered ul { padding-left: 1em; }
+table, .body h2 { border-bottom: 1px solid #666; }
+.body .appendix, .appendix ~ h2 { border-bottom-style: dashed; }
+.footnote-ref a::before { content: "["; }
+.footnote-ref a::after { content: "]"; }
+section.footnotes::before {
+  content: "";
+  display: block;
+  max-width: 20em;
+}
+
+@media print {
+  body {
+    font-size: 12pt;
+    max-width: 100%;
+  }
+  tr, img { page-break-inside: avoid; }
+}
+@media only screen and (min-width: 992px) {
+  pre { white-space: pre; }
+}
+</style>
+</head>
+<body>
+<div class="frontmatter">
+<div class="title"><h1>nanonext - NNG Lightweight Messaging Library</h1></div>
+<div class="author"><h2></h2></div>
+<div class="date"><h3></h3></div>
+</div>
+<div class="body">
+<p><a href="https://shikokuchuo.net/nanonext/" alt="nanonext"><img src="data:image/png;base64,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" alt="nanonext logo" align="right" width="120" /></a></p>
+<h3 id="table-of-contents">Table of Contents</h3>
+<ol>
+<li><a href="#cross-language-exchange">Cross-language Exchange</a></li>
+<li><a href="#async-and-concurrency">Async and Concurrency</a></li>
+<li><a href="#rpc-and-distributed-computing">RPC and Distributed Computing</a></li>
+<li><a href="#synchronisation-primitives">Synchronisation Primitives</a></li>
+<li><a href="#tls-secure-connections">TLS Secure Connections</a></li>
+<li><a href="#publisher-subscriber-model">Publisher / Subscriber Model</a></li>
+<li><a href="#surveyor-respondent-model">Surveyor / Respondent Model</a></li>
+<li><a href="#ncurl-async-http-client">ncurl: (Async) HTTP Client</a></li>
+<li><a href="#stream-websocket-client">stream: Websocket Client</a></li>
+<li><a href="#cryptographic-hashing">Cryptographic Hashing</a></li>
+<li><a href="#options-and-statistics">Options and Statistics</a></li>
+</ol>
+<h3 id="cross-language-exchange">Cross-language Exchange</h3>
+<p><code>nanonext</code> provides a fast and reliable data interface between different programming languages where NNG has an implementation, including C, C++, Java, Python, Go, Rust etc.</p>
+<p>The following example demonstrates the exchange of numerical data between R and Python (NumPy), two of the most commonly-used languages for data science and machine learning.</p>
+<p>Using a messaging interface provides a clean and robust approach, light on resources with limited and identifiable points of failure.</p>
+<p>This approach can also serve as an interface / pipe between different processes written in the same or different languages, running on the same computer or distributed across networks, and is an enabler of modular software design as espoused by the Unix philosophy.</p>
+<p>One solution it provides is that of processing real-time data where computation times exceed the data frequency - by dividing the computation into stages, this may be set up as a pipeline or ‘cascade’ of processes, each connected using NNG sockets.</p>
+<p>Create socket in Python using the NNG binding ‘pynng’:</p>
+<pre><code class="language-python">import numpy as np
+import pynng
+socket = pynng.Pair0(listen=&quot;ipc:///tmp/nanonext.socket&quot;)
+</code></pre>
+<p>Create nano object in R using <code>nanonext</code>, then send a vector of ‘doubles’, specifying mode as ‘raw’:</p>
+<pre><code class="language-r">library(nanonext)
+n &lt;- nano(&quot;pair&quot;, dial = &quot;ipc:///tmp/nanonext.socket&quot;)
+n$send(c(1.1, 2.2, 3.3, 4.4, 5.5), mode = &quot;raw&quot;)
+#&gt; [1] 0
+</code></pre>
+<p>Receive in Python as a NumPy array of ‘floats’, and send back to R:</p>
+<pre><code class="language-python">raw = socket.recv()
+array = np.frombuffer(raw)
+print(array)
+#&gt; [1.1 2.2 3.3 4.4 5.5]
+
+msg = array.tobytes()
+socket.send(msg)
+</code></pre>
+<p>Receive in R, specifying the receive mode as ‘double’:</p>
+<pre><code class="language-r">n$recv(mode = &quot;double&quot;)
+#&gt; [1] 1.1 2.2 3.3 4.4 5.5
+</code></pre>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="async-and-concurrency">Async and Concurrency</h3>
+<p><code>nanonext</code> implements true async send and receive, leveraging NNG as a massively-scaleable concurrency framework.</p>
+<pre><code class="language-r">s1 &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nano&quot;)
+s2 &lt;- socket(&quot;pair&quot;, dial = &quot;inproc://nano&quot;)
+</code></pre>
+<p><code>send_aio()</code> and <code>recv_aio()</code> functions return immediately with an ‘Aio’ object, but perform their operations async.</p>
+<p>An ‘Aio’ object returns an unresolved value whilst its asynchronous operation is ongoing, automatically resolving to a final value once complete.</p>
+<pre><code class="language-r"># an async receive is requested, but no messages are waiting (yet to be sent)
+msg &lt;- recv_aio(s2)
+msg
+#&gt; &lt; recvAio | $data &gt;
+msg$data
+#&gt; 'unresolved' logi NA
+</code></pre>
+<p>For a ‘sendAio’ object, the result is stored at <code>$result</code>.</p>
+<pre><code class="language-r">res &lt;- send_aio(s1, data.frame(a = 1, b = 2))
+res
+#&gt; &lt; sendAio | $result &gt;
+res$result
+#&gt; [1] 0
+</code></pre>
+<p><em>Note: a return value of 0 denotes a successful send, meaning that the message has been accepted by the socket for sending; the message itself may still be buffered within the system.</em></p>
+<p>For a ‘recvAio’ object, the message is stored at <code>$data</code>.</p>
+<pre><code class="language-r"># now that a message has been sent, the 'recvAio' resolves automatically
+msg$data
+#&gt;   a b
+#&gt; 1 1 2
+</code></pre>
+<p>Auxiliary function <code>unresolved()</code> may be used in control flow statements to perform actions which depend on resolution of the Aio, both before and after. This means there is no need to actually wait (block) for an Aio to resolve, as the example below demonstrates.</p>
+<pre><code class="language-r">msg &lt;- recv_aio(s2)
+
+# unresolved() queries for resolution itself so no need to use it again within the while loop
+while (unresolved(msg)) {
+  # do stuff before checking resolution again
+  send_aio(s1, &quot;resolved&quot;)
+  cat(&quot;unresolved&quot;)
+}
+#&gt; unresolved
+
+# perform actions which depend on the Aio value outside the while loop
+msg$data
+#&gt; [1] &quot;resolved&quot;
+</code></pre>
+<p>The values may also be called explicitly using <code>call_aio()</code>. This will wait for completion of the Aio (blocking).</p>
+<pre><code class="language-r"># will wait for completion then return the resolved Aio
+call_aio(msg)
+
+# to access the resolved value directly (waiting if required)
+call_aio(msg)$data
+#&gt; [1] &quot;resolved&quot;
+
+close(s1)
+close(s2)
+</code></pre>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="rpc-and-distributed-computing">RPC and Distributed Computing</h3>
+<p><code>nanonext</code> implements remote procedure calls (RPC) using NNG’s req/rep protocol to provide a basis for distributed computing.</p>
+<p>Can be used to perform computationally-expensive calculations or I/O-bound operations such as writing large amounts of data to disk in a separate ‘server’ process running concurrently.</p>
+<p>[S] Server process: <code>reply()</code> will wait for a message and apply a function, in this case <code>rnorm()</code>, before sending back the result.</p>
+<pre><code class="language-r">library(nanonext)
+rep &lt;- socket(&quot;rep&quot;, listen = &quot;tcp://127.0.0.1:6556&quot;)
+ctxp &lt;- context(rep)
+r &lt;- reply(ctxp, execute = rnorm, send_mode = &quot;raw&quot;)
+
+</code></pre>
+<p>[C] Client process: <code>request()</code> performs an async send and receive request and returns immediately with a <code>recvAio</code> object.</p>
+<pre><code class="language-r">library(nanonext)
+req &lt;- socket(&quot;req&quot;, dial = &quot;tcp://127.0.0.1:6556&quot;)
+ctxq &lt;- context(req)
+aio &lt;- request(ctxq, data = 1e8, recv_mode = &quot;double&quot;)
+</code></pre>
+<p>At this point, the client can run additional code concurrent with the server processing the request.</p>
+<pre><code class="language-r"># do more...
+</code></pre>
+<p>When the result of the server calculation is required, the <code>recvAio</code> may be called using <code>call_aio()</code>.</p>
+<p>The return value from the server request is then retrieved and stored in the Aio as <code>$data</code>.</p>
+<pre><code class="language-r">call_aio(aio)
+
+aio
+#&gt; &lt; recvAio | $data &gt;
+aio$data |&gt; str()
+#&gt;  num [1:100000000] -1.405 0.658 0.991 0.615 1.78 ...
+</code></pre>
+<p>As <code>call_aio()</code> is blocking and will wait for completion, an alternative is to query <code>aio$data</code> directly. This will return an ‘unresolved’ logical NA value if the calculation is yet to complete.</p>
+<p>In this example the calculation is returned, but other operations may reside entirely on the server side, for example writing data to disk.</p>
+<p>In such a case, calling or querying the value confirms that the operation has completed, and provides the return value of the function, which may typically be NULL or an exit code.</p>
+<p>The <a href="https://doi.org/10.5281/zenodo.7912722"><code>mirai</code></a> package (<a href="https://cran.r-project.org/package=mirai">https://cran.r-project.org/package=mirai</a>) uses <code>nanonext</code> as the back-end to provide asynchronous execution of arbitrary R code using the RPC model.</p>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="synchronisation-primitives">Synchronisation Primitives</h3>
+<p><code>nanonext</code> implements cross-platform synchronisation primitives provided by the NNG library.</p>
+<p>As the R interpreter runs on a single thread, synchronisation primitives such as mutexes and condition variables are not natively implemented in the R language. However, as NNG is inherently threaded and messaging can be asynchronous, it is possible to synchronise between NNG events and the main R execution thread.</p>
+<p>The events that can be signalled include asynchronous receive completions, and pipe events - when connections are established or dropped.</p>
+<p>Condition variables can be used simply to record such events, or more powerfully, to wait upon them. The condition variables implemented in <code>nanonext</code> include a both a condition (value) and flag (boolean). Each signal increments the value, and each successful return of <code>wait()</code> or <code>until()</code> decrements the value. A non-zero condition allows waiting threads to continue.</p>
+<p>In any situation where polling for an event presents a solution, waiting upon a condition to be signalled can be more efficient, both in terms of consuming no resources while waiting, and also being synchronised with the event (having no latency).</p>
+<p>The following shows how condition variables and signalling work in practice.</p>
+<p>Example 1: set up a socket, and wait for the other side to connect:</p>
+<pre><code class="language-r">sock &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nanopipe&quot;)
+
+cv &lt;- cv() # create new condition variable
+cv_value(cv)
+#&gt; [1] 0
+
+pipe_notify(sock, cv = cv, add = TRUE, remove = TRUE)
+
+# wait(cv) # uncomment in normal usage - but would block
+
+# for illustration:
+sock2 &lt;- socket(&quot;pair&quot;, dial = &quot;inproc://nanopipe&quot;)
+
+cv_value(cv) # incremented when pipe to 'sock2' was created
+#&gt; [1] 1
+
+wait(cv) # wait() now does not block
+
+cv_value(cv) # wait() decrements the CV value - calling wait() again will block
+#&gt; [1] 0
+
+close(sock2)
+
+cv_value(cv) # incremented when pipe to 'sock2' was destroyed
+#&gt; [1] 1
+
+close(sock)
+</code></pre>
+<p>Example 2: wait until a message is received or connection is dropped:</p>
+<pre><code class="language-r">sock &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nanosignal&quot;)
+sock2 &lt;- socket(&quot;pair&quot;, dial = &quot;inproc://nanosignal&quot;)
+
+cv &lt;- cv() # create new condition variable
+cv_value(cv)
+#&gt; [1] 0
+
+pipe_notify(sock, cv = cv, add = FALSE, remove = TRUE, flag = TRUE)
+
+send(sock2, &quot;this message will wake waiting thread&quot;) # in real usage happens concurrently with wait()
+#&gt; [1] 0
+
+r &lt;- recv_aio_signal(sock, cv = cv) # same cv passed to signalling form of recv_aio()
+
+# wakes as soon as the asynchronous receive completes
+wait(cv) || stop(&quot;peer disconnected&quot;)
+#&gt; [1] TRUE
+
+r$data
+#&gt; [1] &quot;this message will wake waiting thread&quot;
+
+close(sock)
+close(sock2)
+</code></pre>
+<p>The above example shows the working of the flag within the condition variable. As the pipe notification was specified to raise a flag, this can be used to distinguish between a pipe event signal and a message receive signal.</p>
+<p>In the case a flag is raised, <code>wait()</code> returns FALSE rather than TRUE. So the above code will stop with the custom error message upon disconnect or else continue. This affords a way of handling disconnects that would not be possible if simply using <code>call_aio()</code>, which is also a blocking wait (on a single message).</p>
+<p>As can be seen, this type of mechanism presents a powerful way of waiting simulatenously on multiple events, and also distinguishing between them. <code>pipe_notify()</code> can also be set to signal two condition variables upon each event, providing even more flexibility in creating complex concurrent applications.</p>
+<p>For further details, please refer to the function documentation for <code>cv()</code>.</p>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="tls-secure-connections">TLS Secure Connections</h3>
+<p>Secure connections are enabled through the combination of NNG and Mbed TLS libraries.</p>
+<p>Authentication of endpoints and encryption of the TCP transport layer is achieved transparently by:</p>
+<p>i) Specifying a secure <code>tls+tcp://</code> or <code>wss://</code> URL, and
+ii) Passing a TLS configuration object to the ‘tls’ argument of <code>listen()</code> or <code>dial()</code>.</p>
+<p>A TLS configuration, or ‘tlsConfig’, object is created by the <code>tls_config()</code> function. Specify the argument ‘client’ to create a client configuration, and ‘server’ to create a server configuration.</p>
+<p>A client configuration requires a PEM-encoded CA certificate (chain) used to verify the server identity. A server configuration requires the certificate and associated private key. These may be supplied as files or directly as character vectors. Valid X.509 certificates generated via a Certificate Signing Request to a Certificate Authority are supported in this way.</p>
+<p>Additionally, the convenience function <code>write_cert()</code> can automatically generate a 4096 bit RSA key pair and self-signed X.509 certificate in the format required by <code>tls_config()</code>. The ‘cn’ argument must be provided and match exactly the hostname / IP address of the URL that is being used, e.g. in the example below ‘127.0.0.1’ must be used throughout, or alternatively ‘localhost’, but not a mixture of the two.</p>
+<pre><code class="language-r">cert &lt;- write_cert(cn = &quot;127.0.0.1&quot;)
+str(cert)
+#&gt; List of 2
+#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJJwIBAAKCAgEAwKtfMkgvkLkIQmiki/vsP4/8ToUCDOmrl2K/J+C5hZm18aBy\n2iKA6x2WHm38&quot;| __truncated__
+#&gt;  $ client: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;&quot;
+
+ser &lt;- tls_config(server = cert$server)
+ser
+#&gt; &lt; TLS server config | auth mode: optional &gt;
+
+cli &lt;- tls_config(client = cert$client)
+cli
+#&gt; &lt; TLS client config | auth mode: required &gt;
+
+s &lt;- socket(listen = &quot;tls+tcp://127.0.0.1:5558&quot;, tls = ser)
+s1 &lt;- socket(dial = &quot;tls+tcp://127.0.0.1:5558&quot;, tls = cli)
+
+# secure TLS connection established
+
+close(s1)
+close(s)
+</code></pre>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="publisher-subscriber-model">Publisher Subscriber Model</h3>
+<p><code>nanonext</code> fully implements NNG’s pub/sub protocol as per the below example. A subscriber can subscribe to one or multiple topics broadcast by a publisher.</p>
+<pre><code class="language-r">pub &lt;- socket(&quot;pub&quot;, listen = &quot;inproc://nanobroadcast&quot;)
+sub &lt;- socket(&quot;sub&quot;, dial = &quot;inproc://nanobroadcast&quot;)
+
+sub |&gt; subscribe(topic = &quot;examples&quot;)
+
+pub |&gt; send(c(&quot;examples&quot;, &quot;this is an example&quot;), mode = &quot;raw&quot;)
+#&gt; [1] 0
+sub |&gt; recv(mode = &quot;character&quot;)
+#&gt; [1] &quot;examples&quot;           &quot;this is an example&quot;
+
+pub |&gt; send(&quot;examples at the start of a single text message&quot;, mode = &quot;raw&quot;)
+#&gt; [1] 0
+sub |&gt; recv(mode = &quot;character&quot;)
+#&gt; [1] &quot;examples at the start of a single text message&quot;
+
+pub |&gt; send(c(&quot;other&quot;, &quot;this other topic will not be received&quot;), mode = &quot;raw&quot;)
+#&gt; [1] 0
+sub |&gt; recv(mode = &quot;character&quot;)
+#&gt; 'errorValue' int 8 | Try again
+
+# specify NULL to subscribe to ALL topics
+sub |&gt; subscribe(topic = NULL)
+pub |&gt; send(c(&quot;newTopic&quot;, &quot;this is a new topic&quot;), mode = &quot;raw&quot;)
+#&gt; [1] 0
+sub |&gt; recv(&quot;character&quot;)
+#&gt; [1] &quot;newTopic&quot;            &quot;this is a new topic&quot;
+
+sub |&gt; unsubscribe(topic = NULL)
+pub |&gt; send(c(&quot;newTopic&quot;, &quot;this topic will now not be received&quot;), mode = &quot;raw&quot;)
+#&gt; [1] 0
+sub |&gt; recv(&quot;character&quot;)
+#&gt; 'errorValue' int 8 | Try again
+
+# however the topics explicitly subscribed to are still received
+pub |&gt; send(c(&quot;examples will still be received&quot;), mode = &quot;raw&quot;)
+#&gt; [1] 0
+sub |&gt; recv(mode = &quot;character&quot;)
+#&gt; [1] &quot;examples will still be received&quot;
+</code></pre>
+<p>The subscribed topic can be of any atomic type (not just character), allowing integer, double, logical, complex and raw vectors to be sent and received.</p>
+<pre><code class="language-r">sub |&gt; subscribe(topic = 1)
+pub |&gt; send(c(1, 10, 10, 20), mode = &quot;raw&quot;)
+#&gt; [1] 0
+sub |&gt; recv(mode = &quot;double&quot;)
+#&gt; [1]  1 10 10 20
+pub |&gt; send(c(2, 10, 10, 20), mode = &quot;raw&quot;)
+#&gt; [1] 0
+sub |&gt; recv(mode = &quot;double&quot;)
+#&gt; 'errorValue' int 8 | Try again
+
+close(pub)
+close(sub)
+</code></pre>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="surveyor-respondent-model">Surveyor Respondent Model</h3>
+<p>This type of pattern is useful for applications such as service discovery.</p>
+<p>A surveyor sends a survey, which is broadcast to all peer respondents. Respondents are then able to reply, but are not obliged to. The survey itself is a timed event, and responses received after the timeout are discarded.</p>
+<pre><code class="language-r">sur &lt;- socket(&quot;surveyor&quot;, listen = &quot;inproc://nanoservice&quot;)
+res1 &lt;- socket(&quot;respondent&quot;, dial = &quot;inproc://nanoservice&quot;)
+res2 &lt;- socket(&quot;respondent&quot;, dial = &quot;inproc://nanoservice&quot;)
+
+# sur sets a survey timeout, applying to this and subsequent surveys
+sur |&gt; survey_time(value = 500)
+
+# sur sends a message and then requests 2 async receives
+sur |&gt; send(&quot;service check&quot;)
+#&gt; [1] 0
+aio1 &lt;- sur |&gt; recv_aio()
+aio2 &lt;- sur |&gt; recv_aio()
+
+# res1 receives the message and replies using an aio send function
+res1 |&gt; recv()
+#&gt; [1] &quot;service check&quot;
+res1 |&gt; send_aio(&quot;res1&quot;)
+
+# res2 receives the message but fails to reply
+res2 |&gt; recv()
+#&gt; [1] &quot;service check&quot;
+
+# checking the aio - only the first will have resolved
+aio1$data
+#&gt; [1] &quot;res1&quot;
+aio2$data
+#&gt; 'unresolved' logi NA
+
+# after the survey expires, the second resolves into a timeout error
+msleep(500)
+aio2$data
+#&gt; 'errorValue' int 5 | Timed out
+
+close(sur)
+close(res1)
+close(res2)
+</code></pre>
+<p>Above, <code>msleep()</code> is an uninterruptible sleep function (utilising the NNG library), taking a time in milliseconds.</p>
+<p>It can be seen that the final value resolves into a timeout, which is an integer 5 classed as ‘errorValue’. All integer error codes are classed as ‘errorValue’ to be easily distinguishable from integer message values.</p>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="ncurl-async-http-client">ncurl: Async HTTP Client</h3>
+<p><code>ncurl()</code> is a minimalist http(s) client.</p>
+<p><code>ncurl_aio()</code> is the async edition, performing requests asynchronously, returning immediately with an ‘ncurlAio’.</p>
+<p>For normal use, it takes just the URL. It can follow redirects.</p>
+<pre><code class="language-r">ncurl(&quot;https://postman-echo.com/get&quot;)
+#&gt; $status
+#&gt; [1] 200
+#&gt; 
+#&gt; $headers
+#&gt; NULL
+#&gt; 
+#&gt; $data
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-659eac88-7aeb17424a64ed276158be7f\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
+</code></pre>
+<p>For advanced use, supports additional HTTP methods such as POST or PUT.</p>
+<pre><code class="language-r">res &lt;- ncurl_aio(&quot;https://postman-echo.com/post&quot;,
+                 method = &quot;POST&quot;,
+                 headers = c(`Content-Type` = &quot;application/json&quot;, Authorization = &quot;Bearer APIKEY&quot;),
+                 data = '{&quot;key&quot;: &quot;value&quot;}',
+                 response = &quot;date&quot;)
+res
+#&gt; &lt; ncurlAio | $status $headers $data &gt;
+
+call_aio(res)$headers
+#&gt; $date
+#&gt; [1] &quot;Wed, 10 Jan 2024 14:41:12 GMT&quot;
+
+res$data
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-659eac88-7a682ad249d92cd61c497f38\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
+</code></pre>
+<p>In this respect, it may be used as a performant and lightweight method for making REST API requests.</p>
+<p><code>ncurl_session()</code> creates a re-usable open connection and presents a much faster and more efficient solution for repeated polling of an API endpoint. <code>transact()</code> is then used to request data multiple times as required. This method allows a polling frequency that exceeds a server’s new connection limits, where this is permitted.</p>
+<p>By specifying <code>convert = FALSE</code>, the received binary data is made available as a raw vector. This may be fed into ‘json’ parsers which can operate directly on such data etc.</p>
+<pre><code class="language-r">sess &lt;- ncurl_session(&quot;https://postman-echo.com/get&quot;,
+                      convert = FALSE,
+                      headers = c(`Content-Type` = &quot;application/json&quot;, Authorization = &quot;Bearer APIKEY&quot;),
+                      response = c(&quot;Date&quot;, &quot;Content-Type&quot;))
+sess
+#&gt; &lt; ncurlSession &gt; - transact() to return data
+
+transact(sess)
+#&gt; $status
+#&gt; [1] 200
+#&gt; 
+#&gt; $headers
+#&gt; $headers$Date
+#&gt; [1] &quot;Wed, 10 Jan 2024 14:41:13 GMT&quot;
+#&gt; 
+#&gt; $headers$`Content-Type`
+#&gt; [1] &quot;application/json; charset=utf-8&quot;
+#&gt; 
+#&gt; 
+#&gt; $data
+#&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 78 2d 66 6f
+#&gt;  [41] 72 77 61 72 64 65 64 2d 70 72 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65
+#&gt;  [81] 64 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20 22 68 6f 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68
+#&gt; [121] 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36
+#&gt; [161] 35 39 65 61 63 38 39 2d 32 36 37 34 36 66 35 63 34 65 61 36 64 35 32 39 36 33 33 34 36 39 30 31 22 2c 0a 20 20 20 20 22
+#&gt; [201] 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c 0a 20 20 20 20 22
+#&gt; [241] 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20 20 7d 2c 0a 20 20 22
+#&gt; [281] 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f 67 65 74 22 0a 7d
+</code></pre>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="stream-websocket-client">stream: Websocket Client</h3>
+<p><code>stream()</code> exposes NNG’s low-level byte stream interface for communicating with raw sockets. This may be used for connecting to arbitrary non-NNG endpoints.</p>
+<p>The stream interface can be used to communicate with (secure) websocket servers. The argument <code>textframes = TRUE</code> can be specified where the websocket server uses text rather than binary frames.</p>
+<pre><code class="language-r"># connecting to an echo service
+s &lt;- stream(dial = &quot;wss://echo.websocket.events/&quot;, textframes = TRUE)
+s
+#&gt; &lt; nanoStream &gt;
+#&gt;  - mode: dialer text frames
+#&gt;  - state: opened
+#&gt;  - url: wss://echo.websocket.events/
+</code></pre>
+<p><code>send()</code> and <code>recv()</code>, as well as their asynchronous counterparts <code>send_aio()</code> and <code>recv_aio()</code> can be used on Streams in the same way as Sockets. This affords a great deal of flexibility in ingesting and processing streaming data.</p>
+<pre><code class="language-r">s |&gt; recv()
+#&gt; [1] &quot;echo.websocket.events sponsored by Lob.com&quot;
+
+s |&gt; send(&quot;initial message&quot;)
+#&gt; [1] 0
+
+s |&gt; recv()
+#&gt; [1] &quot;initial message&quot;
+
+s |&gt; recv_aio() -&gt; r
+
+s |&gt; send(&quot;async message&quot;)
+#&gt; [1] 0
+
+s |&gt; send(&quot;final message&quot;)
+#&gt; [1] 0
+
+s |&gt; recv()
+#&gt; [1] &quot;final message&quot;
+
+r$data
+#&gt; [1] &quot;async message&quot;
+
+close(s)
+</code></pre>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="cryptographic-hashing">Cryptographic Hashing</h3>
+<p>Functions performing hashing using the SHA-1 and SHA-2 series of algorithms are included: <code>sha1()</code>, <code>sha224()</code>, <code>sha256()</code>, <code>sha384()</code> and <code>sha512()</code>.</p>
+<p>These expose the secure, optimized implementations from the ‘Mbed TLS’ library and return a hash either directly as a raw vector or converted to a character string. For use in authentication, raw vectors can be compared directly for the highest performance.</p>
+<p>To generate an HMAC (hash-based message authentication code), simply supply the value ‘key’ to use as the secret key.</p>
+<pre><code class="language-r">sha256(&quot;hello world!&quot;)
+#&gt; [1] &quot;7509e5bda0c762d2bac7f90d758b5b2263fa01ccbc542ab5e3df163be08e6ca9&quot;
+
+sha256(&quot;hello world!&quot;, convert = FALSE)
+#&gt;  [1] 75 09 e5 bd a0 c7 62 d2 ba c7 f9 0d 75 8b 5b 22 63 fa 01 cc bc 54 2a b5 e3 df 16 3b e0 8e 6c a9
+
+sha256(&quot;hello world!&quot;, key = &quot;MY_SECRET&quot;)
+#&gt; [1] &quot;d8f0e2d368ff632682d55e2c1ccd49c15f8a6a3862d8eb68f1906b6ee658890a&quot;
+</code></pre>
+<p>Optimised functions for base64 encoding and decoding from the ‘Mbed TLS’ library are also provided:</p>
+<pre><code class="language-r">base64enc(&quot;hello world!&quot;)
+#&gt; [1] &quot;aGVsbG8gd29ybGQh&quot;
+
+base64dec(base64enc(&quot;hello world!&quot;))
+#&gt; [1] &quot;hello world!&quot;
+</code></pre>
+<p>Performance is such that base64 decoding a character string into a raw vector can be faster than creating a new raw vector using <code>as.raw()</code>.</p>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+<h3 id="options-and-statistics">Options and Statistics</h3>
+<p>Use <code>opt()</code> and <code>'opt&lt;-'()</code> to get and set options on a Socket, Context, Stream, Listener or Dialer.</p>
+<p>See the function documentation page for a list of common options.</p>
+<p>Once a dialer or listener has started, it is not generally possible to change its configuration. In this case, the dialer or listener should be created specifying ‘autostart = FALSE’.</p>
+<pre><code class="language-r">s &lt;- socket(listen = &quot;inproc://options&quot;, autostart = FALSE)
+
+# no maximum message size
+opt(s$listener[[1]], &quot;recv-size-max&quot;)
+#&gt; [1] 0
+
+# enfore maximum message size to protect against denial-of-service type attacks
+opt(s$listener[[1]], &quot;recv-size-max&quot;) &lt;- 8192L
+
+opt(s$listener[[1]], &quot;recv-size-max&quot;)
+#&gt; [1] 8192
+
+start(s$listener[[1]])
+</code></pre>
+<p>Similarly <code>stat()</code> has been implemented as the interface to NNG’s statistics framework.</p>
+<p>This can be used on a Socket, Listener or Dialer to query useful statistics such as the total number of connection attempts, the current number of connections etc.</p>
+<p>See the function documentation page for available statistics.</p>
+<pre><code class="language-r">s &lt;- socket(listen = &quot;inproc://stat&quot;)
+
+# no active connections (pipes)
+stat(s, &quot;pipes&quot;)
+#&gt; [1] 0
+
+s1 &lt;- socket(dial = &quot;inproc://stat&quot;)
+
+# one now that the dialer has conneceted
+stat(s, &quot;pipes&quot;)
+#&gt; [1] 1
+</code></pre>
+<p><a href="#table-of-contents">« Back to ToC</a></p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
+</body>
+</html>

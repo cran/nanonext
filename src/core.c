@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
 //
 // This file is part of nanonext.
 //
@@ -16,11 +16,13 @@
 
 // nanonext - C level - Core Functions -----------------------------------------
 
+#define NANONEXT_SUPPLEMENTALS
 #include "nanonext.h"
 
 // internals -------------------------------------------------------------------
 
 static uint8_t special_bit = 0;
+static uint8_t registered = 0;
 
 typedef union nano_opt_u {
   char *str;
@@ -38,6 +40,15 @@ SEXP mk_error(const int xc) {
   SET_OBJECT(err, 1);
   return err;
 
+}
+
+SEXP eval_safe (void *call) {
+  return Rf_eval((SEXP) call, R_GlobalEnv);
+}
+
+void rl_reset(void *nothing, Rboolean jump) {
+  if (jump && nothing == NULL)
+    SET_TAG(nano_refHook, R_NilValue);
 }
 
 static void nano_write_char(R_outpstream_t stream, int c) {
@@ -58,8 +69,10 @@ static void nano_write_bytes(R_outpstream_t stream, void *src, int len) {
 
   size_t req = buf->cur + (size_t) len;
   if (req > buf->len) {
-    if (req > R_XLEN_T_MAX)
+    if (req > R_XLEN_T_MAX) {
+      if (buf->len) R_Free(buf->buf);
       Rf_error("serialization exceeds max length of raw vector");
+    }
     do {
       buf->len <<= 1;
     } while (buf->len < req);
@@ -96,23 +109,13 @@ static SEXP rawOneString(unsigned char *bytes, R_xlen_t nbytes, R_xlen_t *np) {
 
   unsigned char *p;
   R_xlen_t i;
-  char *cbuf;
   SEXP res;
 
   for (i = *np, p = bytes + *np; i < nbytes; p++, i++)
     if (*p == '\0') break;
 
-  if (i < nbytes) {
-    p = bytes + *np;
-    res = Rf_mkCharLenCE((char *) p, (int) (i - *np), CE_NATIVE);
-    *np = i + 1;
-  } else {
-    cbuf = R_chk_calloc(nbytes - *np + 1, sizeof(char));
-    memcpy(cbuf, bytes + *np, nbytes - *np);
-    res = Rf_mkCharLenCE(cbuf, (int) (nbytes - *np), CE_NATIVE);
-    R_Free(cbuf);
-    *np = nbytes;
-  }
+  res = Rf_mkCharLenCE((const char *) (bytes + *np), (int) (i - *np), CE_NATIVE);
+  *np = i < nbytes ? i + 1 : nbytes;
 
   return res;
 
@@ -141,16 +144,17 @@ SEXP rawToChar(unsigned char *buf, const size_t sz) {
 static SEXP nano_inHook(SEXP x, SEXP fun) {
 
   if (TYPEOF(x) != EXTPTRSXP)
-    return R_NilValue;
+    return fun;
   SEXP list, names, out;
   R_xlen_t xlen;
-  if (nano_refList == R_NilValue) {
+  list = TAG(nano_refHook);
+  if (list == R_NilValue) {
     xlen = 0;
     PROTECT(list = Rf_allocVector(VECSXP, 1));
     SET_VECTOR_ELT(list, xlen, x);
   } else {
-    xlen = Rf_xlength(nano_refList);
-    PROTECT(list = Rf_xlengthgets(nano_refList, xlen + 1));
+    xlen = Rf_xlength(list);
+    PROTECT(list = Rf_xlengthgets(list, xlen + 1));
     SET_VECTOR_ELT(list, xlen, x);
   }
   char idx[NANONEXT_LD_STRLEN];
@@ -161,10 +165,9 @@ static SEXP nano_inHook(SEXP x, SEXP fun) {
   } else {
     PROTECT(names = Rf_getAttrib(list, R_NamesSymbol));
     SET_STRING_ELT(names, xlen, out);
-    R_ReleaseObject(nano_refList);
   }
   Rf_namesgets(list, names);
-  R_PreserveObject(nano_refList = list);
+  SET_TAG(nano_refHook, list);
 
   UNPROTECT(3);
   return Rf_ScalarString(out);
@@ -173,7 +176,7 @@ static SEXP nano_inHook(SEXP x, SEXP fun) {
 
 static SEXP nano_outHook(SEXP x, SEXP fun) {
 
-  const long int i = atol(CHAR(STRING_ELT(x, 0))) - 1;
+  const long int i = atol(CHAR(*(SEXP *) STDVEC_DATAPTR(x))) - 1;
 
   return VECTOR_ELT(fun, i);
 
@@ -206,8 +209,6 @@ void nano_serialize(nano_buf *buf, SEXP object) {
 
 void nano_serialize_next(nano_buf *buf, SEXP object) {
 
-  const uint8_t registered = nano_refHookIn != R_NilValue;
-
   NANO_ALLOC(buf, NANONEXT_INIT_BUFSIZE);
   buf->buf[0] = 7u;
   buf->buf[1] = registered;
@@ -233,28 +234,24 @@ void nano_serialize_next(nano_buf *buf, SEXP object) {
 
   R_Serialize(object, &output_stream);
 
-  if (registered && nano_refList != R_NilValue) {
+  if (registered && TAG(nano_refHook) != R_NilValue) {
     uint64_t cursor = (uint64_t) buf->cur;
     memcpy(buf->buf + 4, &cursor, 8);
     SEXP call, out;
-    PROTECT(call = Rf_lcons(nano_refHookIn, Rf_cons(nano_refList, R_NilValue)));
-    PROTECT(out = Rf_eval(call, R_GlobalEnv));
-    if (TYPEOF(out) != RAWSXP) {
-      R_ReleaseObject(nano_refList);
-      nano_refList = R_NilValue;
-      Rf_error("serialization refhook did not return a raw vector");
+    PROTECT(call = Rf_lcons(CAR(nano_refHook), Rf_cons(TAG(nano_refHook), R_NilValue)));
+    PROTECT(out = R_UnwindProtect(eval_safe, call, rl_reset, NULL, NULL));
+    if (TYPEOF(out) == RAWSXP) {
+      R_xlen_t xlen = XLENGTH(out);
+      if (buf->cur + xlen > buf->len) {
+        buf->len = buf->cur + xlen;
+        buf->buf = R_Realloc(buf->buf, buf->len, unsigned char);
+      }
+      memcpy(buf->buf + buf->cur, STDVEC_DATAPTR(out), xlen);
+      buf->cur += xlen;
     }
-    R_xlen_t xlen = XLENGTH(out);
-    if (buf->cur + xlen > buf->len) {
-      buf->len = buf->cur + xlen;
-      buf->buf = R_Realloc(buf->buf, buf->len, unsigned char);
-    }
-    memcpy(buf->buf + buf->cur, STDVEC_DATAPTR(out), xlen);
-    buf->cur += xlen;
 
     UNPROTECT(2);
-    R_ReleaseObject(nano_refList);
-    nano_refList = R_NilValue;
+    SET_TAG(nano_refHook, R_NilValue);
   }
 
 }
@@ -299,10 +296,8 @@ SEXP nano_unserialize(unsigned char *buf, const size_t sz) {
           SEXP raw, call;
           PROTECT(raw = Rf_allocVector(RAWSXP, sz - offset));
           memcpy(STDVEC_DATAPTR(raw), buf + offset, sz - offset);
-          PROTECT(call = Rf_lcons(nano_refHookOut, Rf_cons(raw, R_NilValue)));
+          PROTECT(call = Rf_lcons(CADR(nano_refHook), Rf_cons(raw, R_NilValue)));
           PROTECT(reflist = Rf_eval(call, R_GlobalEnv));
-          if (TYPEOF(reflist) != VECSXP)
-            Rf_error("unserialization refhook did not return a list");
         }
         cur = 12;
         goto resume;
@@ -565,10 +560,31 @@ SEXP nano_decode(unsigned char *buf, size_t sz, const int mod) {
 
 static void context_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nng_ctx *xp = (nng_ctx *) R_ExternalPtrAddr(xptr);
   nng_ctx_close(*xp);
+  R_Free(xp);
+
+}
+
+void dialer_finalizer(SEXP xptr) {
+
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
+  nano_dialer *xp = (nano_dialer *) R_ExternalPtrAddr(xptr);
+  nng_dialer_close(xp->dial);
+  if (xp->tls != NULL)
+    nng_tls_config_free(xp->tls);
+  R_Free(xp);
+
+}
+
+void listener_finalizer(SEXP xptr) {
+
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
+  nano_listener *xp = (nano_listener *) R_ExternalPtrAddr(xptr);
+  nng_listener_close(xp->list);
+  if (xp->tls != NULL)
+    nng_tls_config_free(xp->tls);
   R_Free(xp);
 
 }
@@ -646,17 +662,234 @@ SEXP rnng_ctx_close(SEXP context) {
 
 }
 
+// dialers and listeners -------------------------------------------------------
+
+SEXP rnng_dial(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP error) {
+
+  if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
+    Rf_error("'socket' is not a valid Socket");
+
+  const uint8_t sec = tls != R_NilValue;
+
+  if (sec && R_ExternalPtrTag(tls) != nano_TlsSymbol)
+    Rf_error("'tls' is not a valid TLS Configuration");
+
+  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
+  const int start = *NANO_INTEGER(autostart);
+  const char *ur = CHAR(STRING_ELT(url, 0));
+  nano_dialer *dp = R_Calloc(1, nano_dialer);
+  SEXP dialer, klass, attr, newattr;
+  nng_url *up;
+  int xc;
+
+  if (sec) {
+    if ((xc = nng_dialer_create(&dp->dial, *sock, ur)))
+      goto exitlevel1;
+    dp->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
+    nng_tls_config_hold(dp->tls);
+    if ((xc = nng_url_parse(&up, ur)))
+      goto exitlevel2;
+    if ((xc = nng_tls_config_server_name(dp->tls, up->u_hostname)) ||
+        (xc = nng_dialer_set_ptr(dp->dial, NNG_OPT_TLS_CONFIG, dp->tls)))
+      goto exitlevel3;
+    nng_url_free(up);
+  }
+
+  switch (start) {
+  case 0:
+    xc = sec ? 0 : nng_dialer_create(&dp->dial, *sock, ur);
+    break;
+  case 1:
+    xc = sec ? nng_dialer_start(dp->dial, NNG_FLAG_NONBLOCK) : nng_dial(*sock, ur, &dp->dial, NNG_FLAG_NONBLOCK);
+    break;
+  default:
+    xc = sec ? nng_dialer_start(dp->dial, 0) : nng_dial(*sock, ur, &dp->dial, 0);
+  }
+  if (xc)
+    goto exitlevel1;
+
+  PROTECT(dialer = R_MakeExternalPtr(dp, nano_DialerSymbol, R_NilValue));
+  R_RegisterCFinalizerEx(dialer, dialer_finalizer, TRUE);
+
+  klass = Rf_allocVector(STRSXP, 2);
+  Rf_classgets(dialer, klass);
+  SET_STRING_ELT(klass, 0, Rf_mkChar("nanoDialer"));
+  SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
+  Rf_setAttrib(dialer, nano_IdSymbol, Rf_ScalarInteger(nng_dialer_id(dp->dial)));
+  Rf_setAttrib(dialer, nano_UrlSymbol, url);
+  Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString(start ? "started" : "not started"));
+  Rf_setAttrib(dialer, nano_SocketSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
+
+  attr = Rf_getAttrib(socket, nano_DialerSymbol);
+  if (attr == R_NilValue) {
+    PROTECT(newattr = Rf_allocVector(VECSXP, 1));
+    SET_VECTOR_ELT(newattr, 0, dialer);
+  } else {
+    R_xlen_t xlen = Rf_xlength(attr);
+    PROTECT(newattr = Rf_allocVector(VECSXP, xlen + 1));
+    for (R_xlen_t i = 0; i < xlen; i++)
+      SET_VECTOR_ELT(newattr, i, VECTOR_ELT(attr, i));
+    SET_VECTOR_ELT(newattr, xlen, dialer);
+  }
+  Rf_setAttrib(socket, nano_DialerSymbol, newattr);
+
+  UNPROTECT(2);
+  return nano_success;
+
+  exitlevel3:
+    nng_url_free(up);
+  exitlevel2:
+    nng_tls_config_free(dp->tls);
+  exitlevel1:
+    R_Free(dp);
+  if (*NANO_INTEGER(error)) ERROR_OUT(xc);
+  ERROR_RET(xc);
+
+}
+
+SEXP rnng_listen(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP error) {
+
+  if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
+    Rf_error("'socket' is not a valid Socket");
+
+  const uint8_t sec = tls != R_NilValue;
+
+  if (sec && R_ExternalPtrTag(tls) != nano_TlsSymbol)
+    Rf_error("'tls' is not a valid TLS Configuration");
+
+  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
+  const int start = *NANO_INTEGER(autostart);
+  const char *ur = CHAR(STRING_ELT(url, 0));
+  nano_listener *lp = R_Calloc(1, nano_listener);
+  SEXP listener, klass, attr, newattr;
+  nng_url *up;
+  int xc;
+
+  if (sec) {
+    if ((xc = nng_listener_create(&lp->list, *sock, ur)))
+      goto exitlevel1;
+    lp->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
+    nng_tls_config_hold(lp->tls);
+    if ((xc = nng_url_parse(&up, ur)))
+      goto exitlevel2;
+    if ((xc = nng_tls_config_server_name(lp->tls, up->u_hostname)) ||
+        (xc = nng_listener_set_ptr(lp->list, NNG_OPT_TLS_CONFIG, lp->tls)))
+      goto exitlevel3;
+    nng_url_free(up);
+  }
+
+  if (start) {
+    xc = sec ? nng_listener_start(lp->list, 0) : nng_listen(*sock, ur, &lp->list, 0);
+  } else {
+    xc = sec ? 0 : nng_listener_create(&lp->list, *sock, ur);
+  }
+  if (xc)
+    goto exitlevel1;
+
+  PROTECT(listener = R_MakeExternalPtr(lp, nano_ListenerSymbol, R_NilValue));
+  R_RegisterCFinalizerEx(listener, listener_finalizer, TRUE);
+
+  klass = Rf_allocVector(STRSXP, 2);
+  Rf_classgets(listener, klass);
+  SET_STRING_ELT(klass, 0, Rf_mkChar("nanoListener"));
+  SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
+  Rf_setAttrib(listener, nano_IdSymbol, Rf_ScalarInteger(nng_listener_id(lp->list)));
+  Rf_setAttrib(listener, nano_UrlSymbol, url);
+  Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString(start ? "started" : "not started"));
+  Rf_setAttrib(listener, nano_SocketSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
+
+  attr = Rf_getAttrib(socket, nano_ListenerSymbol);
+  if (attr == R_NilValue) {
+    PROTECT(newattr = Rf_allocVector(VECSXP, 1));
+    SET_VECTOR_ELT(newattr, 0, listener);
+  } else {
+    R_xlen_t xlen = Rf_xlength(attr);
+    PROTECT(newattr = Rf_allocVector(VECSXP, xlen + 1));
+    for (R_xlen_t i = 0; i < xlen; i++)
+      SET_VECTOR_ELT(newattr, i, VECTOR_ELT(attr, i));
+    SET_VECTOR_ELT(newattr, xlen, listener);
+  }
+  Rf_setAttrib(socket, nano_ListenerSymbol, newattr);
+
+  UNPROTECT(2);
+  return nano_success;
+
+  exitlevel3:
+    nng_url_free(up);
+  exitlevel2:
+    nng_tls_config_free(lp->tls);
+  exitlevel1:
+    R_Free(lp);
+  if (*NANO_INTEGER(error)) ERROR_OUT(xc);
+  ERROR_RET(xc);
+
+}
+
+SEXP rnng_dialer_start(SEXP dialer, SEXP async) {
+
+  if (R_ExternalPtrTag(dialer) != nano_DialerSymbol)
+    Rf_error("'dialer' is not a valid Dialer");
+  nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(dialer);
+  const int flags = (*NANO_INTEGER(async) == 1) * NNG_FLAG_NONBLOCK;
+  const int xc = nng_dialer_start(*dial, flags);
+  if (xc)
+    ERROR_RET(xc);
+
+  Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString("started"));
+  return nano_success;
+
+}
+
+SEXP rnng_listener_start(SEXP listener) {
+
+  if (R_ExternalPtrTag(listener) != nano_ListenerSymbol)
+    Rf_error("'listener' is not a valid Listener");
+  nng_listener *list = (nng_listener *) R_ExternalPtrAddr(listener);
+  const int xc = nng_listener_start(*list, 0);
+  if (xc)
+    ERROR_RET(xc);
+
+  Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString("started"));
+  return nano_success;
+
+}
+
+SEXP rnng_dialer_close(SEXP dialer) {
+
+  if (R_ExternalPtrTag(dialer) != nano_DialerSymbol)
+    Rf_error("'dialer' is not a valid Dialer");
+  nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(dialer);
+  const int xc = nng_dialer_close(*dial);
+  if (xc)
+    ERROR_RET(xc);
+  Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString("closed"));
+  return nano_success;
+
+}
+
+SEXP rnng_listener_close(SEXP listener) {
+
+  if (R_ExternalPtrTag(listener) != nano_ListenerSymbol)
+    Rf_error("'listener' is not a valid Listener");
+  nng_listener *list = (nng_listener *) R_ExternalPtrAddr(listener);
+  const int xc = nng_listener_close(*list);
+  if (xc)
+    ERROR_RET(xc);
+  Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString("closed"));
+  return nano_success;
+
+}
+
 // send and recv ---------------------------------------------------------------
 
 SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
 
+  const int flags = block == R_NilValue ? NNG_DURATION_DEFAULT : TYPEOF(block) == LGLSXP ? 0 : Rf_asInteger(block);
   nano_buf buf;
   int xc;
 
   const SEXP ptrtag = R_ExternalPtrTag(con);
   if (ptrtag == nano_SocketSymbol) {
-
-    nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
 
     switch (nano_encodes(mode)) {
     case 1:
@@ -667,21 +900,17 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
       nano_serialize_next(&buf, data); break;
     }
 
-    if (block == R_NilValue) {
+    nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
 
-      xc = nng_send(*sock, buf.buf, buf.cur, NNG_FLAG_NONBLOCK);
-      NANO_FREE(buf);
+    if (flags <= 0) {
 
-    } else if (TYPEOF(block) == LGLSXP) {
-
-      xc = nng_send(*sock, buf.buf, buf.cur, (LOGICAL(block)[0] == 0) * NNG_FLAG_NONBLOCK);
+      xc = nng_send(*sock, buf.buf, buf.cur, flags ? NNG_FLAG_NONBLOCK : (*NANO_INTEGER(block) == 0) * NNG_FLAG_NONBLOCK);
       NANO_FREE(buf);
 
     } else {
 
       nng_msg *msgp;
       nng_aio *aiop;
-      const nng_duration dur = (nng_duration) Rf_asInteger(block);
 
       if ((xc = nng_msg_alloc(&msgp, 0)))
         goto exitlevel1;
@@ -693,7 +922,7 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
       }
 
       nng_aio_set_msg(aiop, msgp);
-      nng_aio_set_timeout(aiop, dur);
+      nng_aio_set_timeout(aiop, flags);
       nng_send_aio(*sock, aiop);
       NANO_FREE(buf);
       nng_aio_wait(aiop);
@@ -705,8 +934,6 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
 
   } else if (ptrtag == nano_ContextSymbol) {
 
-    nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
-
     switch (nano_encodes(mode)) {
     case 1:
       nano_serialize(&buf, data); break;
@@ -716,12 +943,10 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
       nano_serialize_next(&buf, data); break;
     }
 
+    nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
     nng_msg *msgp;
 
 #ifdef NANONEXT_LEGACY_NNG
-
-    const nng_duration dur = block == R_NilValue ? NNG_DURATION_DEFAULT :
-      TYPEOF(block) == LGLSXP ? (LOGICAL(block)[0] == 1) * NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(block);
 
     nng_aio *aiop;
 
@@ -735,7 +960,7 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
     }
 
     nng_aio_set_msg(aiop, msgp);
-    nng_aio_set_timeout(aiop, dur);
+    nng_aio_set_timeout(aiop, flags ? flags : (*NANO_INTEGER(block) == 1) * NNG_DURATION_DEFAULT);
     nng_ctx_send(*ctxp, aiop);
     NANO_FREE(buf);
     nng_aio_wait(aiop);
@@ -745,26 +970,13 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
 
 #else
 
-    if (block == R_NilValue) {
+    if (flags <= 0) {
 
       if ((xc = nng_msg_alloc(&msgp, 0)))
         goto exitlevel1;
 
       if ((xc = nng_msg_append(msgp, buf.buf, buf.cur)) ||
-          (xc = nng_ctx_sendmsg(*ctxp, msgp, 0))) {
-        nng_msg_free(msgp);
-        goto exitlevel1;
-      }
-
-      NANO_FREE(buf);
-
-    } else if (TYPEOF(block) == LGLSXP) {
-
-      if ((xc = nng_msg_alloc(&msgp, 0)))
-        goto exitlevel1;
-
-      if ((xc = nng_msg_append(msgp, buf.buf, buf.cur)) ||
-          (xc = nng_ctx_sendmsg(*ctxp, msgp, (LOGICAL(block)[0] == 0) * NNG_FLAG_NONBLOCK))) {
+          (xc = nng_ctx_sendmsg(*ctxp, msgp, flags ? 0 : (*NANO_INTEGER(block) == 0) * NNG_FLAG_NONBLOCK))) {
         nng_msg_free(msgp);
         goto exitlevel1;
       }
@@ -773,7 +985,6 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
 
     } else {
 
-      const nng_duration dur = (nng_duration) Rf_asInteger(block);
       nng_aio *aiop;
 
       if ((xc = nng_msg_alloc(&msgp, 0)))
@@ -786,7 +997,7 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
       }
 
       nng_aio_set_msg(aiop, msgp);
-      nng_aio_set_timeout(aiop, dur);
+      nng_aio_set_timeout(aiop, flags);
       nng_ctx_send(*ctxp, aiop);
       NANO_FREE(buf);
       nng_aio_wait(aiop);
@@ -800,16 +1011,14 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
 
   } else if (ptrtag == nano_StreamSymbol) {
 
-    nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(con);
-    nng_aio *aiop;
-    nng_iov iov;
-    const nng_duration dur = block == R_NilValue ? NNG_DURATION_DEFAULT :
-      TYPEOF(block) == LGLSXP ? (LOGICAL(block)[0] == 1) * NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(block);
-
     nano_encode(&buf, data);
 
-    const int frames = LOGICAL(Rf_getAttrib(con, nano_TextframesSymbol))[0];
-    iov.iov_len = buf.cur - (frames == 1);
+    nano_stream *nst = (nano_stream *) R_ExternalPtrAddr(con);
+    nng_stream *sp = nst->stream;
+    nng_aio *aiop;
+    nng_iov iov;
+
+    iov.iov_len = buf.cur - nst->textframes;
     iov.iov_buf = buf.buf;
 
     if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
@@ -820,7 +1029,7 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
       return mk_error(xc);
     }
 
-    nng_aio_set_timeout(aiop, dur);
+    nng_aio_set_timeout(aiop, flags ? flags : (*NANO_INTEGER(block) == 1) * NNG_DURATION_DEFAULT);
     nng_stream_send(sp, aiop);
     nng_aio_wait(aiop);
     xc = nng_aio_result(aiop);
@@ -843,7 +1052,8 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
 
 SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
 
-  int xc;
+  const int flags = block == R_NilValue ? NNG_DURATION_DEFAULT : TYPEOF(block) == LGLSXP ? 0 : Rf_asInteger(block);
+  int mod, xc;
   unsigned char *buf;
   size_t sz;
   SEXP res;
@@ -851,21 +1061,12 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
   const SEXP ptrtag = R_ExternalPtrTag(con);
   if (ptrtag == nano_SocketSymbol) {
 
+    mod = nano_matcharg(mode);
     nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
-    const int mod = nano_matcharg(mode);
 
-    if (block == R_NilValue) {
+    if (flags <= 0) {
 
-      xc = nng_recv(*sock, &buf, &sz, NNG_FLAG_ALLOC + NNG_FLAG_NONBLOCK);
-      if (xc)
-        return mk_error(xc);
-
-      res = nano_decode(buf, sz, mod);
-      nng_free(buf, sz);
-
-    } else if (TYPEOF(block) == LGLSXP) {
-
-      xc = nng_recv(*sock, &buf, &sz, NNG_FLAG_ALLOC + (LOGICAL(block)[0] == 0) * NNG_FLAG_NONBLOCK);
+      xc = nng_recv(*sock, &buf, &sz, NNG_FLAG_ALLOC + (flags || *NANO_INTEGER(block) == 0) * NNG_FLAG_NONBLOCK);
       if (xc)
         return mk_error(xc);
 
@@ -875,10 +1076,9 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
     } else {
 
       nng_aio *aiop;
-      nng_duration dur = (nng_duration) Rf_asInteger(block);
       if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
         return mk_error(xc);
-      nng_aio_set_timeout(aiop, dur);
+      nng_aio_set_timeout(aiop, flags);
       nng_recv_aio(*sock, aiop);
       nng_aio_wait(aiop);
       if ((xc = nng_aio_result(aiop))) {
@@ -895,19 +1095,17 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
 
   } else if (ptrtag == nano_ContextSymbol) {
 
+    mod = nano_matcharg(mode);
     nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
-    const int mod = nano_matcharg(mode);
     nng_msg *msgp;
 
 #ifdef NANONEXT_LEGACY_NNG
 
-    const nng_duration dur = block == R_NilValue ? NNG_DURATION_DEFAULT :
-      TYPEOF(block) == LGLSXP ? (LOGICAL(block)[0] == 1) * NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(block);
     nng_aio *aiop;
 
     if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
       return mk_error(xc);
-    nng_aio_set_timeout(aiop, dur);
+    nng_aio_set_timeout(aiop, flags ? flags : (*NANO_INTEGER(block) == 1) * NNG_DURATION_DEFAULT);
     nng_ctx_recv(*ctxp, aiop);
 
     nng_aio_wait(aiop);
@@ -925,20 +1123,9 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
 
 #else
 
-    if (block == R_NilValue) {
+    if (flags <= 0) {
 
-      xc = nng_ctx_recvmsg(*ctxp, &msgp, 0);
-      if (xc)
-        return mk_error(xc);
-
-      buf = nng_msg_body(msgp);
-      sz = nng_msg_len(msgp);
-      res = nano_decode(buf, sz, mod);
-      nng_msg_free(msgp);
-
-    } else if (TYPEOF(block) == LGLSXP) {
-
-      xc = nng_ctx_recvmsg(*ctxp, &msgp, (LOGICAL(block)[0] == 0) * NNG_FLAG_NONBLOCK);
+      xc = nng_ctx_recvmsg(*ctxp, &msgp, flags ? 0 : (*NANO_INTEGER(block) == 0) * NNG_FLAG_NONBLOCK);
       if (xc)
         return mk_error(xc);
 
@@ -949,12 +1136,11 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
 
     } else {
 
-      const nng_duration dur = (nng_duration) Rf_asInteger(block);
       nng_aio *aiop;
 
       if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
         return mk_error(xc);
-      nng_aio_set_timeout(aiop, dur);
+      nng_aio_set_timeout(aiop, flags);
       nng_ctx_recv(*ctxp, aiop);
 
       nng_aio_wait(aiop);
@@ -976,11 +1162,9 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
 
   } else if (ptrtag == nano_StreamSymbol) {
 
-    nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(con);
-    const int mod = nano_matchargs(mode);
+    mod = nano_matchargs(mode);
     const size_t xlen = (size_t) Rf_asInteger(bytes);
-    const nng_duration dur = block == R_NilValue ? NNG_DURATION_DEFAULT :
-      TYPEOF(block) == LGLSXP ? (LOGICAL(block)[0] == 1) * NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(block);
+    nng_stream **sp = (nng_stream **) R_ExternalPtrAddr(con);
     nng_iov iov;
     nng_aio *aiop;
 
@@ -996,8 +1180,8 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
       goto exitlevel1;
     }
 
-    nng_aio_set_timeout(aiop, dur);
-    nng_stream_recv(sp, aiop);
+    nng_aio_set_timeout(aiop, flags ? flags : (*NANO_INTEGER(block) == 1) * NNG_DURATION_DEFAULT);
+    nng_stream_recv(*sp, aiop);
 
     nng_aio_wait(aiop);
     if ((xc = nng_aio_result(aiop))) {
@@ -1053,7 +1237,7 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_socket_set_uint64(*sock, op, (uint64_t) val);
       break;
     case LGLSXP:
-      xc = nng_socket_set_bool(*sock, op, (bool) LOGICAL(value)[0]);
+      xc = nng_socket_set_bool(*sock, op, (bool) *NANO_INTEGER(value));
       break;
     default:
       Rf_error("type of 'value' not supported");
@@ -1081,7 +1265,7 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_ctx_set_uint64(*ctx, op, (uint64_t) val);
       break;
     case LGLSXP:
-      xc = nng_ctx_set_bool(*ctx, op, (bool) LOGICAL(value)[0]);
+      xc = nng_ctx_set_bool(*ctx, op, (bool) *NANO_INTEGER(value));
       break;
     default:
       Rf_error("type of 'value' not supported");
@@ -1089,27 +1273,27 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
 
   } else if (ptrtag == nano_StreamSymbol) {
 
-    nng_stream *st = (nng_stream *) R_ExternalPtrAddr(object);
+    nng_stream **st = (nng_stream **) R_ExternalPtrAddr(object);
     switch (typ) {
     case NILSXP:
-      xc = nng_stream_set(st, op, NULL, 0);
+      xc = nng_stream_set(*st, op, NULL, 0);
       break;
     case STRSXP:
-      xc = nng_stream_set_string(st, op, CHAR(STRING_ELT(value, 0)));
+      xc = nng_stream_set_string(*st, op, CHAR(STRING_ELT(value, 0)));
       break;
     case REALSXP:
     case INTSXP:
       val = Rf_asInteger(value);
-      xc = nng_stream_set_ms(st, op, (nng_duration) val);
+      xc = nng_stream_set_ms(*st, op, (nng_duration) val);
       if (xc == 0) break;
-      xc = nng_stream_set_size(st, op, (size_t) val);
+      xc = nng_stream_set_size(*st, op, (size_t) val);
       if (xc == 0) break;
-      xc = nng_stream_set_int(st, op, val);
+      xc = nng_stream_set_int(*st, op, val);
       if (xc == 0) break;
-      xc = nng_stream_set_uint64(st, op, (uint64_t) val);
+      xc = nng_stream_set_uint64(*st, op, (uint64_t) val);
       break;
     case LGLSXP:
-      xc = nng_stream_set_bool(st, op, (bool) LOGICAL(value)[0]);
+      xc = nng_stream_set_bool(*st, op, (bool) *NANO_INTEGER(value));
       break;
     default:
       Rf_error("type of 'value' not supported");
@@ -1137,7 +1321,7 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_listener_set_uint64(*list, op, (uint64_t) val);
       break;
     case LGLSXP:
-      xc = nng_listener_set_bool(*list, op, (bool) LOGICAL(value)[0]);
+      xc = nng_listener_set_bool(*list, op, (bool) *NANO_INTEGER(value));
       break;
     default:
       Rf_error("type of 'value' not supported");
@@ -1165,7 +1349,7 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_dialer_set_uint64(*dial, op, (uint64_t) val);
       break;
     case LGLSXP:
-      xc = nng_dialer_set_bool(*dial, op, (bool) LOGICAL(value)[0]);
+      xc = nng_dialer_set_bool(*dial, op, (bool) *NANO_INTEGER(value));
       break;
     default:
       Rf_error("type of 'value' not supported");
@@ -1184,7 +1368,7 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
 
 SEXP rnng_subscribe(SEXP object, SEXP value, SEXP sub) {
 
-  const char *op = LOGICAL(sub)[0] ? "sub:subscribe" : "sub:unsubscribe";
+  const char *op = *NANO_INTEGER(sub) ? "sub:subscribe" : "sub:unsubscribe";
   nano_buf buf;
   int xc;
 
@@ -1258,19 +1442,19 @@ SEXP rnng_get_opt(SEXP object, SEXP opt) {
 
   } else if (ptrtag == nano_StreamSymbol) {
 
-    nng_stream *st = (nng_stream *) R_ExternalPtrAddr(object);
+    nng_stream **st = (nng_stream **) R_ExternalPtrAddr(object);
     for (;;) {
-      xc = nng_stream_get_string(st, op, &optval.str);
+      xc = nng_stream_get_string(*st, op, &optval.str);
       if (xc == 0) { typ = 1; break; }
-      xc = nng_stream_get_ms(st, op, &optval.d);
+      xc = nng_stream_get_ms(*st, op, &optval.d);
       if (xc == 0) { typ = 2; break; }
-      xc = nng_stream_get_size(st, op, &optval.s);
+      xc = nng_stream_get_size(*st, op, &optval.s);
       if (xc == 0) { typ = 3; break; }
-      xc = nng_stream_get_int(st, op, &optval.i);
+      xc = nng_stream_get_int(*st, op, &optval.i);
       if (xc == 0) { typ = 4; break; }
-      xc = nng_stream_get_bool(st, op, &optval.b);
+      xc = nng_stream_get_bool(*st, op, &optval.b);
       if (xc == 0) { typ = 5; break; }
-      xc = nng_stream_get_uint64(st, op, &optval.u);
+      xc = nng_stream_get_uint64(*st, op, &optval.u);
       typ = 6; break;
     }
 
@@ -1397,13 +1581,13 @@ SEXP rnng_strcat(SEXP a, SEXP b) {
   const size_t alen = strlen(ap);
   const size_t blen = strlen(bp);
 
-  char *buf = nng_alloc(alen + blen + 1);
+  char *buf = nng_alloc(alen + blen);
   memcpy(buf, ap, alen);
-  memcpy(buf + alen, bp, blen + 1);
+  memcpy(buf + alen, bp, blen);
 
   PROTECT(out = Rf_allocVector(STRSXP, 1));
   SET_STRING_ELT(out, 0, Rf_mkCharLenCE(buf, alen + blen, CE_NATIVE));
-  nng_free(buf, alen + blen + 1);
+  nng_free(buf, alen + blen);
 
   UNPROTECT(1);
   return out;
@@ -1414,40 +1598,42 @@ SEXP rnng_strcat(SEXP a, SEXP b) {
 
 SEXP rnng_next_config(SEXP refhook, SEXP mark) {
 
-  SEXPTYPE typ;
-  SEXP out;
-  special_bit = (uint8_t) LOGICAL(mark)[0];
+  special_bit = (uint8_t) *NANO_INTEGER(mark);
+  SEXPTYPE typ1, typ2;
+  int plist;
 
   switch(TYPEOF(refhook)) {
+  case LISTSXP:
+    if (Rf_xlength(refhook) != 2)
+      return nano_refHook;
+    typ1 = TYPEOF(CAR(refhook));
+    typ2 = TYPEOF(CADR(refhook));
+    plist = 1;
+    break;
   case VECSXP:
-    if (Rf_xlength(refhook) != 2) break;
-    typ = TYPEOF(VECTOR_ELT(refhook, 0));
-    if (typ != CLOSXP && typ != SPECIALSXP && typ != BUILTINSXP) break;
-    typ = TYPEOF(VECTOR_ELT(refhook, 1));
-    if (typ != CLOSXP && typ != SPECIALSXP && typ != BUILTINSXP) break;
-    if (nano_refHookIn != R_NilValue)
-      R_ReleaseObject(nano_refHookIn);
-    R_PreserveObject(nano_refHookIn = VECTOR_ELT(refhook, 0));
-    if (nano_refHookOut != R_NilValue)
-      R_ReleaseObject(nano_refHookOut);
-    R_PreserveObject(nano_refHookOut = VECTOR_ELT(refhook, 1));
-    return refhook;
+    if (Rf_xlength(refhook) != 2)
+      return nano_refHook;
+    typ1 = TYPEOF(VECTOR_ELT(refhook, 0));
+    typ2 = TYPEOF(VECTOR_ELT(refhook, 1));
+    plist = 0;
+    break;
   case NILSXP:
-    if (nano_refHookIn != R_NilValue) {
-      R_ReleaseObject(nano_refHookIn);
-      nano_refHookIn = R_NilValue;
-    }
-    if (nano_refHookOut != R_NilValue) {
-      R_ReleaseObject(nano_refHookOut);
-      nano_refHookOut = R_NilValue;
-    }
+    SETCAR(nano_refHook, R_NilValue);
+    SETCADR(nano_refHook, R_NilValue);
+    registered = 0;
+  default:
+    return nano_refHook;
   }
 
-  PROTECT(out = Rf_allocVector(VECSXP, 2));
-  SET_VECTOR_ELT(out, 0, nano_refHookIn);
-  SET_VECTOR_ELT(out, 1, nano_refHookOut);
-  UNPROTECT(1);
+  if ((typ1 == CLOSXP || typ1 == SPECIALSXP || typ1 == BUILTINSXP) &&
+      (typ2 == CLOSXP || typ2 == SPECIALSXP || typ2 == BUILTINSXP)) {
 
-  return out;
+    SETCAR(nano_refHook, plist ? CAR(refhook) : VECTOR_ELT(refhook, 0));
+    SETCADR(nano_refHook, plist ? CADR(refhook) : VECTOR_ELT(refhook, 1));
+    registered = 1;
+
+  }
+
+  return nano_refHook;
 
 }

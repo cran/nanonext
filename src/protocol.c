@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
 //
 // This file is part of nanonext.
 //
@@ -23,8 +23,7 @@
 
 void socket_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nng_socket *xp = (nng_socket *) R_ExternalPtrAddr(xptr);
   nng_close(*xp);
   R_Free(xp);
@@ -35,8 +34,8 @@ void socket_finalizer(SEXP xptr) {
 
 SEXP rnng_protocol_open(SEXP protocol, SEXP raw) {
 
-  const int rw = LOGICAL(raw)[0];
   const char *pro = CHAR(STRING_ELT(protocol, 0));
+  const int rw = *NANO_INTEGER(raw);
   size_t slen = strlen(pro);
 
   const char *pname;

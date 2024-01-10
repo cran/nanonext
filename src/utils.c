@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
 //
 // This file is part of nanonext.
 //
@@ -17,21 +17,12 @@
 // nanonext - C level - Utilities ----------------------------------------------
 
 #define NANONEXT_PROTOCOLS
+#define NANONEXT_HTTP
 #define NANONEXT_SUPPLEMENTALS
 #define NANONEXT_MBED
 #include "nanonext.h"
 
 // internals -------------------------------------------------------------------
-
-typedef struct nano_stream_listener_s {
-  nng_stream_listener *list;
-  nng_tls_config *tls;
-} nano_stream_listener;
-
-typedef struct nano_stream_dialer_s {
-  nng_stream_dialer *dial;
-  nng_tls_config *tls;
-} nano_stream_dialer;
 
 SEXP mk_error_ncurl(const int xc) {
 
@@ -52,34 +43,17 @@ SEXP mk_error_ncurl(const int xc) {
 
 static void stream_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
-  nng_stream *xp = (nng_stream *) R_ExternalPtrAddr(xptr);
-  nng_stream_close(xp);
-  nng_stream_free(xp);
-
-}
-
-static void stream_listener_finalizer(SEXP xptr) {
-
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
-  nano_stream_listener *xp = (nano_stream_listener *) R_ExternalPtrAddr(xptr);
-  nng_stream_listener_close(xp->list);
-  nng_stream_listener_free(xp->list);
-  if (xp->tls != NULL)
-    nng_tls_config_free(xp->tls);
-  R_Free(xp);
-
-}
-
-static void stream_dialer_finalizer(SEXP xptr) {
-
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
-  nano_stream_dialer *xp = (nano_stream_dialer *) R_ExternalPtrAddr(xptr);
-  nng_stream_dialer_close(xp->dial);
-  nng_stream_dialer_free(xp->dial);
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
+  nano_stream *xp = (nano_stream *) R_ExternalPtrAddr(xptr);
+  nng_stream_close(xp->stream);
+  nng_stream_free(xp->stream);
+  if (xp->listener) {
+    nng_stream_listener_close(xp->endpoint.list);
+    nng_stream_listener_free(xp->endpoint.list);
+  } else {
+    nng_stream_dialer_close(xp->endpoint.dial);
+    nng_stream_dialer_free(xp->endpoint.dial);
+  }
   if (xp->tls != NULL)
     nng_tls_config_free(xp->tls);
   R_Free(xp);
@@ -88,8 +62,7 @@ static void stream_dialer_finalizer(SEXP xptr) {
 
 static void tls_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nng_tls_config *xp = (nng_tls_config *) R_ExternalPtrAddr(xptr);
   nng_tls_config_free(xp);
 
@@ -130,9 +103,8 @@ SEXP rnng_url_parse(SEXP url) {
 
   const char *up = CHAR(STRING_ELT(url, 0));
   nng_url *urlp;
-  int xc;
 
-  xc = nng_url_parse(&urlp, up);
+  const int xc = nng_url_parse(&urlp, up);
   if (xc)
     ERROR_OUT(xc);
 
@@ -174,8 +146,9 @@ SEXP rnng_is_error_value(SEXP x) {
 SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
                 SEXP data, SEXP response, SEXP timeout, SEXP tls) {
 
-  const int conv = LOGICAL(convert)[0];
   const char *addr = CHAR(STRING_ELT(http, 0));
+  const char *mthd = method != R_NilValue ? CHAR(STRING_ELT(method, 0)) : NULL;
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   if (tls != R_NilValue && R_ExternalPtrTag(tls) != nano_TlsSymbol)
     Rf_error("'tls' is not a valid TLS Configuration");
   nng_url *url;
@@ -196,10 +169,8 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
     goto exitlevel2;
   if ((xc = nng_http_req_alloc(&req, url)))
     goto exitlevel3;
-  if (method != R_NilValue) {
-    if ((xc = nng_http_req_set_method(req, CHAR(STRING_ELT(method, 0)))))
-      goto exitlevel4;
-  }
+  if (mthd != NULL && (xc = nng_http_req_set_method(req, mthd)))
+    goto exitlevel4;
   if (headers != R_NilValue) {
     const R_xlen_t hlen = Rf_xlength(headers);
     SEXP names = Rf_getAttrib(headers, R_NamesSymbol);
@@ -222,7 +193,7 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
       break;
     }
   }
-  if (data != R_NilValue) {
+  if (data != R_NilValue && TYPEOF(data) == STRSXP) {
     nano_buf enc;
     nano_encode(&enc, data);
     if ((xc = nng_http_req_set_data(req, enc.buf, enc.cur - 1)))
@@ -257,8 +228,7 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
 
   }
 
-  if (timeout != R_NilValue)
-    nng_aio_set_timeout(aio, (nng_duration) Rf_asInteger(timeout));
+  nng_aio_set_timeout(aio, dur);
   nng_http_client_transact(client, req, res, aio);
   nng_aio_wait(aio);
   if ((xc = nng_aio_result(aio)))
@@ -270,7 +240,7 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
 
   code = nng_http_res_get_status(res), relo = code >= 300 && code < 400;
 
-  if (relo && LOGICAL(follow)[0]) {
+  if (relo && *NANO_INTEGER(follow)) {
     const char *location = nng_http_res_get_header(res, "Location");
     if (location == NULL) goto resume;
     nng_url *oldurl = url;
@@ -342,7 +312,7 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
 
   nng_http_res_get_data(res, &dat, &sz);
 
-  if (conv) {
+  if (*NANO_INTEGER(convert)) {
     vec = rawToChar(dat, sz);
   } else {
     vec = Rf_allocVector(RAWSXP, sz);
@@ -384,45 +354,46 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP tls) {
   const char *add = CHAR(STRING_ELT(url, 0));
   if (tls != R_NilValue && R_ExternalPtrTag(tls) != nano_TlsSymbol)
     Rf_error("'tls' is not a valid TLS Configuration");
-  nano_stream_dialer *nsd = R_Calloc(1, nano_stream_dialer);
-  nng_stream *stream;
+  nano_stream *nst = R_Calloc(1, nano_stream);
+  nst->listener = 0;
+  nst->textframes = *NANO_INTEGER(textframes) != 0;
+  nst->tls = NULL;
   nng_url *up;
   nng_aio *aiop;
-  int xc, frames = 0;
-  SEXP st, sd, klass;
+  int xc;
+  SEXP sd, klass;
 
   if ((xc = nng_url_parse(&up, add)))
     goto exitlevel1;
 
-  xc = nng_stream_dialer_alloc_url(&nsd->dial, up);
+  xc = nng_stream_dialer_alloc_url(&nst->endpoint.dial, up);
   if (xc)
     goto exitlevel2;
 
   if (!strcmp(up->u_scheme, "ws") || !strcmp(up->u_scheme, "wss")) {
-    frames = LOGICAL(textframes)[0];
-    if (frames &&
-        ((xc = nng_stream_dialer_set_bool(nsd->dial, "ws:recv-text", 1)) ||
-        (xc = nng_stream_dialer_set_bool(nsd->dial, "ws:send-text", 1))))
+    if (nst->textframes &&
+        ((xc = nng_stream_dialer_set_bool(nst->endpoint.dial, "ws:recv-text", 1)) ||
+        (xc = nng_stream_dialer_set_bool(nst->endpoint.dial, "ws:send-text", 1))))
       goto exitlevel3;
   }
 
   if (!strcmp(up->u_scheme, "wss")) {
 
     if (tls == R_NilValue) {
-      if ((xc = nng_tls_config_alloc(&nsd->tls, NNG_TLS_MODE_CLIENT)))
+      if ((xc = nng_tls_config_alloc(&nst->tls, NNG_TLS_MODE_CLIENT)))
         goto exitlevel3;
 
-      if ((xc = nng_tls_config_server_name(nsd->tls, up->u_hostname)) ||
-          (xc = nng_tls_config_auth_mode(nsd->tls, NNG_TLS_AUTH_MODE_NONE)) ||
-          (xc = nng_stream_dialer_set_ptr(nsd->dial, NNG_OPT_TLS_CONFIG, nsd->tls)))
+      if ((xc = nng_tls_config_server_name(nst->tls, up->u_hostname)) ||
+          (xc = nng_tls_config_auth_mode(nst->tls, NNG_TLS_AUTH_MODE_NONE)) ||
+          (xc = nng_stream_dialer_set_ptr(nst->endpoint.dial, NNG_OPT_TLS_CONFIG, nst->tls)))
         goto exitlevel4;
     } else {
 
-      nsd->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
-      nng_tls_config_hold(nsd->tls);
+      nst->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
+      nng_tls_config_hold(nst->tls);
 
-      if ((xc = nng_tls_config_server_name(nsd->tls, up->u_hostname)) ||
-          (xc = nng_stream_dialer_set_ptr(nsd->dial, NNG_OPT_TLS_CONFIG, nsd->tls)))
+      if ((xc = nng_tls_config_server_name(nst->tls, up->u_hostname)) ||
+          (xc = nng_stream_dialer_set_ptr(nst->endpoint.dial, NNG_OPT_TLS_CONFIG, nst->tls)))
         goto exitlevel4;
     }
 
@@ -431,44 +402,41 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP tls) {
   if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
     goto exitlevel4;
 
-  nng_stream_dialer_dial(nsd->dial, aiop);
+  nng_stream_dialer_dial(nst->endpoint.dial, aiop);
   nng_aio_wait(aiop);
   if ((xc = nng_aio_result(aiop)))
     goto exitlevel5;
 
-  stream = nng_aio_get_output(aiop, 0);
+  nst->stream = nng_aio_get_output(aiop, 0);
 
   nng_aio_free(aiop);
   nng_url_free(up);
 
-  PROTECT(st = R_MakeExternalPtr(stream, nano_StreamSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(st, stream_finalizer, TRUE);
-
-  PROTECT(sd = R_MakeExternalPtr(nsd, R_NilValue, R_NilValue));
-  R_RegisterCFinalizerEx(sd, stream_dialer_finalizer, TRUE);
-  Rf_setAttrib(st, nano_DialerSymbol, sd);
-  Rf_setAttrib(st, nano_UrlSymbol, url);
-  Rf_setAttrib(st, nano_TextframesSymbol, Rf_ScalarLogical(frames));
+  PROTECT(sd = R_MakeExternalPtr(nst, nano_StreamSymbol, R_NilValue));
+  R_RegisterCFinalizerEx(sd, stream_finalizer, TRUE);
+  Rf_setAttrib(sd, R_ModeSymbol, Rf_mkString(nst->textframes ? "dialer text frames" : "dialer"));
+  Rf_setAttrib(sd, nano_StateSymbol, Rf_mkString("opened"));
+  Rf_setAttrib(sd, nano_UrlSymbol, url);
 
   klass = Rf_allocVector(STRSXP, 2);
-  Rf_classgets(st, klass);
+  Rf_classgets(sd, klass);
   SET_STRING_ELT(klass, 0, Rf_mkChar("nanoStream"));
   SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
 
-  UNPROTECT(2);
-  return st;
+  UNPROTECT(1);
+  return sd;
 
   exitlevel5:
   nng_aio_free(aiop);
   exitlevel4:
-  if (nsd->tls != NULL)
-    nng_tls_config_free(nsd->tls);
+  if (nst->tls != NULL)
+    nng_tls_config_free(nst->tls);
   exitlevel3:
-  nng_stream_dialer_free(nsd->dial);
+  nng_stream_dialer_free(nst->endpoint.dial);
   exitlevel2:
   nng_url_free(up);
   exitlevel1:
-  R_Free(nsd);
+  R_Free(nst);
   ERROR_OUT(xc);
 
 }
@@ -478,93 +446,91 @@ SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP tls) {
   const char *add = CHAR(STRING_ELT(url, 0));
   if (tls != R_NilValue && R_ExternalPtrTag(tls) != nano_TlsSymbol)
     Rf_error("'tls' is not a valid TLS Configuration");
-  nano_stream_listener *nsl = R_Calloc(1, nano_stream_listener);
-  nng_stream *stream;
+  nano_stream *nst = R_Calloc(1, nano_stream);
+  nst->listener = 1;
+  nst->textframes = *NANO_INTEGER(textframes) != 0;
+  nst->tls = NULL;
   nng_url *up;
   nng_aio *aiop;
-  int xc, frames = 0;
-  SEXP st, sl, klass;
+  int xc;
+  SEXP sl, klass;
 
   if ((xc = nng_url_parse(&up, add)))
     goto exitlevel1;
 
-  xc = nng_stream_listener_alloc_url(&nsl->list, up);
+  xc = nng_stream_listener_alloc_url(&nst->endpoint.list, up);
   if (xc)
     goto exitlevel2;
 
   if (!strcmp(up->u_scheme, "ws") || !strcmp(up->u_scheme, "wss")) {
-    frames = LOGICAL(textframes)[0];
-    if (frames &&
-        ((xc = nng_stream_listener_set_bool(nsl->list, "ws:recv-text", 1)) ||
-        (xc = nng_stream_listener_set_bool(nsl->list, "ws:send-text", 1))))
+    if (nst->textframes &&
+        ((xc = nng_stream_listener_set_bool(nst->endpoint.list, "ws:recv-text", 1)) ||
+        (xc = nng_stream_listener_set_bool(nst->endpoint.list, "ws:send-text", 1))))
       goto exitlevel3;
   }
 
   if (!strcmp(up->u_scheme, "wss")) {
 
     if (tls == R_NilValue) {
-      if ((xc = nng_tls_config_alloc(&nsl->tls, NNG_TLS_MODE_SERVER)))
+      if ((xc = nng_tls_config_alloc(&nst->tls, NNG_TLS_MODE_SERVER)))
         goto exitlevel3;
 
-      if ((xc = nng_tls_config_auth_mode(nsl->tls, NNG_TLS_AUTH_MODE_NONE)) ||
-          (xc = nng_stream_listener_set_ptr(nsl->list, NNG_OPT_TLS_CONFIG, nsl->tls)))
+      if ((xc = nng_tls_config_auth_mode(nst->tls, NNG_TLS_AUTH_MODE_NONE)) ||
+          (xc = nng_stream_listener_set_ptr(nst->endpoint.list, NNG_OPT_TLS_CONFIG, nst->tls)))
         goto exitlevel4;
     } else {
 
-      nsl->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
-      nng_tls_config_hold(nsl->tls);
+      nst->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
+      nng_tls_config_hold(nst->tls);
 
-      if ((xc = nng_tls_config_server_name(nsl->tls, up->u_hostname)) ||
-          (xc = nng_stream_listener_set_ptr(nsl->list, NNG_OPT_TLS_CONFIG, nsl->tls)))
+      if ((xc = nng_tls_config_server_name(nst->tls, up->u_hostname)) ||
+          (xc = nng_stream_listener_set_ptr(nst->endpoint.list, NNG_OPT_TLS_CONFIG, nst->tls)))
         goto exitlevel4;
     }
 
   }
 
-  if ((xc = nng_stream_listener_listen(nsl->list)))
+  if ((xc = nng_stream_listener_listen(nst->endpoint.list)))
     goto exitlevel4;
 
   if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
     goto exitlevel4;
 
-  nng_stream_listener_accept(nsl->list, aiop);
+  nng_stream_listener_accept(nst->endpoint.list, aiop);
   nng_aio_wait(aiop);
   if ((xc = nng_aio_result(aiop)))
     goto exitlevel5;
 
-  stream = nng_aio_get_output(aiop, 0);
+  nst->stream = nng_aio_get_output(aiop, 0);
 
   nng_aio_free(aiop);
   nng_url_free(up);
 
-  PROTECT(st = R_MakeExternalPtr(stream, nano_StreamSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(st, stream_finalizer, TRUE);
-
-  PROTECT(sl = R_MakeExternalPtr(nsl, R_NilValue, R_NilValue));
-  R_RegisterCFinalizerEx(sl, stream_listener_finalizer, TRUE);
-  Rf_setAttrib(st, nano_ListenerSymbol, sl);
-  Rf_setAttrib(st, nano_UrlSymbol, url);
-  Rf_setAttrib(st, nano_TextframesSymbol, Rf_ScalarLogical(frames));
+  PROTECT(sl = R_MakeExternalPtr(nst, nano_StreamSymbol, R_NilValue));
+  R_RegisterCFinalizerEx(sl, stream_finalizer, TRUE);
+  Rf_setAttrib(sl, R_ModeSymbol, Rf_mkString(nst->textframes ? "listener text frames" : "listener"));
+  Rf_setAttrib(sl, nano_StateSymbol, Rf_mkString("opened"));
+  Rf_setAttrib(sl, nano_UrlSymbol, url);
 
   klass = Rf_allocVector(STRSXP, 2);
-  Rf_classgets(st, klass);
+  Rf_classgets(sl, klass);
   SET_STRING_ELT(klass, 0, Rf_mkChar("nanoStream"));
   SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
 
-  UNPROTECT(2);
-  return st;
+  UNPROTECT(1);
+  return sl;
 
   exitlevel5:
   nng_aio_free(aiop);
   exitlevel4:
-  if (nsl->tls != NULL)
-    nng_tls_config_free(nsl->tls);
+  if (nst->tls != NULL)
+    nng_tls_config_free(nst->tls);
   exitlevel3:
-  nng_stream_listener_free(nsl->list);
+  nng_stream_listener_free(nst->endpoint.list);
   exitlevel2:
   nng_url_free(up);
   exitlevel1:
-  R_Free(nsl);
+  R_Free(nst);
   ERROR_OUT(xc);
 
 }
@@ -573,15 +539,11 @@ SEXP rnng_stream_close(SEXP stream) {
 
   if (R_ExternalPtrTag(stream) != nano_StreamSymbol)
     Rf_error("'stream' is not a valid or active Stream");
-  nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(stream);
-  nng_stream_close(sp);
-  nng_stream_free(sp);
+
+  stream_finalizer(stream);
   R_SetExternalPtrTag(stream, R_NilValue);
   R_ClearExternalPtr(stream);
-  Rf_setAttrib(stream, nano_ListenerSymbol, R_NilValue);
-  Rf_setAttrib(stream, nano_DialerSymbol, R_NilValue);
-  Rf_setAttrib(stream, nano_UrlSymbol, R_NilValue);
-  Rf_setAttrib(stream, nano_TextframesSymbol, R_NilValue);
+  Rf_setAttrib(stream, nano_StateSymbol, Rf_mkString("closed"));
 
   return nano_success;
 
@@ -667,14 +629,17 @@ SEXP rnng_status_code(SEXP x) {
 
 SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
 
-  const nng_tls_auth_mode mod = LOGICAL(auth)[0] ? NNG_TLS_AUTH_MODE_REQUIRED : NNG_TLS_AUTH_MODE_OPTIONAL;
+  const nng_tls_auth_mode mod = *NANO_INTEGER(auth) ? NNG_TLS_AUTH_MODE_REQUIRED : NNG_TLS_AUTH_MODE_OPTIONAL;
   R_xlen_t usefile;
   nng_tls_config *cfg;
   int xc;
+  const char *crl, *file, *key, *pss;
   SEXP xp;
 
   if ((usefile = Rf_xlength(client)) > 0) {
-    const char *file = CHAR(STRING_ELT(client, 0));
+    file = CHAR(STRING_ELT(client, 0));
+    if (usefile > 1)
+      crl = CHAR(STRING_ELT(client, 1));
     if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_CLIENT)))
       goto exitlevel1;
     if ((xc = nng_tls_config_auth_mode(cfg, mod)))
@@ -685,14 +650,15 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
       if ((xc = nng_tls_config_ca_file(cfg, file)))
         goto exitlevel2;
     } else {
-      const char *crl = CHAR(STRING_ELT(client, 1));
       if ((xc = nng_tls_config_ca_chain(cfg, file, strncmp(crl, "", 1) ? crl : NULL)))
         goto exitlevel2;
     }
 
   } else if ((usefile = Rf_xlength(server)) > 0) {
-    const char *file = CHAR(STRING_ELT(server, 0));
-    const char *pss = pass != R_NilValue ? CHAR(STRING_ELT(pass, 0)) : NULL;
+    file = CHAR(STRING_ELT(server, 0));
+    pss = pass != R_NilValue ? CHAR(STRING_ELT(pass, 0)) : NULL;
+    if (usefile > 1)
+      key = CHAR(STRING_ELT(server, 1));
     if ((xc = nng_tls_config_alloc(&cfg, NNG_TLS_MODE_SERVER)))
       goto exitlevel1;
     if ((xc = nng_tls_config_auth_mode(cfg, mod)))
@@ -703,7 +669,6 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
       if ((xc = nng_tls_config_cert_key_file(cfg, file, pss)))
         goto exitlevel2;
     } else {
-      const char *key = CHAR(STRING_ELT(server, 1));
       if ((xc = nng_tls_config_own_cert(cfg, file, key, pss)))
         goto exitlevel2;
     }
@@ -748,17 +713,16 @@ SEXP rnng_random(SEXP n, SEXP convert) {
   case INTSXP:
   case LGLSXP:
     sz = INTEGER(n)[0];
-    break;
+    if (sz >= 0 && sz <= 1024) break;
   case REALSXP:
     sz = Rf_asInteger(n);
-    break;
+    if (sz >= 0 && sz <= 1024) break;
   default:
-    Rf_error("'n' must be integer or coercible to integer");
+    Rf_error("'n' must be an integer between 0 and 1024 or coercible to such");
   }
 
   SEXP out;
   unsigned char buf[sz];
-  char errbuf[1024];
   mbedtls_entropy_context entropy;
   mbedtls_ctr_drbg_context ctr_drbg;
   const char *pers = "r-nanonext-rng";
@@ -766,14 +730,18 @@ SEXP rnng_random(SEXP n, SEXP convert) {
   mbedtls_entropy_init(&entropy);
   mbedtls_ctr_drbg_init(&ctr_drbg);
 
-  if ((xc = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers))) ||
-      (xc = mbedtls_ctr_drbg_random(&ctr_drbg, buf, sz)))
-    goto exitlevel1;
+  xc = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
+  if (xc == 0) {
+    xc = mbedtls_ctr_drbg_random(&ctr_drbg, buf, sz);
+  }
 
   mbedtls_ctr_drbg_free(&ctr_drbg);
   mbedtls_entropy_free(&entropy);
 
-  if (LOGICAL(convert)[0]) {
+  if (xc)
+    Rf_error("error generating random bytes");
+
+  if (*NANO_INTEGER(convert)) {
     out = nano_hashToChar(buf, sz);
   } else {
     out = Rf_allocVector(RAWSXP, sz);
@@ -781,11 +749,5 @@ SEXP rnng_random(SEXP n, SEXP convert) {
   }
 
   return out;
-
-  exitlevel1:
-  mbedtls_ctr_drbg_free(&ctr_drbg);
-  mbedtls_entropy_free(&entropy);
-  mbedtls_strerror(xc, errbuf, sizeof(errbuf));
-  Rf_error("%d | %s", xc, errbuf);
 
 }

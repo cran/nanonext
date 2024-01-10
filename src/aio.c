@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
 //
 // This file is part of nanonext.
 //
@@ -16,7 +16,9 @@
 
 // nanonext - C level - Async Functions ----------------------------------------
 
+#define NANONEXT_HTTP
 #define NANONEXT_SUPPLEMENTALS
+#define NANONEXT_SIGNALS
 #include "nanonext.h"
 
 // internals -------------------------------------------------------------------
@@ -85,76 +87,60 @@ static SEXP mk_error_haio(const int xc, SEXP env) {
 
 // aio completion callbacks ----------------------------------------------------
 
-static void pipe_cb_signal_cv(nng_pipe p, nng_pipe_ev ev, void *arg) {
+static void pipe_cb_signal(nng_pipe p, nng_pipe_ev ev, void *arg) {
 
+  int sig;
   nano_cv *ncv = (nano_cv *) arg;
   nng_cv *cv = ncv->cv;
   nng_mtx *mtx = ncv->mtx;
 
   nng_mtx_lock(mtx);
+  sig = ncv->flag;
+  if (sig > 0) ncv->flag = -1;
   ncv->condition++;
   nng_cv_wake(cv);
   nng_mtx_unlock(mtx);
+  if (sig > 1) {
+#ifdef _WIN32
+    raise(sig);
+#else
+    kill(getpid(), sig);
+#endif
+
+  }
 
 }
 
-static void pipe_cb_signal_cv_duo(nng_pipe p, nng_pipe_ev ev, void *arg) {
+static void pipe_cb_signal_duo(nng_pipe p, nng_pipe_ev ev, void *arg) {
 
+  int sig;
   nano_cv_duo *duo = (nano_cv_duo *) arg;
   nano_cv *ncv = duo->cv;
   nano_cv *ncv2 = duo->cv2;
+
   nng_cv *cv = ncv->cv;
-  nng_cv *cv2 = ncv2->cv;
   nng_mtx *mtx = ncv->mtx;
+  nng_cv *cv2 = ncv2->cv;
   nng_mtx *mtx2 = ncv2->mtx;
 
   nng_mtx_lock(mtx);
+  sig = ncv->flag;
+  if (sig > 0) ncv->flag = -1;
   ncv->condition++;
   nng_cv_wake(cv);
   nng_mtx_unlock(mtx);
-
   nng_mtx_lock(mtx2);
+  if (sig > 0) ncv2->flag = -1;
   ncv2->condition++;
   nng_cv_wake(cv2);
   nng_mtx_unlock(mtx2);
-
-}
-
-static void pipe_cb_flag_cv(nng_pipe p, nng_pipe_ev ev, void *arg) {
-
-  nano_cv *ncv = (nano_cv *) arg;
-  nng_cv *cv = ncv->cv;
-  nng_mtx *mtx = ncv->mtx;
-
-  nng_mtx_lock(mtx);
-  ncv->flag = 1;
-  ncv->condition++;
-  nng_cv_wake(cv);
-  nng_mtx_unlock(mtx);
-
-}
-
-static void pipe_cb_flag_cv_duo(nng_pipe p, nng_pipe_ev ev, void *arg) {
-
-  nano_cv_duo *duo = (nano_cv_duo *) arg;
-  nano_cv *ncv = duo->cv;
-  nano_cv *ncv2 = duo->cv2;
-  nng_cv *cv = ncv->cv;
-  nng_cv *cv2 = ncv2->cv;
-  nng_mtx *mtx = ncv->mtx;
-  nng_mtx *mtx2 = ncv2->mtx;
-
-  nng_mtx_lock(mtx);
-  ncv->flag = 1;
-  ncv->condition++;
-  nng_cv_wake(cv);
-  nng_mtx_unlock(mtx);
-
-  nng_mtx_lock(mtx2);
-  ncv2->flag = 1;
-  ncv2->condition++;
-  nng_cv_wake(cv2);
-  nng_mtx_unlock(mtx2);
+  if (sig > 1) {
+#ifdef _WIN32
+    raise(sig);
+#else
+    kill(getpid(), sig);
+#endif
+  }
 
 }
 
@@ -280,34 +266,9 @@ static void iraio_complete_signal(void *arg) {
 
 // finalisers ------------------------------------------------------------------
 
-void dialer_finalizer(SEXP xptr) {
-
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
-  nano_dialer *xp = (nano_dialer *) R_ExternalPtrAddr(xptr);
-  nng_dialer_close(xp->dial);
-  if (xp->tls != NULL)
-    nng_tls_config_free(xp->tls);
-  R_Free(xp);
-
-}
-
-void listener_finalizer(SEXP xptr) {
-
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
-  nano_listener *xp = (nano_listener *) R_ExternalPtrAddr(xptr);
-  nng_listener_close(xp->list);
-  if (xp->tls != NULL)
-    nng_tls_config_free(xp->tls);
-  R_Free(xp);
-
-}
-
 static void saio_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_aio *xp = (nano_aio *) R_ExternalPtrAddr(xptr);
   nng_aio_free(xp->aio);
   R_Free(xp);
@@ -316,8 +277,7 @@ static void saio_finalizer(SEXP xptr) {
 
 static void raio_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_aio *xp = (nano_aio *) R_ExternalPtrAddr(xptr);
   nng_aio_free(xp->aio);
   if (xp->data != NULL)
@@ -328,8 +288,7 @@ static void raio_finalizer(SEXP xptr) {
 
 static void cvraio_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_cv_aio *xp = (nano_cv_aio *) R_ExternalPtrAddr(xptr);
   nng_aio_free(xp->aio);
   if (xp->data != NULL)
@@ -340,8 +299,7 @@ static void cvraio_finalizer(SEXP xptr) {
 
 static void cv_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_cv *xp = (nano_cv *) R_ExternalPtrAddr(xptr);
   nng_cv_free(xp->cv);
   nng_mtx_free(xp->mtx);
@@ -351,8 +309,7 @@ static void cv_finalizer(SEXP xptr) {
 
 static void reqsaio_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_aio *xp = (nano_aio *) R_ExternalPtrAddr(xptr);
 #ifdef NANONEXT_LEGACY_NNG
   nng_ctx *ctx = (nng_ctx *) xp->data;
@@ -365,8 +322,7 @@ static void reqsaio_finalizer(SEXP xptr) {
 
 static void cv_duo_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_cv_duo *xp = (nano_cv_duo *) R_ExternalPtrAddr(xptr);
   R_Free(xp);
 
@@ -374,8 +330,7 @@ static void cv_duo_finalizer(SEXP xptr) {
 
 static void iaio_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_aio *xp = (nano_aio *) R_ExternalPtrAddr(xptr);
   nng_aio_free(xp->aio);
   if (xp->data != NULL)
@@ -386,8 +341,7 @@ static void iaio_finalizer(SEXP xptr) {
 
 static void cviaio_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_cv_aio *xp = (nano_cv_aio *) R_ExternalPtrAddr(xptr);
   nng_aio_free(xp->aio);
   if (xp->data != NULL)
@@ -398,8 +352,7 @@ static void cviaio_finalizer(SEXP xptr) {
 
 static void haio_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nano_aio *xp = (nano_aio *) R_ExternalPtrAddr(xptr);
   nano_handle *handle = (nano_handle *) xp->data;
   nng_aio_free(xp->aio);
@@ -416,228 +369,9 @@ static void haio_finalizer(SEXP xptr) {
 
 static void session_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL)
-    return;
+  if (R_ExternalPtrAddr(xptr) == NULL) return;
   nng_http_conn *xp = (nng_http_conn *) R_ExternalPtrAddr(xptr);
   nng_http_conn_close(xp);
-
-}
-
-// dialers and listeners -------------------------------------------------------
-
-SEXP rnng_dial(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP error) {
-
-  if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    Rf_error("'socket' is not a valid Socket");
-
-  const uint8_t sec = tls != R_NilValue;
-
-  if (sec && R_ExternalPtrTag(tls) != nano_TlsSymbol)
-    Rf_error("'tls' is not a valid TLS Configuration");
-
-  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
-  const int start = LOGICAL(autostart)[0];
-  const char *ur = CHAR(STRING_ELT(url, 0));
-  nano_dialer *dp = R_Calloc(1, nano_dialer);
-  SEXP dialer, klass, attr, newattr;
-  int xc;
-
-  if (sec) {
-    if ((xc = nng_dialer_create(&dp->dial, *sock, ur)))
-      goto exitlevel1;
-    dp->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
-    nng_tls_config_hold(dp->tls);
-    nng_url *up;
-    if ((xc = nng_url_parse(&up, ur)))
-      goto exitlevel2;
-    if ((xc = nng_tls_config_server_name(dp->tls, up->u_hostname)) ||
-        (xc = nng_dialer_set_ptr(dp->dial, NNG_OPT_TLS_CONFIG, dp->tls))) {
-      nng_url_free(up);
-      goto exitlevel2;
-    }
-    nng_url_free(up);
-  }
-
-  switch (start) {
-  case 0:
-    xc = sec ? 0 : nng_dialer_create(&dp->dial, *sock, ur);
-    break;
-  case 1:
-    xc = sec ? nng_dialer_start(dp->dial, NNG_FLAG_NONBLOCK) : nng_dial(*sock, ur, &dp->dial, NNG_FLAG_NONBLOCK);
-    break;
-  default:
-    xc = sec ? nng_dialer_start(dp->dial, 0) : nng_dial(*sock, ur, &dp->dial, 0);
-  }
-  if (xc)
-    goto exitlevel1;
-
-  PROTECT(dialer = R_MakeExternalPtr(dp, nano_DialerSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(dialer, dialer_finalizer, TRUE);
-
-  klass = Rf_allocVector(STRSXP, 2);
-  Rf_classgets(dialer, klass);
-  SET_STRING_ELT(klass, 0, Rf_mkChar("nanoDialer"));
-  SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
-  Rf_setAttrib(dialer, nano_IdSymbol, Rf_ScalarInteger(nng_dialer_id(dp->dial)));
-  Rf_setAttrib(dialer, nano_UrlSymbol, url);
-  Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString(start ? "started" : "not started"));
-  Rf_setAttrib(dialer, nano_SocketSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
-
-  attr = Rf_getAttrib(socket, nano_DialerSymbol);
-  if (attr == R_NilValue) {
-    PROTECT(newattr = Rf_allocVector(VECSXP, 1));
-    SET_VECTOR_ELT(newattr, 0, dialer);
-  } else {
-    R_xlen_t xlen = Rf_xlength(attr);
-    PROTECT(newattr = Rf_allocVector(VECSXP, xlen + 1));
-    for (R_xlen_t i = 0; i < xlen; i++)
-      SET_VECTOR_ELT(newattr, i, VECTOR_ELT(attr, i));
-    SET_VECTOR_ELT(newattr, xlen, dialer);
-  }
-  Rf_setAttrib(socket, nano_DialerSymbol, newattr);
-
-  UNPROTECT(2);
-  return nano_success;
-
-  exitlevel2:
-  nng_tls_config_free(dp->tls);
-  exitlevel1:
-  R_Free(dp);
-  if (LOGICAL(error)[0]) ERROR_OUT(xc);
-  ERROR_RET(xc);
-
-}
-
-SEXP rnng_listen(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP error) {
-
-  if (R_ExternalPtrTag(socket) != nano_SocketSymbol)
-    Rf_error("'socket' is not a valid Socket");
-
-  const uint8_t sec = tls != R_NilValue;
-
-  if (sec && R_ExternalPtrTag(tls) != nano_TlsSymbol)
-    Rf_error("'tls' is not a valid TLS Configuration");
-
-  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
-  const int start = LOGICAL(autostart)[0];
-  const char *ur = CHAR(STRING_ELT(url, 0));
-  nano_listener *lp = R_Calloc(1, nano_listener);
-  SEXP listener, klass, attr, newattr;
-  int xc;
-
-  if (sec) {
-    if ((xc = nng_listener_create(&lp->list, *sock, ur)))
-      goto exitlevel1;
-    lp->tls = (nng_tls_config *) R_ExternalPtrAddr(tls);
-    nng_tls_config_hold(lp->tls);
-    nng_url *up;
-    if ((xc = nng_url_parse(&up, ur)))
-      goto exitlevel2;
-    if ((xc = nng_tls_config_server_name(lp->tls, up->u_hostname)) ||
-        (xc = nng_listener_set_ptr(lp->list, NNG_OPT_TLS_CONFIG, lp->tls))) {
-      nng_url_free(up);
-      goto exitlevel2;
-    }
-    nng_url_free(up);
-  }
-
-  if (start) {
-    xc = sec ? nng_listener_start(lp->list, 0) : nng_listen(*sock, ur, &lp->list, 0);
-  } else {
-    xc = sec ? 0 : nng_listener_create(&lp->list, *sock, ur);
-  }
-  if (xc)
-    goto exitlevel1;
-
-  PROTECT(listener = R_MakeExternalPtr(lp, nano_ListenerSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(listener, listener_finalizer, TRUE);
-
-  klass = Rf_allocVector(STRSXP, 2);
-  Rf_classgets(listener, klass);
-  SET_STRING_ELT(klass, 0, Rf_mkChar("nanoListener"));
-  SET_STRING_ELT(klass, 1, Rf_mkChar("nano"));
-  Rf_setAttrib(listener, nano_IdSymbol, Rf_ScalarInteger(nng_listener_id(lp->list)));
-  Rf_setAttrib(listener, nano_UrlSymbol, url);
-  Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString(start ? "started" : "not started"));
-  Rf_setAttrib(listener, nano_SocketSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
-
-  attr = Rf_getAttrib(socket, nano_ListenerSymbol);
-  if (attr == R_NilValue) {
-    PROTECT(newattr = Rf_allocVector(VECSXP, 1));
-    SET_VECTOR_ELT(newattr, 0, listener);
-  } else {
-    R_xlen_t xlen = Rf_xlength(attr);
-    PROTECT(newattr = Rf_allocVector(VECSXP, xlen + 1));
-    for (R_xlen_t i = 0; i < xlen; i++)
-      SET_VECTOR_ELT(newattr, i, VECTOR_ELT(attr, i));
-    SET_VECTOR_ELT(newattr, xlen, listener);
-  }
-  Rf_setAttrib(socket, nano_ListenerSymbol, newattr);
-
-  UNPROTECT(2);
-  return nano_success;
-
-  exitlevel2:
-  nng_tls_config_free(lp->tls);
-  exitlevel1:
-  R_Free(lp);
-  if (LOGICAL(error)[0]) ERROR_OUT(xc);
-  ERROR_RET(xc);
-
-}
-
-SEXP rnng_dialer_start(SEXP dialer, SEXP async) {
-
-  if (R_ExternalPtrTag(dialer) != nano_DialerSymbol)
-    Rf_error("'dialer' is not a valid Dialer");
-  nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(dialer);
-  const int flags = (LOGICAL(async)[0] == 1) * NNG_FLAG_NONBLOCK;
-  const int xc = nng_dialer_start(*dial, flags);
-  if (xc)
-    ERROR_RET(xc);
-
-  Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString("started"));
-  return nano_success;
-
-}
-
-SEXP rnng_listener_start(SEXP listener) {
-
-  if (R_ExternalPtrTag(listener) != nano_ListenerSymbol)
-    Rf_error("'listener' is not a valid Listener");
-  nng_listener *list = (nng_listener *) R_ExternalPtrAddr(listener);
-  const int xc = nng_listener_start(*list, 0);
-  if (xc)
-    ERROR_RET(xc);
-
-  Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString("started"));
-  return nano_success;
-
-}
-
-SEXP rnng_dialer_close(SEXP dialer) {
-
-  if (R_ExternalPtrTag(dialer) != nano_DialerSymbol)
-    Rf_error("'dialer' is not a valid Dialer");
-  nng_dialer *dial = (nng_dialer *) R_ExternalPtrAddr(dialer);
-  const int xc = nng_dialer_close(*dial);
-  if (xc)
-    ERROR_RET(xc);
-  Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString("closed"));
-  return nano_success;
-
-}
-
-SEXP rnng_listener_close(SEXP listener) {
-
-  if (R_ExternalPtrTag(listener) != nano_ListenerSymbol)
-    Rf_error("'listener' is not a valid Listener");
-  nng_listener *list = (nng_listener *) R_ExternalPtrAddr(listener);
-  const int xc = nng_listener_close(*list);
-  if (xc)
-    ERROR_RET(xc);
-  Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString("closed"));
-  return nano_success;
 
 }
 
@@ -872,11 +606,6 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP clo) {
   const SEXP ptrtag = R_ExternalPtrTag(con);
   if (ptrtag == nano_SocketSymbol) {
 
-    nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
-    nng_msg *msg;
-    saio = R_Calloc(1, nano_aio);
-    saio->type = SENDAIO;
-
     switch (nano_encodes(mode)) {
     case 1:
       nano_serialize(&buf, data); break;
@@ -885,6 +614,11 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP clo) {
     default:
       nano_serialize_next(&buf, data); break;
     }
+
+    nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
+    nng_msg *msg;
+    saio = R_Calloc(1, nano_aio);
+    saio->type = SENDAIO;
 
     if ((xc = nng_msg_alloc(&msg, 0)))
       goto exitlevel2;
@@ -905,11 +639,6 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP clo) {
 
   } else if (ptrtag == nano_ContextSymbol) {
 
-    nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
-    nng_msg *msg;
-    saio = R_Calloc(1, nano_aio);
-    saio->type = SENDAIO;
-
     switch (nano_encodes(mode)) {
     case 1:
       nano_serialize(&buf, data); break;
@@ -918,6 +647,11 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP clo) {
     default:
       nano_serialize_next(&buf, data); break;
     }
+
+    nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
+    nng_msg *msg;
+    saio = R_Calloc(1, nano_aio);
+    saio->type = SENDAIO;
 
     if ((xc = nng_msg_alloc(&msg, 0)))
       goto exitlevel2;
@@ -938,17 +672,17 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP clo) {
 
   } else if (ptrtag == nano_StreamSymbol) {
 
-    nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(con);
-    const int frames = LOGICAL(Rf_getAttrib(con, nano_TextframesSymbol))[0];
-    nng_iov iov;
-
     nano_encode(&buf, data);
+
+    nano_stream *nst = (nano_stream *) R_ExternalPtrAddr(con);
+    nng_stream *sp = nst->stream;
+    nng_iov iov;
 
     saio = R_Calloc(1, nano_aio);
     saio->type = IOV_SENDAIO;
     saio->data = R_Calloc(buf.cur, unsigned char);
     memcpy(saio->data, buf.buf, buf.cur);
-    iov.iov_len = buf.cur - (frames == 1);
+    iov.iov_len = buf.cur - nst->textframes;
     iov.iov_buf = saio->data;
 
     if ((xc = nng_aio_alloc(&saio->aio, isaio_complete, saio))) {
@@ -1000,15 +734,16 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP bytes, SEXP clo) {
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   nano_aio *raio;
   SEXP aio;
-  int xc;
+  int mod, xc;
 
   const SEXP ptrtag = R_ExternalPtrTag(con);
   if (ptrtag == nano_SocketSymbol) {
 
+    mod = nano_matcharg(mode);
     nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
     raio = R_Calloc(1, nano_aio);
     raio->type = RECVAIO;
-    raio->mode = nano_matcharg(mode);
+    raio->mode = mod;
 
     if ((xc = nng_aio_alloc(&raio->aio, raio_complete, raio)))
       goto exitlevel1;
@@ -1021,10 +756,11 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP bytes, SEXP clo) {
 
   } else if (ptrtag == nano_ContextSymbol) {
 
+    mod = nano_matcharg(mode);
     nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
     raio = R_Calloc(1, nano_aio);
     raio->type = RECVAIO;
-    raio->mode = nano_matcharg(mode);
+    raio->mode = mod;
 
     if ((xc = nng_aio_alloc(&raio->aio, raio_complete, raio)))
       goto exitlevel1;
@@ -1037,13 +773,14 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP bytes, SEXP clo) {
 
   } else if (ptrtag == nano_StreamSymbol) {
 
-    nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(con);
+    mod = nano_matchargs(mode);
     const size_t xlen = (size_t) Rf_asInteger(bytes);
+    nng_stream **sp = (nng_stream **) R_ExternalPtrAddr(con);
     nng_iov iov;
 
     raio = R_Calloc(1, nano_aio);
     raio->type = IOV_RECVAIO;
-    raio->mode = nano_matchargs(mode);
+    raio->mode = mod;
     raio->data = R_Calloc(xlen, unsigned char);
     iov.iov_len = xlen;
     iov.iov_buf = raio->data;
@@ -1055,7 +792,7 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP bytes, SEXP clo) {
       goto exitlevel3;
 
     nng_aio_set_timeout(raio->aio, dur);
-    nng_stream_recv(sp, raio->aio);
+    nng_stream_recv(*sp, raio->aio);
 
     PROTECT(aio = R_MakeExternalPtr(raio, nano_AioSymbol, R_NilValue));
     R_RegisterCFinalizerEx(aio, iaio_finalizer, TRUE);
@@ -1095,6 +832,8 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
                     SEXP timeout, SEXP tls, SEXP clo) {
 
   const char *httr = CHAR(STRING_ELT(http, 0));
+  const char *mthd = method != R_NilValue ? CHAR(STRING_ELT(method, 0)) : NULL;
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   if (tls != R_NilValue && R_ExternalPtrTag(tls) != nano_TlsSymbol)
     Rf_error("'tls' is not a valid TLS Configuration");
   nano_aio *haio = R_Calloc(1, nano_aio);
@@ -1104,7 +843,7 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
 
   haio->type = HTTP_AIO;
   haio->data = handle;
-  haio->mode = LOGICAL(convert)[0];
+  haio->mode = *NANO_INTEGER(convert);
   handle->cfg = NULL;
 
   if ((xc = nng_url_parse(&handle->url, httr)))
@@ -1113,12 +852,8 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
     goto exitlevel2;
   if ((xc = nng_http_req_alloc(&handle->req, handle->url)))
     goto exitlevel3;
-
-  if (method != R_NilValue) {
-    const char *met = CHAR(STRING_ELT(method, 0));
-    if ((xc = nng_http_req_set_method(handle->req, met)))
-      goto exitlevel4;
-  }
+  if (mthd != NULL && (xc = nng_http_req_set_method(handle->req, mthd)))
+    goto exitlevel4;
 
   if (headers != R_NilValue) {
     R_xlen_t hlen = Rf_xlength(headers);
@@ -1143,7 +878,7 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
     }
   }
 
-  if (data != R_NilValue) {
+  if (data != R_NilValue && TYPEOF(data) == STRSXP) {
     nano_buf enc;
     nano_encode(&enc, data);
     if ((xc = nng_http_req_set_data(handle->req, enc.buf, enc.cur - 1)))
@@ -1179,8 +914,7 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
 
   }
 
-  if (timeout != R_NilValue)
-    nng_aio_set_timeout(haio->aio, (nng_duration) Rf_asInteger(timeout));
+  nng_aio_set_timeout(haio->aio, dur);
   nng_http_client_transact(handle->cli, handle->req, handle->res, haio->aio);
 
   PROTECT(aio = R_MakeExternalPtr(haio, nano_AioSymbol, R_NilValue));
@@ -1230,7 +964,7 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
 
 SEXP rnng_aio_http(SEXP env, SEXP response, SEXP type) {
 
-  const int typ = LOGICAL(type)[0];
+  const int typ = *NANO_INTEGER(type);
   SEXP exist;
   switch (typ) {
   case 0: exist = Rf_findVarInFrame(env, nano_ResultSymbol); break;
@@ -1344,17 +1078,19 @@ SEXP rnng_ncurl_session(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP
                         SEXP response, SEXP timeout, SEXP tls) {
 
   const char *httr = CHAR(STRING_ELT(http, 0));
+  const char *mthd = method != R_NilValue ? CHAR(STRING_ELT(method, 0)) : NULL;
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   if (tls != R_NilValue && R_ExternalPtrTag(tls) != nano_TlsSymbol)
     Rf_error("'tls' is not a valid TLS Configuration");
+
   nano_aio *haio = R_Calloc(1, nano_aio);
   nano_handle *handle = R_Calloc(1, nano_handle);
-
   int xc;
   SEXP sess, aio;
 
   haio->type = HTTP_AIO;
   haio->data = handle;
-  haio->mode = LOGICAL(convert)[0];
+  haio->mode = *NANO_INTEGER(convert);
   handle->cfg = NULL;
 
   if ((xc = nng_url_parse(&handle->url, httr)))
@@ -1363,12 +1099,8 @@ SEXP rnng_ncurl_session(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP
     goto exitlevel2;
   if ((xc = nng_http_req_alloc(&handle->req, handle->url)))
     goto exitlevel3;
-
-  if (method != R_NilValue) {
-    const char *met = CHAR(STRING_ELT(method, 0));
-    if ((xc = nng_http_req_set_method(handle->req, met)))
-      goto exitlevel4;
-  }
+  if (mthd != NULL && (xc = nng_http_req_set_method(handle->req, mthd)))
+    goto exitlevel4;
 
   if (headers != R_NilValue) {
     R_xlen_t hlen = Rf_xlength(headers);
@@ -1393,7 +1125,7 @@ SEXP rnng_ncurl_session(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP
     }
   }
 
-  if (data != R_NilValue) {
+  if (data != R_NilValue && TYPEOF(data) == STRSXP) {
     nano_buf enc;
     nano_encode(&enc, data);
     if ((xc = nng_http_req_set_data(handle->req, enc.buf, enc.cur - 1)))
@@ -1429,8 +1161,7 @@ SEXP rnng_ncurl_session(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP
 
   }
 
-  if (timeout != R_NilValue)
-    nng_aio_set_timeout(haio->aio, (nng_duration) Rf_asInteger(timeout));
+  nng_aio_set_timeout(haio->aio, dur);
   nng_http_client_connect(handle->cli, haio->aio);
   nng_aio_wait(haio->aio);
   if ((xc = haio->result) > 0)
@@ -1570,14 +1301,13 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   if (R_ExternalPtrTag(con) != nano_ContextSymbol)
     Rf_error("'context' is not a valid Context");
 
-  nng_ctx *ctx = (nng_ctx *) R_ExternalPtrAddr(con);
-
-  int xc;
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
-
+  const int mod = nano_matcharg(recvmode);
+  nng_ctx *ctx = (nng_ctx *) R_ExternalPtrAddr(con);
   SEXP sendaio, aio, env, fun;
   nano_buf buf;
   nng_msg *msg;
+  int xc;
 
   switch (nano_encodes(sendmode)) {
   case 1:
@@ -1613,7 +1343,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
 
   nano_aio *raio = R_Calloc(1, nano_aio);
   raio->type = RECVAIO;
-  raio->mode = nano_matcharg(recvmode);
+  raio->mode = mod;
 
   if ((xc = nng_aio_alloc(&raio->aio, raio_complete, raio))) {
     R_Free(raio);
@@ -1656,16 +1386,11 @@ SEXP rnng_cv_alloc(void) {
   SEXP xp;
   int xc;
 
-  if ((xc = nng_mtx_alloc(&cvp->mtx))) {
-    R_Free(cvp);
-    ERROR_OUT(xc);
-  }
+  if ((xc = nng_mtx_alloc(&cvp->mtx)))
+    goto exitlevel1;
 
-  if ((xc = nng_cv_alloc(&cvp->cv, cvp->mtx))) {
-    nng_mtx_free(cvp->mtx);
-    R_Free(cvp);
-    ERROR_OUT(xc);
-  }
+  if ((xc = nng_cv_alloc(&cvp->cv, cvp->mtx)))
+    goto exitlevel2;
 
   PROTECT(xp = R_MakeExternalPtr(cvp, nano_CvSymbol, R_NilValue));
   R_RegisterCFinalizerEx(xp, cv_finalizer, TRUE);
@@ -1673,6 +1398,12 @@ SEXP rnng_cv_alloc(void) {
 
   UNPROTECT(1);
   return xp;
+
+  exitlevel2:
+  nng_mtx_free(cvp->mtx);
+  exitlevel1:
+  R_Free(cvp);
+  ERROR_OUT(xc);
 
 }
 
@@ -1684,7 +1415,7 @@ SEXP rnng_cv_wait(SEXP cvar) {
   nano_cv *ncv = (nano_cv *) R_ExternalPtrAddr(cvar);
   nng_cv *cv = ncv->cv;
   nng_mtx *mtx = ncv->mtx;
-  uint8_t flag;
+  int flag;
 
   nng_mtx_lock(mtx);
   while (ncv->condition == 0)
@@ -1693,7 +1424,7 @@ SEXP rnng_cv_wait(SEXP cvar) {
   flag = ncv->flag;
   nng_mtx_unlock(mtx);
 
-  return Rf_ScalarLogical(flag == 0);
+  return Rf_ScalarLogical(flag >= 0);
 
 }
 
@@ -1745,7 +1476,7 @@ SEXP rnng_cv_wait_safe(SEXP cvar) {
   nng_cv *cv = ncv->cv;
   nng_mtx *mtx = ncv->mtx;
   int signalled;
-  uint8_t flag;
+  int flag;
   nng_time time = nng_clock();
 
   while (1) {
@@ -1767,7 +1498,7 @@ SEXP rnng_cv_wait_safe(SEXP cvar) {
   flag = ncv->flag;
   nng_mtx_unlock(mtx);
 
-  return Rf_ScalarLogical(flag == 0);
+  return Rf_ScalarLogical(flag >= 0);
 
 }
 
@@ -1876,24 +1607,22 @@ SEXP rnng_cv_recv_aio(SEXP con, SEXP cvar, SEXP mode, SEXP timeout, SEXP bytes, 
     Rf_error("'cv' is not a valid Condition Variable");
 
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
-
   nano_cv_aio *cv_raio;
   SEXP aio;
-  int xc;
+  int mod, xc;
 
   const SEXP ptrtag = R_ExternalPtrTag(con);
   if (ptrtag == nano_SocketSymbol) {
 
+    mod = nano_matcharg(mode);
     nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(con);
     cv_raio = R_Calloc(1, nano_cv_aio);
     cv_raio->cv = (nano_cv *) R_ExternalPtrAddr(cvar);
     cv_raio->type = RECVAIO;
-    cv_raio->mode = nano_matcharg(mode);
+    cv_raio->mode = mod;
 
-    if ((xc = nng_aio_alloc(&cv_raio->aio, raio_complete_signal, cv_raio))) {
-      R_Free(cv_raio);
-      return mk_error_data(xc);
-    }
+    if ((xc = nng_aio_alloc(&cv_raio->aio, raio_complete_signal, cv_raio)))
+      goto exitlevel1;
 
     nng_aio_set_timeout(cv_raio->aio, dur);
     nng_recv_aio(*sock, cv_raio->aio);
@@ -1903,16 +1632,15 @@ SEXP rnng_cv_recv_aio(SEXP con, SEXP cvar, SEXP mode, SEXP timeout, SEXP bytes, 
 
   } else if (ptrtag == nano_ContextSymbol) {
 
+    mod = nano_matcharg(mode);
     nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
     cv_raio = R_Calloc(1, nano_cv_aio);
     cv_raio->cv = (nano_cv *) R_ExternalPtrAddr(cvar);
     cv_raio->type = RECVAIO;
-    cv_raio->mode = nano_matcharg(mode);
+    cv_raio->mode = mod;
 
-    if ((xc = nng_aio_alloc(&cv_raio->aio, raio_complete_signal, cv_raio))) {
-      R_Free(cv_raio);
-      return mk_error_data(xc);
-    }
+    if ((xc = nng_aio_alloc(&cv_raio->aio, raio_complete_signal, cv_raio)))
+      goto exitlevel1;
 
     nng_aio_set_timeout(cv_raio->aio, dur);
     nng_ctx_recv(*ctxp, cv_raio->aio);
@@ -1922,33 +1650,27 @@ SEXP rnng_cv_recv_aio(SEXP con, SEXP cvar, SEXP mode, SEXP timeout, SEXP bytes, 
 
   } else if (ptrtag == nano_StreamSymbol) {
 
-    nng_stream *sp = (nng_stream *) R_ExternalPtrAddr(con);
+    mod = nano_matchargs(mode);
     const size_t xlen = (size_t) Rf_asInteger(bytes);
+    nng_stream **sp = (nng_stream **) R_ExternalPtrAddr(con);
     nng_iov iov;
 
     cv_raio = R_Calloc(1, nano_cv_aio);
     cv_raio->cv = (nano_cv *) R_ExternalPtrAddr(cvar);
     cv_raio->type = IOV_RECVAIO;
-    cv_raio->mode = nano_matchargs(mode);
+    cv_raio->mode = mod;
     cv_raio->data = R_Calloc(xlen, unsigned char);
     iov.iov_len = xlen;
     iov.iov_buf = cv_raio->data;
 
-    if ((xc = nng_aio_alloc(&cv_raio->aio, iraio_complete_signal, cv_raio))) {
-      R_Free(cv_raio->data);
-      R_Free(cv_raio);
-      return mk_error_data(xc);
-    }
+    if ((xc = nng_aio_alloc(&cv_raio->aio, iraio_complete_signal, cv_raio)))
+      goto exitlevel2;
 
-    if ((xc = nng_aio_set_iov(cv_raio->aio, 1u, &iov))) {
-      nng_aio_free(cv_raio->aio);
-      R_Free(cv_raio->data);
-      R_Free(cv_raio);
-      return mk_error_data(xc);
-    }
+    if ((xc = nng_aio_set_iov(cv_raio->aio, 1u, &iov)))
+      goto exitlevel3;
 
     nng_aio_set_timeout(cv_raio->aio, dur);
-    nng_stream_recv(sp, cv_raio->aio);
+    nng_stream_recv(*sp, cv_raio->aio);
 
     PROTECT(aio = R_MakeExternalPtr(cv_raio, nano_AioSymbol, R_NilValue));
     R_RegisterCFinalizerEx(aio, cviaio_finalizer, TRUE);
@@ -1972,6 +1694,14 @@ SEXP rnng_cv_recv_aio(SEXP con, SEXP cvar, SEXP mode, SEXP timeout, SEXP bytes, 
   UNPROTECT(3);
   return env;
 
+  exitlevel3:
+  nng_aio_free(cv_raio->aio);
+  exitlevel2:
+  R_Free(cv_raio->data);
+  exitlevel1:
+  R_Free(cv_raio);
+  return mk_error_data(xc);
+
 }
 
 SEXP rnng_cv_request(SEXP con, SEXP data, SEXP cvar, SEXP sendmode, SEXP recvmode, SEXP timeout, SEXP clo) {
@@ -1981,15 +1711,14 @@ SEXP rnng_cv_request(SEXP con, SEXP data, SEXP cvar, SEXP sendmode, SEXP recvmod
   if (R_ExternalPtrTag(cvar) != nano_CvSymbol)
     Rf_error("'cv' is not a valid Condition Variable");
 
+  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
+  const int mod = nano_matcharg(recvmode);
   nng_ctx *ctx = (nng_ctx *) R_ExternalPtrAddr(con);
   nano_cv *cvp = (nano_cv *) R_ExternalPtrAddr(cvar);
-
-  int xc;
-  const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
-
   SEXP sendaio, aio, env, fun;
   nano_buf buf;
   nng_msg *msg;
+  int xc;
 
   switch (nano_encodes(sendmode)) {
   case 1:
@@ -2025,7 +1754,7 @@ SEXP rnng_cv_request(SEXP con, SEXP data, SEXP cvar, SEXP sendmode, SEXP recvmod
 
   nano_cv_aio *cv_raio = R_Calloc(1, nano_cv_aio);
   cv_raio->type = RECVAIO;
-  cv_raio->mode = nano_matcharg(recvmode);
+  cv_raio->mode = mod;
   cv_raio->cv = cvp;
 
   if ((xc = nng_aio_alloc(&cv_raio->aio, raio_complete_signal, cv_raio))) {
@@ -2073,50 +1802,39 @@ SEXP rnng_pipe_notify(SEXP socket, SEXP cv, SEXP cv2, SEXP add, SEXP remove, SEX
 
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   nano_cv *cvp = (nano_cv *) R_ExternalPtrAddr(cv);
-  int xc;
+  int xc, flg = *NANO_INTEGER(flag);
+  SEXP xptr;
 
   if (cv2 != R_NilValue) {
 
     if (R_ExternalPtrTag(cv2) != nano_CvSymbol)
       Rf_error("'cv2' is not a valid Condition Variable");
-    nano_cv *cvp2 = (nano_cv *) R_ExternalPtrAddr(cv2);
+
+    cvp->flag = flg < 0 ? 1 : flg;
     nano_cv_duo *duo = R_Calloc(1, nano_cv_duo);
     duo->cv = cvp;
-    duo->cv2 = cvp2;
+    duo->cv2 = (nano_cv *) R_ExternalPtrAddr(cv2);
 
-    if (LOGICAL(add)[0]) {
-      xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST,
-                           LOGICAL(flag)[0] ? pipe_cb_flag_cv_duo : pipe_cb_signal_cv_duo, duo);
-      if (xc)
-        ERROR_OUT(xc);
-    }
-    if (LOGICAL(remove)[0]) {
-      xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST,
-                           LOGICAL(flag)[0] ? pipe_cb_flag_cv_duo : pipe_cb_signal_cv_duo, duo);
-      if (xc)
-        ERROR_OUT(xc);
-    }
+    if (*NANO_INTEGER(add) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST, pipe_cb_signal_duo, duo)))
+      ERROR_OUT(xc);
 
-    SEXP duoptr;
-    PROTECT(duoptr = R_MakeExternalPtr(duo, R_NilValue, R_NilValue));
-    R_RegisterCFinalizerEx(duoptr, cv_duo_finalizer, TRUE);
-    R_MakeWeakRef(cv, duoptr, R_NilValue, FALSE);
+    if (*NANO_INTEGER(remove) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST, pipe_cb_signal_duo, duo)))
+      ERROR_OUT(xc);
+
+    PROTECT(xptr = R_MakeExternalPtr(duo, R_NilValue, R_NilValue));
+    R_RegisterCFinalizerEx(xptr, cv_duo_finalizer, TRUE);
+    R_MakeWeakRef(cv, xptr, R_NilValue, FALSE);
     UNPROTECT(1);
 
   } else {
 
-    if (LOGICAL(add)[0]) {
-      xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST,
-                           LOGICAL(flag)[0] ? pipe_cb_flag_cv : pipe_cb_signal_cv, cvp);
-      if (xc)
-        ERROR_OUT(xc);
-    }
-    if (LOGICAL(remove)[0]) {
-      xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST,
-                           LOGICAL(flag)[0] ? pipe_cb_flag_cv : pipe_cb_signal_cv, cvp);
-      if (xc)
-        ERROR_OUT(xc);
-    }
+    cvp->flag = flg < 0 ? 1 : flg;
+
+    if (*NANO_INTEGER(add) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST, pipe_cb_signal, cvp)))
+      ERROR_OUT(xc);
+
+    if (*NANO_INTEGER(remove) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST, pipe_cb_signal, cvp)))
+      ERROR_OUT(xc);
 
   }
 

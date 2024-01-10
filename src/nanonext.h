@@ -38,8 +38,11 @@
 #include <nng/protocol/survey0/respond.h>
 #endif
 
-#ifdef NANONEXT_SUPPLEMENTALS
+#ifdef NANONEXT_HTTP
 #include <nng/supplemental/http/http.h>
+#endif
+
+#ifdef NANONEXT_SUPPLEMENTALS
 #include <nng/supplemental/tls/tls.h>
 #include <nng/supplemental/util/platform.h>
 #ifdef NANONEXT_LEGACY_NNG
@@ -55,6 +58,17 @@ typedef struct nano_dialer_s {
   nng_dialer dial;
   nng_tls_config *tls;
 } nano_dialer;
+
+typedef struct nano_stream_s {
+  nng_stream *stream;
+  int listener;
+  int textframes;
+  union {
+    nng_stream_dialer *dial;
+    nng_stream_listener *list;
+  } endpoint;
+  nng_tls_config *tls;
+} nano_stream;
 
 typedef enum nano_aio_typ {
   SENDAIO,
@@ -74,11 +88,18 @@ typedef struct nano_aio_s {
 
 typedef struct nano_cv_s {
   int condition;
-  uint8_t flag;
+  int flag;
   nng_mtx *mtx;
   nng_cv *cv;
 } nano_cv;
 
+#endif
+
+#ifdef NANONEXT_SIGNALS
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+#include <signal.h>
 #endif
 
 #ifdef NANONEXT_TIME
@@ -92,7 +113,6 @@ typedef struct nano_cv_s {
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
 #include <mbedtls/version.h>
-
 #endif
 
 #ifdef NANONEXT_MBED
@@ -139,6 +159,7 @@ typedef struct nano_cv_s {
   (x)->len = 0;                                                \
   (x)->cur = sz
 #define NANO_FREE(x) if (x.len) R_Free(x.buf)
+#define NANO_INTEGER(x) (int *) STDVEC_DATAPTR(x)
 
 typedef struct nano_buf_s {
   unsigned char *buf;
@@ -255,7 +276,6 @@ extern SEXP nano_SocketSymbol;
 extern SEXP nano_StateSymbol;
 extern SEXP nano_StatusSymbol;
 extern SEXP nano_StreamSymbol;
-extern SEXP nano_TextframesSymbol;
 extern SEXP nano_TlsSymbol;
 extern SEXP nano_UrlSymbol;
 extern SEXP nano_ValueSymbol;
@@ -267,9 +287,7 @@ extern SEXP nano_error;
 extern SEXP nano_ncurlAio;
 extern SEXP nano_ncurlSession;
 extern SEXP nano_recvAio;
-extern SEXP nano_refHookIn;
-extern SEXP nano_refHookOut;
-extern SEXP nano_refList;
+extern SEXP nano_refHook;
 extern SEXP nano_sendAio;
 extern SEXP nano_success;
 extern SEXP nano_unresolved;
