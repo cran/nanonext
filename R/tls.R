@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+# Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
 #
 # This file is part of nanonext.
 #
@@ -28,7 +28,7 @@
 #'     certificates presented by peers,\cr
 #'     \strong{or} a length 2 character vector comprising [i] the certificate
 #'     authority certificate chain and [ii] the certificate revocation list, or
-#'     empty character \code{''} if not applicable.
+#'     empty string \code{''} if not applicable.
 #' @param server \strong{either} the character path to a file containing
 #'     the PEM-encoded TLS certificate and associated private key (may contain
 #'     additional certificates leading to a validation chain, with the leaf
@@ -88,12 +88,15 @@ tls_config <- function(client = NULL, server = NULL, pass = NULL, auth = is.null
 #'     length 32 for SHA-256, 28 for SHA-224, 48 for SHA-384, and 64 for SHA-512.
 #'
 #' @details For arguments 'x' and 'key', a scalar string or raw vector (with no
-#'     attributes) is hashed directly, whilst all other objects are first
-#'     serialised (using R serialisation version 3, big-endian representation).
+#'     attributes) is hashed 'as is'.
 #'
-#'     The result of hashing is always a raw vector, which is translated to a
-#'     character string if 'convert' is TRUE, or returned directly if 'convert'
-#'     is FALSE.
+#'     All other objects are first serialized using R serialization v3 XDR, with
+#'     headers skipped (for portability as these contain R version and encoding
+#'     information).
+#'
+#'     The result of hashing is always a byte sequence, which is converted to a
+#'     character string hex representation if 'convert' is TRUE, or returned as
+#'     a raw vector if 'convert' is FALSE.
 #'
 #' @examples
 #' # SHA-256 hash as character string:
@@ -146,42 +149,6 @@ sha384 <- function(x, key = NULL, convert = TRUE) .Call(rnng_sha384, x, key, con
 #'
 sha512 <- function(x, key = NULL, convert = TRUE) .Call(rnng_sha512, x, key, convert)
 
-#' Cryptographic Hashing Using the SHA-1 Algorithm
-#'
-#' Returns a SHA-1 hash or HMAC of the supplied R object. Uses the optimised
-#'     implementation from the Mbed TLS library. For secure applications, one of
-#'     the SHA-2 algorithms such as \code{\link{sha256}} should be considered
-#'     instead.
-#'
-#' @inheritParams sha256
-#' @param key (optional) supply a secret key to generate an HMAC. If missing or
-#'     NULL, the SHA-1 hash of 'x' is returned.
-#'
-#' @return A raw vector or character string depending on 'convert', of byte
-#'     length 20.
-#'
-#' @details For arguments 'x' and 'key', a scalar string or raw vector (with no
-#'     attributes) is hashed directly, whilst all other objects are first
-#'     serialised (using R serialisation version 3, big-endian representation).
-#'
-#'     The result of hashing is always a raw vector, which is translated to a
-#'     character string if 'convert' is TRUE, or returned directly if 'convert'
-#'     is FALSE.
-#'
-#' @examples
-#' # SHA-1 hash as character string:
-#' sha1("hello world!")
-#'
-#' # SHA-1 hash as raw vector:
-#' sha1("hello world!", convert = FALSE)
-#'
-#' # Obtain HMAC:
-#' sha1("hello world!", "SECRET_KEY")
-#'
-#' @export
-#'
-sha1 <- function(x, key = NULL, convert = TRUE) .Call(rnng_sha1, x, key, convert)
-
 # nanonext - Base64 Encoding Decoding ------------------------------------------
 
 #' Base64 Encode / Decode
@@ -201,9 +168,9 @@ sha1 <- function(x, key = NULL, convert = TRUE) .Call(rnng_sha1, x, key, convert
 #'     For \strong{base64dec}: A character string, raw vector, or other object
 #'     depending on the value of 'convert'.
 #'
-#' @details For encoding: a scalar string or raw vector (with no attributes) is
-#'     encoded directly, whilst all other objects are first serialised (using R
-#'     serialisation version 3, big-endian representation).
+#' @details For encoding: a character string or raw vector (with no attributes)
+#'     is encoded 'as is', whilst all other objects are first serialized (using
+#'     R serialisation version 3, big-endian representation).
 #'
 #'     For decoding: the value of 'convert' should be set to TRUE, FALSE or NA
 #'     to be the analogue of the above 3 cases in order to return the original

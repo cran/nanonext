@@ -1,3 +1,21 @@
+# nanonext 0.13.0
+
+#### Updates
+
+*Please note the following potentially breaking changes, and only update when ready:*
+
+* Default behaviour of `send()` and `recv()` aligned to non-blocking for both Sockets and Contexts (facilitated by synchronous context sends in NNG since v1.6.0).
+* `ncurl()`, `ncurl_aio()` and `ncurl_session()` now restrict 'header' and 'response' arguments to character vectors only, no longer accepting lists (for safety and performance).
+* Unserialization / decoding errors where the received message cannot be translated to the specified mode will output a message to stderr, but no longer generate a warning.
+* SHA functions now skip serialization headers for serialized R objects (ensuring portability as these contain R version and encoding information). This means that, for serialized objects, hashes will be different to those obtained using prior package versions.
+* `sha1()` is removed as a hash option.
+
+*Other changes:*
+
+* `messenger()` specifying 'auth' now works reliably on endpoints using different R versions/platforms due to the above hashing portability fix.
+* Internal memory-efficiency and performance enhancements.
+* Upgrades bundled 'libmbedtls' to v3.5.2.
+
 # nanonext 0.12.0
 
 *This is a major performance and stability release bundling the 'libnng' v1.7.0 source code.*

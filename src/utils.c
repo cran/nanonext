@@ -19,7 +19,6 @@
 #define NANONEXT_PROTOCOLS
 #define NANONEXT_HTTP
 #define NANONEXT_SUPPLEMENTALS
-#define NANONEXT_MBED
 #include "nanonext.h"
 
 // internals -------------------------------------------------------------------
@@ -39,6 +38,16 @@ SEXP mk_error_ncurl(const int xc) {
 
 }
 
+nano_buf nano_char_buf(const SEXP data) {
+
+  nano_buf buf;
+  const char *s = CHAR(STRING_ELT(data, 0));
+  NANO_INIT(&buf, (unsigned char *) s, strlen(s));
+
+  return buf;
+
+}
+
 // finalizers ------------------------------------------------------------------
 
 static void stream_finalizer(SEXP xptr) {
@@ -47,7 +56,7 @@ static void stream_finalizer(SEXP xptr) {
   nano_stream *xp = (nano_stream *) R_ExternalPtrAddr(xptr);
   nng_stream_close(xp->stream);
   nng_stream_free(xp->stream);
-  if (xp->listener) {
+  if (xp->mode == NANO_STREAM_LISTENER) {
     nng_stream_listener_close(xp->endpoint.list);
     nng_stream_listener_free(xp->endpoint.list);
   } else {
@@ -151,14 +160,16 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) Rf_asInteger(timeout);
   if (tls != R_NilValue && R_ExternalPtrTag(tls) != nano_TlsSymbol)
     Rf_error("'tls' is not a valid TLS Configuration");
+  int chk_resp = response != R_NilValue && TYPEOF(response) == STRSXP;
+
   nng_url *url;
   nng_http_client *client;
   nng_http_req *req;
   nng_http_res *res;
   nng_aio *aio;
   nng_tls_config *cfg = NULL;
-  int xc;
   uint16_t code, relo;
+  int xc;
 
   if ((xc = nng_url_parse(&url, addr)))
     goto exitlevel1;
@@ -171,32 +182,21 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
     goto exitlevel3;
   if (mthd != NULL && (xc = nng_http_req_set_method(req, mthd)))
     goto exitlevel4;
-  if (headers != R_NilValue) {
-    const R_xlen_t hlen = Rf_xlength(headers);
-    SEXP names = Rf_getAttrib(headers, R_NamesSymbol);
-    switch (TYPEOF(headers)) {
-    case STRSXP:
+  if (headers != R_NilValue && TYPEOF(headers) == STRSXP) {
+    const R_xlen_t hlen = XLENGTH(headers);
+    SEXP hnames = Rf_getAttrib(headers, R_NamesSymbol);
+    if (TYPEOF(hnames) == STRSXP && XLENGTH(hnames) == hlen) {
       for (R_xlen_t i = 0; i < hlen; i++) {
         if ((xc = nng_http_req_set_header(req,
-                                          CHAR(STRING_ELT(names, i)),
+                                          CHAR(STRING_ELT(hnames, i)),
                                           CHAR(STRING_ELT(headers, i)))))
           goto exitlevel4;
       }
-      break;
-    case VECSXP:
-      for (R_xlen_t i = 0; i < hlen; i++) {
-        if ((xc = nng_http_req_set_header(req,
-                                          CHAR(STRING_ELT(names, i)),
-                                          CHAR(STRING_ELT(VECTOR_ELT(headers, i), 0)))))
-          goto exitlevel4;
-      }
-      break;
     }
   }
   if (data != R_NilValue && TYPEOF(data) == STRSXP) {
-    nano_buf enc;
-    nano_encode(&enc, data);
-    if ((xc = nng_http_req_set_data(req, enc.buf, enc.cur - 1)))
+    nano_buf enc = nano_char_buf(data);
+    if ((xc = nng_http_req_set_data(req, enc.buf, enc.cur)))
       goto exitlevel4;
   }
 
@@ -266,43 +266,24 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
   SET_VECTOR_ELT(out, 0, Rf_ScalarInteger(code));
 
   if (relo) {
-    const R_xlen_t rlen = Rf_xlength(response);
-    switch (TYPEOF(response)) {
-    case STRSXP:
+    if (chk_resp) {
+      const R_xlen_t rlen = XLENGTH(response);
       PROTECT(response = Rf_xlengthgets(response, rlen + 1));
       SET_STRING_ELT(response, rlen, Rf_mkChar("Location"));
-      break;
-    case VECSXP:
-      PROTECT(response = Rf_xlengthgets(response, rlen + 1));
-      SET_VECTOR_ELT(response, rlen, Rf_mkString("Location"));
-      break;
-    default:
+    } else {
       PROTECT(response = Rf_mkString("Location"));
+      chk_resp = 1;
     }
   }
 
-  if (response != R_NilValue) {
-    const R_xlen_t rlen = Rf_xlength(response);
+  if (chk_resp) {
+    const R_xlen_t rlen = XLENGTH(response);
     rvec = Rf_allocVector(VECSXP, rlen);
     SET_VECTOR_ELT(out, 1, rvec);
-    switch (TYPEOF(response)) {
-    case STRSXP:
-      Rf_namesgets(rvec, response);
-      for (R_xlen_t i = 0; i < rlen; i++) {
-        const char *r = nng_http_res_get_header(res, CHAR(STRING_ELT(response, i)));
-        SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
-      }
-      break;
-    case VECSXP: ;
-      SEXP rnames = Rf_allocVector(STRSXP, rlen);
-      Rf_namesgets(rvec, rnames);
-      for (R_xlen_t i = 0; i < rlen; i++) {
-        SEXP rname = STRING_ELT(VECTOR_ELT(response, i), 0);
-        SET_STRING_ELT(rnames, i, rname);
-        const char *r = nng_http_res_get_header(res, CHAR(rname));
-        SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
-      }
-      break;
+    Rf_namesgets(rvec, response);
+    for (R_xlen_t i = 0; i < rlen; i++) {
+      const char *r = nng_http_res_get_header(res, CHAR(STRING_ELT(response, i)));
+      SET_VECTOR_ELT(rvec, i, r == NULL ? R_NilValue : Rf_mkString(r));
     }
   } else {
     rvec = R_NilValue;
@@ -355,7 +336,7 @@ SEXP rnng_stream_dial(SEXP url, SEXP textframes, SEXP tls) {
   if (tls != R_NilValue && R_ExternalPtrTag(tls) != nano_TlsSymbol)
     Rf_error("'tls' is not a valid TLS Configuration");
   nano_stream *nst = R_Calloc(1, nano_stream);
-  nst->listener = 0;
+  nst->mode = NANO_STREAM_DIALER;
   nst->textframes = *NANO_INTEGER(textframes) != 0;
   nst->tls = NULL;
   nng_url *up;
@@ -447,7 +428,7 @@ SEXP rnng_stream_listen(SEXP url, SEXP textframes, SEXP tls) {
   if (tls != R_NilValue && R_ExternalPtrTag(tls) != nano_TlsSymbol)
     Rf_error("'tls' is not a valid TLS Configuration");
   nano_stream *nst = R_Calloc(1, nano_stream);
-  nst->listener = 1;
+  nst->mode = NANO_STREAM_LISTENER;
   nst->textframes = *NANO_INTEGER(textframes) != 0;
   nst->tls = NULL;
   nng_url *up;
@@ -701,53 +682,5 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
     nng_tls_config_free(cfg);
   exitlevel1:
     ERROR_OUT(xc);
-
-}
-
-// Mbed TLS Random Data Generator ----------------------------------------------
-
-SEXP rnng_random(SEXP n, SEXP convert) {
-
-  int sz, xc;
-  switch (TYPEOF(n)) {
-  case INTSXP:
-  case LGLSXP:
-    sz = INTEGER(n)[0];
-    if (sz >= 0 && sz <= 1024) break;
-  case REALSXP:
-    sz = Rf_asInteger(n);
-    if (sz >= 0 && sz <= 1024) break;
-  default:
-    Rf_error("'n' must be an integer between 0 and 1024 or coercible to such");
-  }
-
-  SEXP out;
-  unsigned char buf[sz];
-  mbedtls_entropy_context entropy;
-  mbedtls_ctr_drbg_context ctr_drbg;
-  const char *pers = "r-nanonext-rng";
-
-  mbedtls_entropy_init(&entropy);
-  mbedtls_ctr_drbg_init(&ctr_drbg);
-
-  xc = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
-  if (xc == 0) {
-    xc = mbedtls_ctr_drbg_random(&ctr_drbg, buf, sz);
-  }
-
-  mbedtls_ctr_drbg_free(&ctr_drbg);
-  mbedtls_entropy_free(&entropy);
-
-  if (xc)
-    Rf_error("error generating random bytes");
-
-  if (*NANO_INTEGER(convert)) {
-    out = nano_hashToChar(buf, sz);
-  } else {
-    out = Rf_allocVector(RAWSXP, sz);
-    memcpy(STDVEC_DATAPTR(out), buf, sz);
-  }
-
-  return out;
 
 }

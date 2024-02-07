@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
 //
 // This file is part of nanonext.
 //
@@ -61,7 +61,10 @@ typedef struct nano_dialer_s {
 
 typedef struct nano_stream_s {
   nng_stream *stream;
-  int listener;
+  enum {
+    NANO_STREAM_DIALER,
+    NANO_STREAM_LISTENER
+  } mode;
   int textframes;
   union {
     nng_stream_dialer *dial;
@@ -84,6 +87,7 @@ typedef struct nano_aio_s {
   int mode;
   int result;
   void *data;
+  void *next;
 } nano_aio;
 
 typedef struct nano_cv_s {
@@ -109,10 +113,15 @@ typedef struct nano_cv_s {
 #ifdef NANONEXT_TLS
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
-#include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
 #include <mbedtls/version.h>
+
+#define SHA224_KEY_SIZE 28
+#define SHA256_KEY_SIZE 32
+#define SHA384_KEY_SIZE 48
+#define SHA512_KEY_SIZE 64
+
 #endif
 
 #ifdef NANONEXT_MBED
@@ -142,24 +151,25 @@ typedef struct nano_cv_s {
 #define STRICT_R_HEADERS
 #include <R.h>
 #include <Rinternals.h>
-#include <Rversion.h>
 #include <R_ext/Visibility.h>
 
 #define ERROR_OUT(xc) Rf_error("%d | %s", xc, nng_strerror(xc))
 #define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
 #define NANONEXT_INIT_BUFSIZE 8192
 #define NANONEXT_SERIAL_VER 3
+#define NANONEXT_SERIAL_HEADERS 6
+#define NANONEXT_SERIAL_THR 134217728
 #define NANONEXT_LD_STRLEN 21
 #define NANO_ALLOC(x, sz)                                      \
   (x)->buf = R_Calloc(sz, unsigned char);                      \
-  (x)->len = sz;                                    \
+  (x)->len = sz;                                               \
   (x)->cur = 0
 #define NANO_INIT(x, ptr, sz)                                  \
   (x)->buf = ptr;                                              \
   (x)->len = 0;                                                \
   (x)->cur = sz
 #define NANO_FREE(x) if (x.len) R_Free(x.buf)
-#define NANO_INTEGER(x) (int *) STDVEC_DATAPTR(x)
+#define NANO_INTEGER(x) (int *) DATAPTR_RO(x)
 
 typedef struct nano_buf_s {
   unsigned char *buf;
@@ -169,17 +179,17 @@ typedef struct nano_buf_s {
 
 SEXP mk_error(const int);
 SEXP mk_error_ncurl(const int);
-SEXP nano_decode(unsigned char *, size_t, const int);
-void nano_encode(nano_buf *, SEXP);
-int nano_encodes(SEXP);
-int nano_matcharg(SEXP);
-int nano_matchargs(SEXP);
-void nano_serialize(nano_buf *, SEXP);
-void nano_serialize_next(nano_buf *, SEXP);
-void nano_serialize_xdr(nano_buf *, SEXP);
+nano_buf nano_char_buf(const SEXP);
+SEXP nano_decode(unsigned char *, const size_t, const int);
+void nano_encode(nano_buf *, const SEXP);
+int nano_encodes(const SEXP);
+int nano_matcharg(const SEXP);
+int nano_matchargs(const SEXP);
+void nano_serialize(nano_buf *, const SEXP);
+void nano_serialize_next(nano_buf *, const SEXP);
+void nano_serialize_xdr(nano_buf *, const SEXP, const int);
 SEXP nano_unserialize(unsigned char *, const size_t);
-SEXP nano_hashToChar(unsigned char *, const size_t);
-SEXP rawToChar(unsigned char *, const size_t);
+SEXP rawToChar(const unsigned char *, const size_t);
 void dialer_finalizer(SEXP);
 void listener_finalizer(SEXP);
 void socket_finalizer(SEXP);
@@ -187,6 +197,7 @@ void socket_finalizer(SEXP);
 SEXP rnng_aio_call(SEXP);
 SEXP rnng_aio_get_msg(SEXP);
 SEXP rnng_aio_get_msg2(SEXP);
+SEXP rnng_aio_get_msg3(SEXP);
 SEXP rnng_aio_http(SEXP, SEXP, SEXP);
 SEXP rnng_aio_result(SEXP);
 SEXP rnng_aio_stop(SEXP);
@@ -198,8 +209,6 @@ SEXP rnng_ctx_close(SEXP);
 SEXP rnng_ctx_create(SEXP);
 SEXP rnng_ctx_open(SEXP);
 SEXP rnng_cv_alloc(void);
-SEXP rnng_cv_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_cv_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_cv_reset(SEXP);
 SEXP rnng_cv_signal(SEXP);
 SEXP rnng_cv_until(SEXP, SEXP);
@@ -230,11 +239,12 @@ SEXP rnng_random(SEXP, SEXP);
 SEXP rnng_reap(SEXP);
 SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_recv_aio_signal(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_request_signal(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_set_opt(SEXP, SEXP, SEXP);
-SEXP rnng_sha1(SEXP, SEXP, SEXP);
 SEXP rnng_sha224(SEXP, SEXP, SEXP);
 SEXP rnng_sha256(SEXP, SEXP, SEXP);
 SEXP rnng_sha384(SEXP, SEXP, SEXP);

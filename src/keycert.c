@@ -23,7 +23,7 @@
 static int parse_serial_decimal_format(unsigned char *obuf, size_t obufmax,
                                        const char *ibuf, size_t *len) {
 
-  unsigned long long int dec;
+  unsigned long long dec;
   unsigned int remaining_bytes = sizeof(dec);
   unsigned char *p = obuf;
   unsigned char val;
@@ -60,7 +60,7 @@ static int parse_serial_decimal_format(unsigned char *obuf, size_t obufmax,
 SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
   const char *common = CHAR(STRING_ELT(cn, 0));
-  const char *validuntil = CHAR(STRING_ELT(valid, 0));
+  const char *not_after = CHAR(STRING_ELT(valid, 0)); /* validity period not after */
   const int interactive = *NANO_INTEGER(inter);
   mbedtls_entropy_context entropy;
   mbedtls_ctr_drbg_context ctr_drbg;
@@ -76,7 +76,6 @@ SEXP rnng_write_cert(SEXP cn, SEXP valid, SEXP inter) {
 
   const char *serialvalue = "1";          /* serial number string (decimal)     */
   const char *not_before = "20010101000000";  /* validity period not before   */
-  const char *not_after = validuntil; /* validity period not after */
   const int is_ca = 1;                  /* is a CA certificate                */
   const int max_pathlen = 0;            /* maximum CA path length             */
   const int version = 2;                /* CRT version                        */
