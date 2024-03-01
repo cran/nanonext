@@ -1,3 +1,11 @@
+# nanonext 0.13.2
+
+#### Updates
+
+* Fixes cases of 'built for newer macOS version than being linked' installation warnings on MacOS.
+* Fixes other compiler warnings with additional flags enabled on the CRAN M1mac test machine.
+* Upgrades bundled 'libnng' to v1.7.2.
+
 # nanonext 0.13.0
 
 #### Updates

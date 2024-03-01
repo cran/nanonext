@@ -685,8 +685,7 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP clo) {
 
   SEXP env, fun;
   PROTECT(env = Rf_allocSExp(ENVSXP));
-  SET_ATTRIB(env, nano_sendAio);
-  SET_OBJECT(env, 1);
+  NANO_CLASS(env, "sendAio");
   Rf_defineVar(nano_AioSymbol, aio, env);
 
   PROTECT(fun = Rf_allocSExp(CLOSXP));
@@ -770,8 +769,7 @@ SEXP rnng_recv_aio_impl(const SEXP con, const SEXP mode, const SEXP timeout,
 
   SEXP env, fun;
   PROTECT(env = Rf_allocSExp(ENVSXP));
-  SET_ATTRIB(env, nano_recvAio);
-  SET_OBJECT(env, 1);
+  NANO_CLASS(env, "recvAio");
   Rf_defineVar(nano_AioSymbol, aio, env);
 
   PROTECT(fun = Rf_allocSExp(CLOSXP));
@@ -892,8 +890,7 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
 
   SEXP env, fun;
   PROTECT(env = Rf_allocSExp(ENVSXP));
-  SET_ATTRIB(env, nano_ncurlAio);
-  SET_OBJECT(env, 1);
+  NANO_CLASS2(env, "ncurlAio", "recvAio");
   Rf_defineVar(nano_AioSymbol, aio, env);
 
   int i = 0;
@@ -1108,8 +1105,7 @@ SEXP rnng_ncurl_session(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP
 
   PROTECT(sess = R_MakeExternalPtr(conn, nano_StatusSymbol, R_NilValue));
   R_RegisterCFinalizerEx(sess, session_finalizer, TRUE);
-  SET_ATTRIB(sess, nano_ncurlSession);
-  SET_OBJECT(sess, 1);
+  NANO_CLASS(sess, "ncurlSession");
 
   PROTECT(aio = R_MakeExternalPtr(haio, nano_AioSymbol, R_NilValue));
   R_RegisterCFinalizerEx(aio, haio_finalizer, TRUE);
@@ -1271,8 +1267,7 @@ SEXP rnng_request_impl(const SEXP con, const SEXP data, const SEXP sendmode,
   R_RegisterCFinalizerEx(aio, request_finalizer, TRUE);
 
   PROTECT(env = Rf_allocSExp(ENVSXP));
-  SET_ATTRIB(env, nano_recvAio);
-  SET_OBJECT(env, 1);
+  NANO_CLASS(env, "recvAio");
   Rf_defineVar(nano_AioSymbol, aio, env);
 
   PROTECT(fun = Rf_allocSExp(CLOSXP));
@@ -1331,7 +1326,7 @@ SEXP rnng_cv_alloc(void) {
 
   PROTECT(xp = R_MakeExternalPtr(cvp, nano_CvSymbol, R_NilValue));
   R_RegisterCFinalizerEx(xp, cv_finalizer, TRUE);
-  Rf_classgets(xp, Rf_mkString("conditionVariable"));
+  NANO_CLASS(xp, "conditionVariable");
 
   UNPROTECT(1);
   return xp;

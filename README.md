@@ -178,7 +178,7 @@ vignette("nanonext", package = "nanonext")
 
 Installation from source requires ‘libnng’ \>= v1.5.0 and ‘libmbedtls’
 \>= 2.5.0 (suitable installations are automatically detected), or else
-‘cmake’ to compile ‘libnng’ v1.7.0 and ‘libmbedtls’ v3.5.2 included
+‘cmake’ to compile ‘libnng’ v1.7.2 and ‘libmbedtls’ v3.5.2 included
 within the package sources.
 
 **It is recommended for optimal performance and stability to let the
@@ -202,10 +202,10 @@ OpenCSW - refer to the ‘cmake’ website for the latest source file.*
 #### Windows
 
 For R \>= 4.2 using the ‘Rtools42’ or ‘Rtools43’ toolchains, ‘libnng’
-v1.7.0 and ‘libmbedtls’ v3.5.2 will be automatically compiled from the
+v1.7.2 and ‘libmbedtls’ v3.5.2 will be automatically compiled from the
 package sources during installation.
 
-For previous R versions, pre-compiled ‘libnng’ v1.7.0 and ‘libmbedtls’
+For previous R versions, pre-compiled ‘libnng’ v1.7.2 and ‘libmbedtls’
 v3.5.2 libraries are downloaded and used for installation instead.
 
 ### Acknowledgements and Links
@@ -218,7 +218,7 @@ We would like to acknowledge in particular:
   {nanonext}.
 - The [R Consortium](https://www.r-consortium.org/) for funding the
   development of the secure TLS capabilities in the package, and [Henrik
-  Bengtsson](https://github.com/HenrikBengtsson) and [William
+  Bengtsson](https://github.com/HenrikBengtsson) and [Will
   Landau](https://github.com/wlandau/)’s roles in making this possible.
 - [R Core](https://www.r-project.org/contributors.html) for various
   auxiliary functions for serialisation and raw / character conversion,
