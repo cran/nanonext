@@ -47,9 +47,9 @@ become unavailable since sending the request).}
 Integer exit code (zero on success).
 }
 \description{
-Implements an executor/server for the rep node of the req/rep protocol. Awaits
-    data, applies an arbitrary specified function, and returns the result
-    to the caller/client.
+Implements an executor/server for the rep node of the req/rep protocol.
+    Awaits data, applies an arbitrary specified function, and returns the
+    result to the caller/client.
 }
 \details{
 Receive will block while awaiting a message to arrive and is usually

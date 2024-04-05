@@ -7,8 +7,8 @@
 
 [![CRAN
 status](https://www.r-pkg.org/badges/version/nanonext?color=112d4e)](https://CRAN.R-project.org/package=nanonext)
-[![nanonext status
-badge](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https://shikokuchuo.r-universe.dev/nanonext)
+[![R-universe
+status](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https://shikokuchuo.r-universe.dev/nanonext)
 [![R-CMD-check](https://github.com/shikokuchuo/nanonext/workflows/R-CMD-check/badge.svg)](https://github.com/shikokuchuo/nanonext/actions)
 [![codecov](https://codecov.io/gh/shikokuchuo/nanonext/graph/badge.svg)](https://app.codecov.io/gh/shikokuchuo/nanonext)
 [![DOI](https://zenodo.org/badge/451104675.svg)](https://zenodo.org/badge/latestdoi/451104675)
@@ -69,10 +69,7 @@ Web utilities:
   (async) http(s) client
 - [stream](https://shikokuchuo.net/nanonext/articles/nanonext.html#stream-websocket-client) -
   secure websockets client / generic low-level socket interface
-- [sha224\|256\|384\|512](https://shikokuchuo.net/nanonext/articles/nanonext.html#cryptographic-hashing) -
-  cryptographic hash and HMAC algorithms
-- [base64enc\|dec](https://shikokuchuo.net/nanonext/articles/nanonext.html#cryptographic-hashing) -
-  base64 encoding and decoding
+- `base64enc()` / `base64dec()`
 - `messenger()` - console-based instant messaging with authentication
 
 ### Installation
@@ -83,7 +80,7 @@ Install the latest release from CRAN:
 install.packages("nanonext")
 ```
 
-or the development version from rOpenSci R-universe:
+Or the latest development build from R-universe:
 
 ``` r
 install.packages("nanonext", repos = "https://shikokuchuo.r-universe.dev")
@@ -223,7 +220,7 @@ We would like to acknowledge in particular:
 - [R Core](https://www.r-project.org/contributors.html) for various
   auxiliary functions for serialisation and raw / character conversion,
   which have been adopted by the package.
-- [Luke Tierney](https://homepage.stat.uiowa.edu/~luke/) and [Mike
+- [Luke Tierney](https://github.com/ltierney/) and [Mike
   Cheng](https://github.com/coolbutuseless) for meticulous documentation
   of the R serialization mechanism, which led to the package’s own
   implementation of a low-level interface to R serialization.
@@ -233,16 +230,15 @@ We would like to acknowledge in particular:
 
 Links:
 
-`nanonext` website: <https://shikokuchuo.net/nanonext/><br /> `nanonext`
-on CRAN: <https://cran.r-project.org/package=nanonext><br />
+◈ nanonext R package: <https://shikokuchuo.net/nanonext/>
 
-`nanonext` is listed in CRAN Task Views:<br /> - High Performance
+nanonext is listed in CRAN Task Views:<br /> - High Performance
 Computing:
 <https://cran.r-project.org/view=HighPerformanceComputing><br /> - Web
-Technologies: <https://cran.r-project.org/view=WebTechnologies><br />
+Technologies: <https://cran.r-project.org/view=WebTechnologies>
 
-NNG website: <https://nng.nanomsg.org/><br /> Mbed TLS website:
-<https://www.trustedfirmware.org/projects/mbed-tls/><br />
+NNG: <https://nng.nanomsg.org/><br /> Mbed TLS:
+<https://www.trustedfirmware.org/projects/mbed-tls/>
 
 –
 

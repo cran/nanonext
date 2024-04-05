@@ -1292,7 +1292,7 @@ SEXP rnng_request_impl(const SEXP con, const SEXP data, const SEXP sendmode,
 SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeout, SEXP clo) {
 
   if (R_ExternalPtrTag(con) != nano_ContextSymbol)
-    Rf_error("'context' is not a valid Context");
+    Rf_error("'con' is not a valid Context");
 
   return rnng_request_impl(con, data, sendmode, recvmode, timeout, clo, NULL);
 
@@ -1301,7 +1301,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
 SEXP rnng_request_signal(SEXP con, SEXP data, SEXP cvar, SEXP sendmode, SEXP recvmode, SEXP timeout, SEXP clo) {
 
   if (R_ExternalPtrTag(con) != nano_ContextSymbol)
-    Rf_error("'context' is not a valid Context");
+    Rf_error("'con' is not a valid Context");
   if (R_ExternalPtrTag(cvar) != nano_CvSymbol)
     Rf_error("'cv' is not a valid Condition Variable");
   nano_cv *ncv = (nano_cv *) R_ExternalPtrAddr(cvar);

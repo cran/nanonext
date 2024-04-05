@@ -25,6 +25,7 @@ SEXP nano_CvSymbol;
 SEXP nano_DataSymbol;
 SEXP nano_DialerSymbol;
 SEXP nano_DotcallSymbol;
+SEXP nano_FdSymbol;
 SEXP nano_HeadersSymbol;
 SEXP nano_IdSymbol;
 SEXP nano_ListenerSymbol;
@@ -44,6 +45,7 @@ SEXP nano_aioFormals;
 SEXP nano_aioFuncs;
 SEXP nano_aioNFuncs;
 SEXP nano_error;
+SEXP nano_klassString;
 SEXP nano_refHook;
 SEXP nano_success;
 SEXP nano_unresolved;
@@ -59,6 +61,7 @@ static void RegisterSymbols(void) {
   nano_DataSymbol = Rf_install("data");
   nano_DialerSymbol = Rf_install("dialer");
   nano_DotcallSymbol = Rf_install(".Call");
+  nano_FdSymbol = Rf_install("fd");
   nano_HeadersSymbol = Rf_install("headers");
   nano_IdSymbol = Rf_install("id");
   nano_ListenerSymbol = Rf_install("listener");
@@ -90,16 +93,18 @@ static void PreserveObjects(void) {
   SET_TAG(nano_error, R_ClassSymbol);
   SET_STRING_ELT(CAR(nano_error), 0, Rf_mkChar("errorValue"));
   SET_STRING_ELT(CAR(nano_error), 1, Rf_mkChar("try-error"));
+  R_PreserveObject(nano_klassString = Rf_cons(R_NilValue, R_NilValue));
+  R_PreserveObject(nano_refHook = Rf_list2(R_NilValue, R_NilValue));
   R_PreserveObject(nano_success = Rf_ScalarInteger(0));
   R_PreserveObject(nano_unresolved = Rf_shallow_duplicate(Rf_ScalarLogical(NA_LOGICAL)));
   NANO_CLASS(nano_unresolved, "unresolvedValue");
-  R_PreserveObject(nano_refHook = Rf_list2(R_NilValue, R_NilValue));
 }
 
 static void ReleaseObjects(void) {
-  R_ReleaseObject(nano_refHook);
   R_ReleaseObject(nano_unresolved);
   R_ReleaseObject(nano_success);
+  R_ReleaseObject(nano_refHook);
+  R_ReleaseObject(nano_klassString);
   R_ReleaseObject(nano_error);
   R_ReleaseObject(nano_aioNFuncs);
   R_ReleaseObject(nano_aioFuncs);
@@ -144,7 +149,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
   {"rnng_ncurl_session_close", (DL_FUNC) &rnng_ncurl_session_close, 1},
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
-  {"rnng_next_config", (DL_FUNC) &rnng_next_config, 2},
+  {"rnng_next_config", (DL_FUNC) &rnng_next_config, 4},
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 2},
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
@@ -157,10 +162,6 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},
-  {"rnng_sha224", (DL_FUNC) &rnng_sha224, 3},
-  {"rnng_sha256", (DL_FUNC) &rnng_sha256, 3},
-  {"rnng_sha384", (DL_FUNC) &rnng_sha384, 3},
-  {"rnng_sha512", (DL_FUNC) &rnng_sha512, 3},
   {"rnng_signal_thread_create", (DL_FUNC) &rnng_signal_thread_create, 2},
   {"rnng_sleep", (DL_FUNC) &rnng_sleep, 1},
   {"rnng_socket_lock", (DL_FUNC) &rnng_socket_lock, 2},

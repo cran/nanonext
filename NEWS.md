@@ -1,3 +1,14 @@
+# nanonext 0.13.5.1
+
+#### New Features
+
+* An integer file descriptor is appended to 'nanoSockets' as the attribute 'fd' - see updated documentation for `socket()`.
+* `next_config()` gains argument 'class' and 'vec', enabling custom serialization for all reference object types supported by R serialization.
+
+#### Updates
+
+* Removes SHA-2 cryptographic hash functions (please use the streaming implementation in the secretbase package).
+
 # nanonext 0.13.2
 
 #### Updates

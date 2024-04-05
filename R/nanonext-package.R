@@ -85,14 +85,15 @@
 #'
 #' @section Links:
 #'
-#'     NNG website: \url{https://nng.nanomsg.org/} \cr
-#'     Mbed TLS website: \url{https://www.trustedfirmware.org/projects/mbed-tls/}
+#'     NNG: \url{https://nng.nanomsg.org/} \cr
+#'     Mbed TLS: \url{https://www.trustedfirmware.org/projects/mbed-tls/}
 #'
 #' @encoding UTF-8
 #' @author Charlie Gao \email{charlie.gao@@shikokuchuo.net}
 #'     (\href{https://orcid.org/0000-0002-0750-061X}{ORCID})
 #'
 #' @importFrom stats start
+#' @importFrom tools md5sum
 #' @importFrom utils .DollarNames
 #' @useDynLib nanonext, .registration = TRUE
 #'

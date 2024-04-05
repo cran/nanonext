@@ -278,14 +278,22 @@ strcat <- function(a, b) .Call(rnng_strcat, a, b)
 #' Configure Next Mode
 #'
 #' Configures send mode 'next' by registering functions for custom serialization
-#'     and unserialization of external pointer reference objects, allowing these
+#'     and unserialization of non-system reference objects, allowing these
 #'     to be sent and received between different R sessions.
 #'
 #' @param refhook \strong{either} a list or pairlist of two functions: the
-#'     signature for the first must accept a list of external pointer objects
-#'     and return a raw vector, e.g. \code{torch::torch_serialize}, and the
-#'     second must accept a raw vector and return a list of external pointer
-#'     objects, e.g. \code{torch::torch_load},\cr \strong{or else} NULL to reset.
+#'     signature for the first must accept a reference object inheriting from
+#'     'class' (or a list of such objects) and return a raw vector, and the
+#'     second must accept a raw vector and return reference objects (or a list
+#'     of such objects), \cr \strong{or else} NULL to reset.
+#' @param class [default ""] a character string representing the class of object
+#'     that these serialization function will be applied to, e.g. 'ArrowTabular'
+#'     or 'torch_tensor'.
+#' @param vec [default FALSE] the serialization functions accept and return
+#'     reference object individually e.g. \code{arrow::write_to_raw} and
+#'     \code{arrow::read_ipc_stream}. If TRUE, the serialization functions are
+#'     vectorized and accept and return a list of reference objects, e.g.
+#'     \code{torch::torch_serialize} and \code{torch::torch_load}.
 #' @param mark [default FALSE] (for advanced use only) logical value, whether to
 #'     mark serialized data with a special bit.
 #'
@@ -293,6 +301,8 @@ strcat <- function(a, b) .Call(rnng_strcat, a, b)
 #'
 #' @details Calling this function without any arguments returns the pairlist of
 #'     currently-registered 'refhook' functions (and resets 'mark' to FALSE).
+#'
+#'
 #'
 #' @examples
 #' g <- next_config(refhook = list(function(x) serialize(x, NULL), unserialize))
@@ -304,5 +314,5 @@ strcat <- function(a, b) .Call(rnng_strcat, a, b)
 #'
 #' @export
 #'
-next_config <- function(refhook = list(), mark = FALSE)
-  .Call(rnng_next_config, refhook, mark)
+next_config <- function(refhook = list(), class = "", vec = FALSE, mark = FALSE)
+  .Call(rnng_next_config, refhook, class, vec, mark)

@@ -93,9 +93,9 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 
 #' Reply over Context (RPC Server for Req/Rep Protocol)
 #'
-#' Implements an executor/server for the rep node of the req/rep protocol. Awaits
-#'     data, applies an arbitrary specified function, and returns the result
-#'     to the caller/client.
+#' Implements an executor/server for the rep node of the req/rep protocol.
+#'     Awaits data, applies an arbitrary specified function, and returns the
+#'     result to the caller/client.
 #'
 #' @param context a Context.
 #' @param execute a function which takes the received (converted) data as its
@@ -186,9 +186,9 @@ reply <- function(context,
 #'
 #' @return A 'recvAio' (object of class 'recvAio') (invisibly).
 #'
-#' @details Sending the request and receiving the result are both performed async,
-#'     hence the function will return immediately with a 'recvAio' object. Access
-#'     the return value at \code{$data}.
+#' @details Sending the request and receiving the result are both performed
+#'     async, hence the function will return immediately with a 'recvAio'
+#'     object. Access the return value at \code{$data}.
 #'
 #'     This is designed so that the process on the server can run concurrently
 #'     without blocking the client.
@@ -198,7 +198,8 @@ reply <- function(context,
 #'
 #'     If an error occured in the server process, a nul byte \code{00} will be
 #'     received. This allows an error to be easily distinguished from a NULL
-#'     return value. \code{\link{is_nul_byte}} can be used to test for a nul byte.
+#'     return value. \code{\link{is_nul_byte}} can be used to test for a nul
+#'     byte.
 #'
 #'     It is recommended to use a new context for each request to ensure
 #'     consistent state tracking. For safety, the context used for the request
@@ -229,7 +230,7 @@ request <- function(context,
                     timeout = NULL)
   data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, environment())
 
-#' Request over Context and Signal a Condition Variable
+#' Request and Signal a Condition Variable (RPC Client for Req/Rep Protocol)
 #'
 #' A signalling version of the function takes a 'conditionVariable' as an
 #'     additional argument and signals it when the async receive is complete.

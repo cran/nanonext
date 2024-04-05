@@ -157,7 +157,6 @@ section.footnotes::before {
 <li><a href="#surveyor-respondent-model">Surveyor / Respondent Model</a></li>
 <li><a href="#ncurl-async-http-client">ncurl: (Async) HTTP Client</a></li>
 <li><a href="#stream-websocket-client">stream: Websocket Client</a></li>
-<li><a href="#cryptographic-hashing">Cryptographic Hashing</a></li>
 <li><a href="#options-and-statistics">Options and Statistics</a></li>
 </ol>
 <h3 id="cross-language-exchange">Cross-language Exchange</h3>
@@ -271,12 +270,12 @@ aio &lt;- request(context(req), data = 1e8, recv_mode = &quot;double&quot;)
 aio
 #&gt; &lt; recvAio | $data &gt;
 aio$data |&gt; str()
-#&gt;  num [1:100000000] 1.725 0.263 0.484 -0.144 -0.809 ...
+#&gt;  num [1:100000000] 0.431 0.698 0.385 -0.549 -0.192 ...
 </code></pre>
 <p>As <code>call_aio()</code> is blocking and will wait for completion, an alternative is to query <code>aio$data</code> directly. This will return an ‘unresolved’ logical NA value if the calculation is yet to complete.</p>
 <p>In this example the calculation is returned, but other operations may reside entirely on the server side, for example writing data to disk.</p>
 <p>In such a case, calling or querying the value confirms that the operation has completed, and provides the return value of the function, which may typically be NULL or an exit code.</p>
-<p>The <a href="https://doi.org/10.5281/zenodo.7912722"><code>mirai</code></a> package (<a href="https://cran.r-project.org/package=mirai">https://cran.r-project.org/package=mirai</a>) uses <code>nanonext</code> as the back-end to provide asynchronous execution of arbitrary R code using the RPC model.</p>
+<p>The <a href="https://doi.org/10.5281/zenodo.7912722"><code>mirai</code></a> package (<a href="https://shikokuchuo.net/mirai/">https://shikokuchuo.net/mirai/</a>) uses <code>nanonext</code> as the back-end to provide asynchronous execution of arbitrary R code using the RPC model.</p>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="synchronisation-primitives">Synchronisation Primitives</h3>
 <p><code>nanonext</code> implements cross-platform synchronisation primitives provided by the NNG library.</p>
@@ -355,7 +354,7 @@ ii) Passing a TLS configuration object to the ‘tls’ argument of <code>listen
 <pre><code class="language-r">cert &lt;- write_cert(cn = &quot;127.0.0.1&quot;)
 str(cert)
 #&gt; List of 2
-#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJKQIBAAKCAgEA8fg2eyflBvg+hiy/0v+/n5Il4tmAop/mq+lbqtWDHBbSb9bn\nepRX3yUXco9J&quot;| __truncated__
+#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJJwIBAAKCAgEArzP2MTyBX5h/N4sM0XJ8wrjK8lKG4kZGFl6T7kaaRfY39yfR\nDhdNAsbuu7is&quot;| __truncated__
 #&gt;  $ client: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;&quot;
 
 ser &lt;- tls_config(server = cert$server)
@@ -486,7 +485,7 @@ close(res2)
 #&gt; NULL
 #&gt; 
 #&gt; $data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-65cccbc9-7536cf3e51e166df2474cbec\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-65f81bd9-0e24b09f41687de24699af60\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
 </code></pre>
 <p>For advanced use, supports additional HTTP methods such as POST or PUT.</p>
 <pre><code class="language-r">res &lt;- ncurl_aio(&quot;https://postman-echo.com/post&quot;,
@@ -499,10 +498,10 @@ res
 
 call_aio(res)$headers
 #&gt; $date
-#&gt; [1] &quot;Wed, 14 Feb 2024 14:18:49 GMT&quot;
+#&gt; [1] &quot;Mon, 18 Mar 2024 10:47:54 GMT&quot;
 
 res$data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-65cccbc9-64d4d19f6cd7be111b749662\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-65f81bda-351c0797117f43bf6a9127bd\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
 </code></pre>
 <p>In this respect, it may be used as a performant and lightweight method for making REST API requests.</p>
 <p><code>ncurl_session()</code> creates a re-usable open connection and presents a much faster and more efficient solution for repeated polling of an API endpoint. <code>transact()</code> is then used to request data multiple times as required. This method allows a polling frequency that exceeds a server’s new connection limits, where this is permitted.</p>
@@ -520,7 +519,7 @@ transact(sess)
 #&gt; 
 #&gt; $headers
 #&gt; $headers$Date
-#&gt; [1] &quot;Wed, 14 Feb 2024 14:18:50 GMT&quot;
+#&gt; [1] &quot;Mon, 18 Mar 2024 10:47:54 GMT&quot;
 #&gt; 
 #&gt; $headers$`Content-Type`
 #&gt; [1] &quot;application/json; charset=utf-8&quot;
@@ -531,10 +530,17 @@ transact(sess)
 #&gt;  [41] 72 77 61 72 64 65 64 2d 70 72 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65
 #&gt;  [81] 64 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20 22 68 6f 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68
 #&gt; [121] 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36
-#&gt; [161] 35 63 63 63 62 63 61 2d 37 64 65 64 32 31 35 65 36 65 33 64 32 65 39 66 32 37 38 36 38 38 32 30 22 2c 0a 20 20 20 20 22
+#&gt; [161] 35 66 38 31 62 64 61 2d 36 32 65 39 30 34 34 31 36 64 64 62 36 30 31 63 30 35 64 66 37 61 31 30 22 2c 0a 20 20 20 20 22
 #&gt; [201] 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c 0a 20 20 20 20 22
 #&gt; [241] 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20 20 7d 2c 0a 20 20 22
 #&gt; [281] 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f 67 65 74 22 0a 7d
+</code></pre>
+<p>Optimised functions for base64 encoding and decoding from the ‘Mbed TLS’ library are also exposed as convenience utilities:</p>
+<pre><code class="language-r">base64enc(&quot;hello world!&quot;)
+#&gt; [1] &quot;aGVsbG8gd29ybGQh&quot;
+
+base64dec(base64enc(&quot;hello world!&quot;))
+#&gt; [1] &quot;hello world!&quot;
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="stream-websocket-client">stream: Websocket Client</h3>
@@ -574,28 +580,6 @@ r$data
 
 close(s)
 </code></pre>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="cryptographic-hashing">Cryptographic Hashing</h3>
-<p>Hash functions using the SHA-2 algorithms are included: <code>sha224()</code>, <code>sha256()</code>, <code>sha384()</code> and <code>sha512()</code>.</p>
-<p>These expose the secure, optimized implementations from the ‘Mbed TLS’ library and return a hash either directly as a raw vector or converted to a character string. For use in authentication, raw vectors can be compared directly for the highest performance.</p>
-<p>To generate an HMAC (hash-based message authentication code), simply supply the value ‘key’ to use as the secret key.</p>
-<pre><code class="language-r">sha256(&quot;hello world!&quot;)
-#&gt; [1] &quot;7509e5bda0c762d2bac7f90d758b5b2263fa01ccbc542ab5e3df163be08e6ca9&quot;
-
-sha256(&quot;hello world!&quot;, convert = FALSE)
-#&gt;  [1] 75 09 e5 bd a0 c7 62 d2 ba c7 f9 0d 75 8b 5b 22 63 fa 01 cc bc 54 2a b5 e3 df 16 3b e0 8e 6c a9
-
-sha256(&quot;hello world!&quot;, key = &quot;MY_SECRET&quot;)
-#&gt; [1] &quot;d8f0e2d368ff632682d55e2c1ccd49c15f8a6a3862d8eb68f1906b6ee658890a&quot;
-</code></pre>
-<p>Optimised functions for base64 encoding and decoding from the ‘Mbed TLS’ library are also provided:</p>
-<pre><code class="language-r">base64enc(&quot;hello world!&quot;)
-#&gt; [1] &quot;aGVsbG8gd29ybGQh&quot;
-
-base64dec(base64enc(&quot;hello world!&quot;))
-#&gt; [1] &quot;hello world!&quot;
-</code></pre>
-<p>Performance is such that base64 decoding a character string into a raw vector can be faster than creating a new raw vector using <code>as.raw()</code>.</p>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="options-and-statistics">Options and Statistics</h3>
 <p>Use <code>opt()</code> and <code>'opt&lt;-'()</code> to get and set options on a Socket, Context, Stream, Listener or Dialer.</p>
