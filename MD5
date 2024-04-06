@@ -1,7 +1,7 @@
-2982c1718a9499b9fb28b80397891fff *DESCRIPTION
+160dd4e05213d1aded498c25a5cb15f6 *DESCRIPTION
 bcd556d9c8639da1bf79175a0bb9c3a2 *LICENSE.note
 643f9331a8ce9321e2b6037c3d8d1e0c *NAMESPACE
-0d1ca0ad5274f863dc6df6ef9cb8c14c *NEWS.md
+c574b55905fc3c13b2bb5e7fb5dc9386 *NEWS.md
 28879b81d4d5e0ba4ada9c230185588e *R/aio.R
 a3340b6c31957ec7032feac413a2e02f *R/context.R
 bff2f3db038f657d00dde1c53125dc96 *R/docs.R
@@ -18,7 +18,7 @@ b5a9acf79d670302fcc9060a89de6fc6 *R/opts.R
 7c30a6229cbf0f09e08e75df72a11d02 *R/sync.R
 1511c0d63b8266af72eb18c8f06dfd6c *R/tls.R
 4493d0af8fc3d507625c8ffab8dd4f0d *R/utils.R
-dc68d15f4b4e09117758a10dac5b613d *README.md
+8a2b103d4036feb3c0d1f703ddd21c45 *README.md
 b2af507b804150b7114ab2f020566da9 *build/vignette.rds
 b1f1e5176a166197136c1ba2a8f0185b *cleanup
 83fd34fe321cb8780a8d1dc14eb2c146 *cleanup.ucrt
@@ -80,9 +80,9 @@ cad230753685b437df85e077f910069f *man/tls_config.Rd
 d9619dccd2b8dc90c3df98f28fadee52 *man/write_cert.Rd
 21a5a119f301f486503a76aa80c677f9 *src/Makevars.in
 0eb7393ece0e299bb48c0cc20ffa4fde *src/Makevars.ucrt
-3f56b00f885df493cadd3fd21a146644 *src/Makevars.win
+d0db225581f3371b13435a9689ea3306 *src/Makevars.win
 1f761ca1962c5ef3f4556dcdc0645a68 *src/aio.c
-ec555fb9ae38c52a701b015950ef111b *src/core.c
+387c58ebbeb34910ee188509f8ece45c *src/core.c
 f7c775620deb6fb1dd354057405abc92 *src/init.c
 d97b506ccd7b6648df072a8dd3560234 *src/keycert.c
 27f3f8edbf43a2ec0720f27c3d767e8e *src/mbedtls-daca7a3.tar.xz
@@ -92,7 +92,7 @@ f7bf2f7421b6e9d30b51f3f759d4d5aa *src/protocol.c
 b6f9f8b524506933dc670db4bb5f3200 *src/thread.c
 c3b99561cc323c0f500e8815015c7129 *src/tls.c
 9e790a811e21da9a5a49a097b3f912b7 *src/utils.c
-f6964ea70d06c144a38d650139f25899 *tests/tests.R
+0f97135381eb6fda4be3b222c7cb2f02 *tests/tests.R
 886f21f62946f807240a7bda07b2d1e4 *vignettes/nanonext.Rmd
 4114bef116809a560dcb41c23d233a64 *vignettes/nanonext.Rmd.orig
 c9bb8d216a54725af19885d4779bb1ad *vignettes/precompile.R
