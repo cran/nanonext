@@ -15,8 +15,9 @@ socket(
 )
 }
 \arguments{
-\item{protocol}{[default 'bus'] choose protocol - 'bus', 'pair', 'push',
-'pull', 'pub', 'sub', 'req', 'rep', 'surveyor', or 'respondent' - see
+\item{protocol}{[default 'bus'] choose protocol - \sQuote{bus}, \sQuote{pair},
+\sQuote{push}, \sQuote{pull}, \sQuote{pub}, \sQuote{sub}, \sQuote{req},
+\sQuote{rep}, \sQuote{surveyor}, or \sQuote{respondent} - see
 \link{protocols}.}
 
 \item{dial}{(optional) a URL to dial, specifying the transport and address as
@@ -42,11 +43,11 @@ general use - do not enable unless you have a specific need (refer to NNG
 documentation).}
 }
 \value{
-A Socket (object of class 'nanoSocket' and 'nano').
+A Socket (object of class \sQuote{nanoSocket} and \sQuote{nano}).
 }
 \description{
-Open a Socket implementing 'protocol', and optionally dial (establish an
-    outgoing connection) or listen (accept an incoming connection) at an
+Open a Socket implementing \sQuote{protocol}, and optionally dial (establish
+    an outgoing connection) or listen (accept an incoming connection) at an
     address.
 }
 \details{
@@ -66,12 +67,6 @@ NNG presents a socket view of networking. The sockets are
 
     New contexts may also be created using \code{\link{context}} if the
     protocol supports it.
-
-    For supported protocols, an integer file descriptor is appended as the
-    attribute 'fd'. This will become readable when a message is available for
-    receiving on the socket. Attempts should not be made to read or write to
-    the returned file descriptor, but it is suitable for use with poll(),
-    select(), or WSAPoll() on Windows, and similar functions.
 }
 \section{Protocols}{
 

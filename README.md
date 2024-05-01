@@ -7,6 +7,8 @@
 
 [![CRAN
 status](https://www.r-pkg.org/badges/version/nanonext?color=112d4e)](https://CRAN.R-project.org/package=nanonext)
+[![R-multiverse
+status](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fr-multiverse.r-universe.dev%2Fapi%2Fpackages%2Fnanonext&query=%24.Version&label=R-multiverse&color=112d4e)](https://r-multiverse.r-universe.dev/nanonext)
 [![R-universe
 status](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https://shikokuchuo.r-universe.dev/nanonext)
 [![R-CMD-check](https://github.com/shikokuchuo/nanonext/workflows/R-CMD-check/badge.svg)](https://github.com/shikokuchuo/nanonext/actions)
@@ -28,9 +30,10 @@ completion of asynchronous operations, and [synchronisation
 primitives](https://shikokuchuo.net/nanonext/articles/nanonext.html#synchronisation-primitives)
 allowing R to wait upon events signalled by concurrent threads.
 
-Designed for performance and reliability, the NNG library is written in
-C and [`nanonext`](https://doi.org/10.5281/zenodo.7903429) is a
-lightweight zero-dependency wrapper.
+Designed for performance and reliability,
+[`nanonext`](https://doi.org/10.5281/zenodo.7903429) is a lightweight
+wrapper around the NNG C library, and is itself implemented almost
+entirely in C.
 
 Provides the interface for code and processes to communicate with each
 other - [receive data generated in Python, perform analysis in R, and
@@ -60,7 +63,7 @@ Supported transports:
   (over TCP and WebSocket)
 
 Development of the TLS implementation was generously supported by the
-<a href="https://www.r-consortium.org/all-projects/awarded-projects/2023-group-1" alt="R Consortium ISC Grant 2023"><img src="man/figures/RConsortium.png" alt="R Consortium logo" width="100" /></a>
+<a href="https://www.r-consortium.org/all-projects/awarded-projects/2023-group-1" alt="R Consortium ISC Grant 2023"><img src="man/figures/RConsortium.png" alt="R Consortium" width="100" /></a>
 .
 
 Web utilities:
@@ -80,7 +83,7 @@ Install the latest release from CRAN:
 install.packages("nanonext")
 ```
 
-Or the development build from R-universe:
+Or the development version from R-universe:
 
 ``` r
 install.packages("nanonext", repos = "https://shikokuchuo.r-universe.dev")
@@ -173,9 +176,9 @@ vignette("nanonext", package = "nanonext")
 
 #### Linux / Mac / Solaris
 
-Installation from source requires ‘libnng’ \>= v1.5.0 and ‘libmbedtls’
+Installation from source requires ‘libnng’ \>= v1.6.0 and ‘libmbedtls’
 \>= 2.5.0 (suitable installations are automatically detected), or else
-‘cmake’ to compile ‘libnng’ v1.7.2 and ‘libmbedtls’ v3.5.2 included
+‘cmake’ to compile ‘libnng’ v1.8.0 and ‘libmbedtls’ v3.5.2 included
 within the package sources.
 
 **It is recommended for optimal performance and stability to let the
@@ -198,11 +201,11 @@ OpenCSW - refer to the ‘cmake’ website for the latest source file.*
 
 #### Windows
 
-For R \>= 4.2 using the ‘Rtools42’ or ‘Rtools43’ toolchains, ‘libnng’
-v1.7.2 and ‘libmbedtls’ v3.5.2 will be automatically compiled from the
-package sources during installation.
+For R \>= 4.2 using the ‘Rtools42’ or newer toolchains, ‘libnng’ v1.8.0
+and ‘libmbedtls’ v3.5.2 will be automatically compiled from the package
+sources during installation.
 
-For previous R versions, pre-compiled ‘libnng’ v1.7.2 and ‘libmbedtls’
+For previous R versions, pre-compiled ‘libnng’ v1.8.0 and ‘libmbedtls’
 v3.5.2 libraries are downloaded and used for installation instead.
 
 ### Acknowledgements and Links
@@ -210,13 +213,15 @@ v3.5.2 libraries are downloaded and used for installation instead.
 We would like to acknowledge in particular:
 
 - [Garrett D’Amore](https://github.com/gdamore), author of the NNG
-  library, for being generous with advice and implementing a feature
-  request specifically for a more efficient ‘aio’ implementation in
-  {nanonext}.
+  library, for generous advice and for implementing a feature request
+  specifically for a more efficient ‘aio’ implementation in `nanonext`.
 - The [R Consortium](https://www.r-consortium.org/) for funding the
   development of the secure TLS capabilities in the package, and [Henrik
   Bengtsson](https://github.com/HenrikBengtsson) and [Will
   Landau](https://github.com/wlandau/)’s roles in making this possible.
+- [Joe Cheng](https://github.com/jcheng5/) for prototyping the
+  integration of `nanonext` with `later` to support the next generation
+  of completely event-driven promises in `mirai`.
 - [R Core](https://www.r-project.org/contributors.html) for various
   auxiliary functions for serialisation and raw / character conversion,
   which have been adopted by the package.

@@ -24,7 +24,7 @@
 #'
 #' @param socket a Socket.
 #'
-#' @return A Context (object of class 'nanoContext' and 'nano').
+#' @return A Context (object of class \sQuote{nanoContext} and \sQuote{nano}).
 #'
 #' @details Contexts allow the independent and concurrent use of stateful
 #'     operations using the same socket. For example, two different contexts
@@ -76,11 +76,6 @@ context <- function(socket) .Call(rnng_ctx_open, socket)
 #'
 #' @return An external pointer.
 #'
-#' @examples
-#' s <- socket("req", listen = "inproc://nanonext")
-#' r <- request(.context(s), "request data")
-#' close(s)
-#'
 #' @export
 #'
 .context <- function(socket) .Call(rnng_ctx_create, socket)
@@ -101,17 +96,18 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #' @param execute a function which takes the received (converted) data as its
 #'     first argument. Can be an anonymous function of the form
 #'     \code{function(x) do(x)}. Additional arguments can also be passed in
-#'     through '...'.
+#'     through \sQuote{...}.
 #' @param send_mode [default 'serial'] character value or integer equivalent -
-#'     one of 'serial' (1L) to send serialised R objects, 'raw' (2L) to send
-#'     atomic vectors of any type as a raw byte vector, or 'next' (3L) - see
-#'     'Send Modes' section below.
+#'     one of \sQuote{serial} (1L) to send serialised R objects, \sQuote{raw}
+#'     (2L) to send atomic vectors of any type as a raw byte vector, or
+#'     \sQuote{next} (3L) - see \sQuote{Send Modes} section below.
 #' @param recv_mode [default 'serial'] character value or integer equivalent -
-#'     one of 'serial' (1L), 'character' (2L), 'complex' (3L), 'double' (4L),
-#'     'integer' (5L), 'logical' (6L), 'numeric' (7L), 'raw' (8L), or 'string'
-#'     (9L). The default 'serial' means a serialised R object; for the other
-#'     modes, received bytes are converted into the respective mode. 'string' is
-#'     a faster option for length one character vectors.
+#'     one of \sQuote{serial} (1L), \sQuote{character} (2L), \sQuote{complex}
+#'     (3L), \sQuote{double} (4L), \sQuote{integer} (5L), \sQuote{logical} (6L),
+#'     \sQuote{numeric} (7L), \sQuote{raw} (8L), or \sQuote{string} (9L). The
+#'     default \sQuote{serial} means a serialised R object; for the other
+#'     modes, received bytes are converted into the respective mode.
+#'     \sQuote{string} is a faster option for length one character vectors.
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout. Note
 #'     that this applies to receiving the request. The total elapsed time would
@@ -180,21 +176,21 @@ reply <- function(context,
 #'
 #' @inheritParams reply
 #' @inheritParams recv
-#' @param data an object (if send_mode = 'raw', a vector).
+#' @param data an object (if send_mode = \sQuote{raw}, a vector).
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout.
 #'
-#' @return A 'recvAio' (object of class 'recvAio') (invisibly).
+#' @return A \sQuote{recvAio} (object of class \sQuote{recvAio}) (invisibly).
 #'
 #' @details Sending the request and receiving the result are both performed
-#'     async, hence the function will return immediately with a 'recvAio'
+#'     async, hence the function will return immediately with a \sQuote{recvAio}
 #'     object. Access the return value at \code{$data}.
 #'
 #'     This is designed so that the process on the server can run concurrently
 #'     without blocking the client.
 #'
-#'     Optionally use \code{\link{call_aio}} on the 'recvAio' to call (and wait
-#'     for) the result.
+#'     Optionally use \code{\link{call_aio}} on the \sQuote{recvAio} to call
+#'     (and wait for) the result.
 #'
 #'     If an error occured in the server process, a nul byte \code{00} will be
 #'     received. This allows an error to be easily distinguished from a NULL
@@ -203,22 +199,23 @@ reply <- function(context,
 #'
 #'     It is recommended to use a new context for each request to ensure
 #'     consistent state tracking. For safety, the context used for the request
-#'     is closed when all references to the returned 'recvAio' are removed and
-#'     the object is garbage collected.
+#'     is closed when all references to the returned \sQuote{recvAio} are
+#'     removed and the object is garbage collected.
 #'
 #' @inheritSection send Send Modes
 #'
 #' @examples
-#' req <- socket("req", listen = "tcp://127.0.0.1:6546")
-#' rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
-#'
 #' # works if req and rep are running in parallel in different processes
-#' reply(.context(rep), execute = function(x) x + 1, timeout = 50)
-#' aio <- request(.context(req), data = 2022)
-#' aio$data
 #'
-#' close(req)
-#' close(rep)
+#' # req <- socket("req", listen = "tcp://127.0.0.1:6546")
+#' # rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
+#'
+#' # reply(.context(rep), execute = function(x) x + 1, timeout = 50)
+#' # aio <- request(.context(req), data = 2022)
+#' # aio$data
+#'
+#' # close(req)
+#' # close(rep)
 #'
 #' @export
 #'
@@ -232,25 +229,25 @@ request <- function(context,
 
 #' Request and Signal a Condition Variable (RPC Client for Req/Rep Protocol)
 #'
-#' A signalling version of the function takes a 'conditionVariable' as an
+#' A signalling version of the function takes a \sQuote{conditionVariable} as an
 #'     additional argument and signals it when the async receive is complete.
 #'
 #' @inheritParams recv_aio_signal
 #'
 #' @details \strong{For the signalling version}: when the receive is complete,
-#'     the supplied 'conditionVariable' is signalled by incrementing its value
-#'     by 1. This happens asynchronously and independently of the R execution
-#'     thread.
+#'     the supplied \sQuote{conditionVariable} is signalled by incrementing its
+#'     value by 1. This happens asynchronously and independently of the R
+#'     execution thread.
 #'
 #' @examples
 #' # Signalling a condition variable
 #'
-#' req <- socket("req", listen = "tcp://127.0.0.1:6546")
-#' ctxq <- context(req)
-#' cv <- cv()
-#' aio <- request_signal(ctxq, data = 2022, cv = cv)
-#' until(cv, 10L)
-#' close(req)
+#' # req <- socket("req", listen = "tcp://127.0.0.1:6546")
+#' # ctxq <- context(req)
+#' # cv <- cv()
+#' # aio <- request_signal(ctxq, data = 2022, cv = cv)
+#' # until(cv, 10L)
+#' # close(req)
 #'
 #' # The following should be run in another process
 #' # rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
@@ -269,3 +266,23 @@ request_signal <- function(context,
                                          "integer", "logical", "numeric", "raw", "string"),
                            timeout = NULL)
   data <- .Call(rnng_request_signal, context, data, cv, send_mode, recv_mode, timeout, environment())
+
+#' Set Promise Context
+#'
+#' If called from an appropriate context, creates an event-driven promise that
+#'     will resolve asynchronously when the request is complete.
+#'
+#' @param x a 'recvAio' object returned by \code{\link{request}} or
+#'     \code{\link{request_signal}}.
+#' @param ctx the context environment.
+#'
+#' @details The object passed as \sQuote{x} is returned regardless of whether
+#'     the promise context was set successfully or not. If successful,
+#'     \sQuote{x} is modified in place with the promise context.
+#'
+#' @return The object \sQuote{x}.
+#'
+#' @keywords internal
+#' @export
+#'
+set_promise_context <- function(x, ctx) .Call(rnng_set_promise_context, x, ctx)

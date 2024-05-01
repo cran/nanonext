@@ -21,10 +21,6 @@
 
 #include <nng/nng.h>
 
-#if NNG_MAJOR_VERSION == 1 && NNG_MINOR_VERSION < 6
-#define NANONEXT_LEGACY_NNG
-#endif
-
 #ifdef NANONEXT_PROTOCOLS
 #include <nng/protocol/bus0/bus.h>
 #include <nng/protocol/pair0/pair.h>
@@ -45,9 +41,6 @@
 #ifdef NANONEXT_SUPPLEMENTALS
 #include <nng/supplemental/tls/tls.h>
 #include <nng/supplemental/util/platform.h>
-#ifdef NANONEXT_LEGACY_NNG
-extern nng_mtx *shr_mtx;
-#endif
 
 typedef struct nano_listener_s {
   nng_listener list;
@@ -76,6 +69,7 @@ typedef struct nano_stream_s {
 typedef enum nano_aio_typ {
   SENDAIO,
   RECVAIO,
+  REQAIO,
   IOV_SENDAIO,
   IOV_RECVAIO,
   HTTP_AIO
@@ -157,8 +151,8 @@ typedef struct nano_cv_s {
 #define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
 #define NANONEXT_INIT_BUFSIZE 8192
 #define NANONEXT_SERIAL_VER 3
-#define NANONEXT_SERIAL_HEADERS 6
 #define NANONEXT_SERIAL_THR 134217728
+#define NANONEXT_ERR_STRLEN 40
 #define NANONEXT_LD_STRLEN 21
 #define NANO_ALLOC(x, sz)                                      \
   (x)->buf = R_Calloc(sz, unsigned char);                      \
@@ -170,25 +164,24 @@ typedef struct nano_cv_s {
   (x)->cur = sz
 #define NANO_FREE(x) if (x.len) R_Free(x.buf)
 #define NANO_INTEGER(x) (int *) DATAPTR_RO(x)
-#define NANO_CLASS(x, cls)                                     \
-  SEXP klass = Rf_cons(Rf_mkString(cls), R_NilValue);          \
-  SET_TAG(klass, R_ClassSymbol);                               \
-  SET_ATTRIB(x, klass);                                        \
-  SET_OBJECT(x, 1)
+#define NANO_ERROR(x) { Rf_error(x); return R_NilValue; }
 #define NANO_CLASS2(x, cls1, cls2)                             \
-  SEXP klass = Rf_cons(Rf_allocVector(STRSXP, 2), R_NilValue); \
-  SET_TAG(klass, R_ClassSymbol);                               \
-  SET_ATTRIB(x, klass);                                        \
-  SET_OBJECT(x, 1);                                            \
-  SET_STRING_ELT(CAR(klass), 0, Rf_mkChar(cls1));              \
-  SET_STRING_ELT(CAR(klass), 1, Rf_mkChar(cls2))
-
+  SEXP klass = Rf_allocVector(STRSXP, 2);                      \
+  Rf_classgets(x, klass);                                      \
+  SET_STRING_ELT(klass, 0, Rf_mkChar(cls1));                   \
+  SET_STRING_ELT(klass, 1, Rf_mkChar(cls2))
 typedef struct nano_buf_s {
   unsigned char *buf;
   size_t len;
   size_t cur;
 } nano_buf;
 
+void later2(void (*)(void *), void *);
+extern void (*eln2)(void (*)(void *), void *, double, int);
+void eln2dummy(void (*)(void *), void *, double, int);
+
+SEXP nano_PreserveObject(SEXP);
+void nano_ReleaseObject(SEXP);
 SEXP mk_error(const int);
 SEXP mk_error_ncurl(const int);
 nano_buf nano_char_buf(const SEXP);
@@ -231,6 +224,7 @@ SEXP rnng_cv_wait_safe(SEXP);
 SEXP rnng_dial(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_dialer_close(SEXP);
 SEXP rnng_dialer_start(SEXP, SEXP);
+SEXP rnng_fini(void);
 SEXP rnng_get_opt(SEXP, SEXP);
 SEXP rnng_is_error_value(SEXP);
 SEXP rnng_is_nul_byte(SEXP);
@@ -256,6 +250,7 @@ SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_request_signal(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_set_promise_context(SEXP, SEXP);
 SEXP rnng_set_opt(SEXP, SEXP, SEXP);
 SEXP rnng_signal_thread_create(SEXP, SEXP);
 SEXP rnng_sleep(SEXP);
@@ -283,12 +278,13 @@ extern SEXP nano_CvSymbol;
 extern SEXP nano_DataSymbol;
 extern SEXP nano_DialerSymbol;
 extern SEXP nano_DotcallSymbol;
-extern SEXP nano_FdSymbol;
 extern SEXP nano_HeadersSymbol;
 extern SEXP nano_IdSymbol;
 extern SEXP nano_ListenerSymbol;
+extern SEXP nano_LNSymbol;
 extern SEXP nano_ProtocolSymbol;
 extern SEXP nano_RawSymbol;
+extern SEXP nano_ResolveSymbol;
 extern SEXP nano_ResponseSymbol;
 extern SEXP nano_ResultSymbol;
 extern SEXP nano_SocketSymbol;
@@ -304,6 +300,9 @@ extern SEXP nano_aioFuncs;
 extern SEXP nano_aioNFuncs;
 extern SEXP nano_error;
 extern SEXP nano_klassString;
+extern SEXP nano_onLoad;
+extern SEXP nano_precious;
+extern SEXP nano_recvAio;
 extern SEXP nano_refHook;
 extern SEXP nano_success;
 extern SEXP nano_unresolved;

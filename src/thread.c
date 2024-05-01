@@ -134,18 +134,16 @@ SEXP rnng_messenger(SEXP url) {
     dialer = 1;
   }
 
-  PROTECT(socket = R_MakeExternalPtr(sock, nano_SocketSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(socket, socket_finalizer, TRUE);
-
   if (dialer) {
     PROTECT(con = R_MakeExternalPtr(dp, R_NilValue, R_NilValue));
     R_RegisterCFinalizerEx(con, dialer_finalizer, TRUE);
-    Rf_setAttrib(socket, nano_DialerSymbol, R_MissingArg);
   } else {
     PROTECT(con = R_MakeExternalPtr(lp, R_NilValue, R_NilValue));
     R_RegisterCFinalizerEx(con, listener_finalizer, TRUE);
   }
-  R_MakeWeakRef(socket, con, R_NilValue, FALSE);
+  PROTECT(socket = R_MakeExternalPtr(sock, nano_SocketSymbol, con));
+  R_RegisterCFinalizerEx(socket, socket_finalizer, TRUE);
+  if (dialer) Rf_setAttrib(socket, nano_DialerSymbol, R_MissingArg);
 
   UNPROTECT(2);
   return socket;
@@ -160,15 +158,13 @@ SEXP rnng_messenger_thread_create(SEXP args) {
 
   SEXP socket = CADR(args);
   nng_thread *thr;
-  SEXP xptr;
 
   nng_thread_create(&thr, rnng_messenger_thread, args);
 
-  PROTECT(xptr = R_MakeExternalPtr(thr, R_NilValue, R_NilValue));
+  SEXP xptr = R_MakeExternalPtr(thr, R_NilValue, R_NilValue);
+  R_SetExternalPtrProtected(socket, xptr);
   R_RegisterCFinalizerEx(xptr, thread_finalizer, TRUE);
-  R_MakeWeakRef(socket, xptr, R_NilValue, FALSE);
 
-  UNPROTECT(1);
   return socket;
 
 }
@@ -236,6 +232,7 @@ SEXP rnng_wait_thread_create(SEXP aio) {
   if (R_ExternalPtrTag(coreaio) != nano_AioSymbol)
     return aio;
 
+  PROTECT(coreaio);
   nano_aio *aiop = (nano_aio *) R_ExternalPtrAddr(coreaio);
 
   nano_thread_aio *taio = R_Calloc(1, nano_thread_aio);
@@ -258,12 +255,10 @@ SEXP rnng_wait_thread_create(SEXP aio) {
 
   nng_thread_create(&taio->thr, rnng_wait_thread, taio);
 
-  SEXP xptr;
-  PROTECT(coreaio);
-  PROTECT(xptr = R_MakeExternalPtr(taio, R_NilValue, R_NilValue));
+  SEXP xptr = R_MakeExternalPtr(taio, R_NilValue, R_NilValue);
+  R_SetExternalPtrProtected(coreaio, xptr);
   R_RegisterCFinalizerEx(xptr, thread_aio_finalizer, TRUE);
-  R_MakeWeakRef(coreaio, xptr, R_NilValue, FALSE);
-  UNPROTECT(2);
+  UNPROTECT(1);
 
   nng_time time = nng_clock();
 
@@ -284,6 +279,7 @@ SEXP rnng_wait_thread_create(SEXP aio) {
 
   switch (aiop->type) {
   case RECVAIO:
+  case REQAIO:
   case IOV_RECVAIO:
   case HTTP_AIO:
     Rf_findVarInFrame(aio, nano_DataSymbol);
@@ -301,6 +297,7 @@ SEXP rnng_wait_thread_create(SEXP aio) {
   exitlevel1:
   R_Free(ncv);
   R_Free(taio);
+  UNPROTECT(1);
   ERROR_OUT(xc);
 
 }

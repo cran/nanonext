@@ -39,7 +39,7 @@ SEXP rnng_protocol_open(SEXP protocol, SEXP raw) {
   size_t slen = strlen(pro);
 
   const char *pname;
-  int xc, fd;
+  int xc;
   nng_socket *sock;
   SEXP socket;
 
@@ -121,7 +121,7 @@ SEXP rnng_protocol_open(SEXP protocol, SEXP raw) {
       break;
     }
   default:
-    error_return("'protocol' should be one of bus, pair, push, pull, pub, sub, req, rep, surveyor, respondent");
+    NANO_ERROR("'protocol' should be one of bus, pair, push, pull, pub, sub, req, rep, surveyor, respondent");
   }
 
   if (xc) {
@@ -136,8 +136,6 @@ SEXP rnng_protocol_open(SEXP protocol, SEXP raw) {
   Rf_setAttrib(socket, nano_IdSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
   Rf_setAttrib(socket, nano_StateSymbol, Rf_mkString("opened"));
   Rf_setAttrib(socket, nano_ProtocolSymbol, Rf_mkString(pname));
-  if (nng_socket_get_int(*sock, "recv-fd", &fd) == 0)
-    Rf_setAttrib(socket, nano_FdSymbol, Rf_ScalarInteger(fd));
 
   UNPROTECT(1);
   return socket;

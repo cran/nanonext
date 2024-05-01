@@ -25,12 +25,13 @@ SEXP nano_CvSymbol;
 SEXP nano_DataSymbol;
 SEXP nano_DialerSymbol;
 SEXP nano_DotcallSymbol;
-SEXP nano_FdSymbol;
 SEXP nano_HeadersSymbol;
 SEXP nano_IdSymbol;
 SEXP nano_ListenerSymbol;
+SEXP nano_LNSymbol;
 SEXP nano_ProtocolSymbol;
 SEXP nano_RawSymbol;
+SEXP nano_ResolveSymbol;
 SEXP nano_ResponseSymbol;
 SEXP nano_ResultSymbol;
 SEXP nano_SocketSymbol;
@@ -46,13 +47,25 @@ SEXP nano_aioFuncs;
 SEXP nano_aioNFuncs;
 SEXP nano_error;
 SEXP nano_klassString;
+SEXP nano_onLoad;
+SEXP nano_precious;
+SEXP nano_recvAio;
 SEXP nano_refHook;
 SEXP nano_success;
 SEXP nano_unresolved;
 
-#ifdef NANONEXT_LEGACY_NNG
-nng_mtx *shr_mtx;
-#endif
+void (*eln2)(void (*)(void *), void *, double, int);
+
+void later2(void (*fun)(void *), void *data) {
+  eln2(fun, data, 0, 0);
+}
+
+void eln2dummy(void (*fun)(void *), void *data, double secs, int loop) {
+  (void) fun;
+  (void) data;
+  (void) secs;
+  (void) loop;
+}
 
 static void RegisterSymbols(void) {
   nano_AioSymbol = Rf_install("aio");
@@ -61,12 +74,13 @@ static void RegisterSymbols(void) {
   nano_DataSymbol = Rf_install("data");
   nano_DialerSymbol = Rf_install("dialer");
   nano_DotcallSymbol = Rf_install(".Call");
-  nano_FdSymbol = Rf_install("fd");
   nano_HeadersSymbol = Rf_install("headers");
   nano_IdSymbol = Rf_install("id");
   nano_ListenerSymbol = Rf_install("listener");
+  nano_LNSymbol = Rf_install("loadNamespace");
   nano_ProtocolSymbol = Rf_install("protocol");
   nano_RawSymbol = Rf_install("raw");
+  nano_ResolveSymbol = Rf_install("resolve");
   nano_ResponseSymbol = Rf_install("response");
   nano_ResultSymbol = Rf_install("result");
   nano_SocketSymbol = Rf_install("socket");
@@ -89,21 +103,26 @@ static void PreserveObjects(void) {
   SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(0)));
   SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(1)));
   SETCADDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(NA_LOGICAL)));
-  R_PreserveObject(nano_error = Rf_cons(Rf_allocVector(STRSXP, 2), R_NilValue));
-  SET_TAG(nano_error, R_ClassSymbol);
-  SET_STRING_ELT(CAR(nano_error), 0, Rf_mkChar("errorValue"));
-  SET_STRING_ELT(CAR(nano_error), 1, Rf_mkChar("try-error"));
+  R_PreserveObject(nano_error = Rf_allocVector(STRSXP, 2));
+  SET_STRING_ELT(nano_error, 0, Rf_mkChar("errorValue"));
+  SET_STRING_ELT(nano_error, 1, Rf_mkChar("try-error"));
   R_PreserveObject(nano_klassString = Rf_cons(R_NilValue, R_NilValue));
+  R_PreserveObject(nano_onLoad = Rf_lcons(nano_LNSymbol, Rf_cons(Rf_mkString("later"), R_NilValue)));
+  R_PreserveObject(nano_precious = Rf_cons(R_NilValue, Rf_cons(R_NilValue, R_NilValue)));
+  R_PreserveObject(nano_recvAio = Rf_mkString("recvAio"));
   R_PreserveObject(nano_refHook = Rf_list2(R_NilValue, R_NilValue));
   R_PreserveObject(nano_success = Rf_ScalarInteger(0));
   R_PreserveObject(nano_unresolved = Rf_shallow_duplicate(Rf_ScalarLogical(NA_LOGICAL)));
-  NANO_CLASS(nano_unresolved, "unresolvedValue");
+  Rf_classgets(nano_unresolved, Rf_mkString("unresolvedValue"));
 }
 
 static void ReleaseObjects(void) {
   R_ReleaseObject(nano_unresolved);
   R_ReleaseObject(nano_success);
   R_ReleaseObject(nano_refHook);
+  R_ReleaseObject(nano_recvAio);
+  R_ReleaseObject(nano_precious);
+  R_ReleaseObject(nano_onLoad);
   R_ReleaseObject(nano_klassString);
   R_ReleaseObject(nano_error);
   R_ReleaseObject(nano_aioNFuncs);
@@ -137,6 +156,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
   {"rnng_base64dec", (DL_FUNC) &rnng_base64dec, 2},
   {"rnng_base64enc", (DL_FUNC) &rnng_base64enc, 2},
+  {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
   {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
   {"rnng_is_error_value", (DL_FUNC) &rnng_is_error_value, 1},
   {"rnng_is_nul_byte", (DL_FUNC) &rnng_is_nul_byte, 1},
@@ -161,6 +181,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_request_signal", (DL_FUNC) &rnng_request_signal, 7},
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
+  {"rnng_set_promise_context", (DL_FUNC) &rnng_set_promise_context, 2},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},
   {"rnng_signal_thread_create", (DL_FUNC) &rnng_signal_thread_create, 2},
   {"rnng_sleep", (DL_FUNC) &rnng_sleep, 1},
@@ -192,9 +213,7 @@ static const R_ExternalMethodDef externalMethods[] = {
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
-#ifdef NANONEXT_LEGACY_NNG
-  nng_mtx_alloc(&shr_mtx);
-#endif
+  eln2 = eln2dummy;
   R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
@@ -202,7 +221,4 @@ void attribute_visible R_init_nanonext(DllInfo* dll) {
 
 void attribute_visible R_unload_nanonext(DllInfo *info) {
   ReleaseObjects();
-#ifdef NANONEXT_LEGACY_NNG
-  nng_mtx_free(shr_mtx);
-#endif
 }

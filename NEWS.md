@@ -1,3 +1,22 @@
+# nanonext 1.0.0
+
+#### New Features
+
+* Integrates with the `later` package to provide the foundation for truly event-driven (non-polling) promises (thanks @jcheng5 for the initial prototype in #28), where side-effects are enacted asynchronously upon aio completion.
+  + `request()` and `request_signal()` modified internally to support conversion of 'recvAio' to event-driven promises.
+  + `later` dependency ensures asynchronous R code is always run on the main R thread.
+  + `later` is lazily loaded the first time a promise is used, and hence does not impact the load time of `nanonext` or dependent packages.
+
+#### Updates
+
+* `stop_aio()` now causes the 'aio' to resolve to an 'errorValue' of 20 (Operation canceled) if successfully stopped.
+* `nng_error()` now returns the error code combined with the message as a character string.
+* Integer file descriptors are no longer appended to 'nanoSocket' attributes.
+* Adds 'xz' to SystemRequirements (as was the case previously but not explicitly specified) (thanks @gaborcsardi).
+* Re-aligns bundled 'libmbedtls' to v3.5.2 and optimises bundle size.
+* Updates minimum 'libnng' version requirement to v1.6.0.
+* Upgrades bundled 'libnng' to v1.8.0.
+
 # nanonext 0.13.5.2
 
 #### Updates
@@ -8,8 +27,8 @@
 
 #### New Features
 
-* An integer file descriptor is appended to 'nanoSockets' as the attribute 'fd' - see updated documentation for `socket()`.
 * `next_config()` gains argument 'class' and 'vec', enabling custom serialization for all reference object types supported by R serialization.
+* An integer file descriptor is appended to 'nanoSockets' as the attribute 'fd' - see updated documentation for `socket()`.
 
 #### Updates
 
@@ -20,7 +39,6 @@
 #### Updates
 
 * Fixes cases of 'built for newer macOS version than being linked' installation warnings on MacOS.
-* Fixes other compiler warnings with additional flags enabled on the CRAN M1mac test machine.
 * Upgrades bundled 'libnng' to v1.7.2.
 
 # nanonext 0.13.0

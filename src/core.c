@@ -33,11 +33,28 @@ typedef union nano_opt_u {
   uint64_t u;
 } nano_opt;
 
+SEXP nano_PreserveObject(SEXP x) {
+
+  SEXP node = Rf_cons(nano_precious, CDR(nano_precious));
+  SETCDR(nano_precious, node);
+  SETCAR(CDR(nano_precious), node);
+  SET_TAG(node, x);
+
+  return node;
+
+}
+
+void nano_ReleaseObject(SEXP node) {
+
+  SETCDR(CAR(node), CDR(node));
+  SETCAR(CDR(node), CAR(node));
+
+}
+
 SEXP mk_error(const int xc) {
 
   SEXP err = Rf_ScalarInteger(xc);
-  SET_ATTRIB(err, nano_error);
-  SET_OBJECT(err, 1);
+  Rf_classgets(err, nano_error);
   return err;
 
 }
@@ -47,7 +64,8 @@ static SEXP eval_safe (void *call) {
 }
 
 static void rl_reset(void *data, Rboolean jump) {
-  if (jump && data == NULL)
+  (void) data;
+  if (jump)
     SET_TAG(nano_refHook, R_NilValue);
 }
 
@@ -117,7 +135,7 @@ SEXP rawToChar(const unsigned char *buf, const size_t sz) {
   if (sz - i > 1) {
     REprintf("data could not be converted to a character string\n");
     out = Rf_allocVector(RAWSXP, sz);
-    memcpy(STDVEC_DATAPTR(out), buf, sz);
+    memcpy(DATAPTR(out), buf, sz);
     return out;
   }
 
@@ -164,7 +182,7 @@ static SEXP nano_inHook(SEXP x, SEXP fun) {
 
 static SEXP nano_outHook(SEXP x, SEXP fun) {
 
-  const long i = atol(CHAR(*(SEXP *) STDVEC_DATAPTR(x))) - 1;
+  const long i = atol(CHAR(*(SEXP *) DATAPTR_RO(x))) - 1;
 
   return VECTOR_ELT(fun, i);
 
@@ -239,7 +257,7 @@ void nano_serialize_next(nano_buf *buf, const SEXP object) {
           buf->len = buf->cur + xlen;
           buf->buf = R_Realloc(buf->buf, buf->len, unsigned char);
         }
-        memcpy(buf->buf + buf->cur, STDVEC_DATAPTR(out), xlen);
+        memcpy(buf->buf + buf->cur, DATAPTR_RO(out), xlen);
         buf->cur += xlen;
       }
       UNPROTECT(2);
@@ -267,7 +285,7 @@ void nano_serialize_next(nano_buf *buf, const SEXP object) {
           }
           memcpy(buf->buf + buf->cur, &xlen, sizeof(R_xlen_t));
           buf->cur += sizeof(R_xlen_t);
-          memcpy(buf->buf + buf->cur, STDVEC_DATAPTR(out), xlen);
+          memcpy(buf->buf + buf->cur, DATAPTR_RO(out), xlen);
           buf->cur += xlen;
         }
         UNPROTECT(2);
@@ -324,7 +342,7 @@ SEXP nano_unserialize(unsigned char *buf, const size_t sz) {
           SEXP raw, call;
           if (reg == 1) {
             PROTECT(raw = Rf_allocVector(RAWSXP, sz - offset));
-            memcpy(STDVEC_DATAPTR(raw), buf + offset, sz - offset);
+            memcpy(DATAPTR(raw), buf + offset, sz - offset);
             PROTECT(call = Rf_lcons(CADR(nano_refHook), Rf_cons(raw, R_NilValue)));
             reflist = Rf_eval(call, R_GlobalEnv);
             SET_TAG(nano_refHook, reflist);
@@ -340,7 +358,7 @@ SEXP nano_unserialize(unsigned char *buf, const size_t sz) {
               memcpy(&xlen, buf + cur, sizeof(R_xlen_t));
               cur += sizeof(R_xlen_t);
               PROTECT(raw = Rf_allocVector(RAWSXP, xlen));
-              memcpy(STDVEC_DATAPTR(raw), buf + cur, xlen);
+              memcpy(DATAPTR(raw), buf + cur, xlen);
               cur += xlen;
               PROTECT(call = Rf_lcons(func, Rf_cons(raw, R_NilValue)));
               out = Rf_eval(call, R_GlobalEnv);
@@ -427,7 +445,7 @@ void nano_encode(nano_buf *enc, const SEXP object) {
     NANO_INIT(enc, (unsigned char *) DATAPTR_RO(object), XLENGTH(object) * 2 * sizeof(double));
     break;
   case RAWSXP:
-    NANO_INIT(enc, (unsigned char *) STDVEC_DATAPTR(object), XLENGTH(object));
+    NANO_INIT(enc, (unsigned char *) DATAPTR_RO(object), XLENGTH(object));
     break;
   case NILSXP:
     NANO_INIT(enc, NULL, 0);
@@ -547,7 +565,8 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const int mod) {
       SET_STRING_ELT(data, i, onechar);
       if (XLENGTH(onechar) > 0) m = i;
     }
-    if (i) SETLENGTH(data, m + 1);
+    if (i)
+      data = Rf_xlengthgets(data, m + 1);
     UNPROTECT(1);
     return data;
   case 3:
@@ -606,7 +625,7 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const int mod) {
     return data;
   }
 
-  memcpy(STDVEC_DATAPTR(data), buf, sz);
+  memcpy(DATAPTR(data), buf, sz);
   return data;
 
 }
@@ -982,30 +1001,6 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
     nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
     nng_msg *msgp;
 
-#ifdef NANONEXT_LEGACY_NNG
-
-    nng_aio *aiop;
-
-    if ((xc = nng_msg_alloc(&msgp, 0)))
-      goto exitlevel1;
-
-    if ((xc = nng_msg_append(msgp, buf.buf, buf.cur)) ||
-        (xc = nng_aio_alloc(&aiop, NULL, NULL))) {
-      nng_msg_free(msgp);
-      goto exitlevel1;
-    }
-
-    nng_aio_set_msg(aiop, msgp);
-    nng_aio_set_timeout(aiop, flags < 0 ? 0 : flags > 0 ? flags : (*NANO_INTEGER(block) == 1) * NNG_DURATION_DEFAULT);
-    nng_ctx_send(*ctxp, aiop);
-    NANO_FREE(buf);
-    nng_aio_wait(aiop);
-    if ((xc = nng_aio_result(aiop)))
-      nng_msg_free(nng_aio_get_msg(aiop));
-    nng_aio_free(aiop);
-
-#else
-
     if (flags <= 0) {
 
       if ((xc = nng_msg_alloc(&msgp, 0)))
@@ -1042,8 +1037,6 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block) {
       nng_aio_free(aiop);
 
     }
-
-#endif
 
   } else if (ptrtag == nano_StreamSymbol) {
 
@@ -1136,30 +1129,6 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
     nng_ctx *ctxp = (nng_ctx *) R_ExternalPtrAddr(con);
     nng_msg *msgp;
 
-#ifdef NANONEXT_LEGACY_NNG
-
-    nng_aio *aiop;
-
-    if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
-      goto exitlevel1;
-    nng_aio_set_timeout(aiop, flags < 0 ? 0 : flags > 0 ? flags : (*NANO_INTEGER(block) == 1) * NNG_DURATION_DEFAULT);
-    nng_ctx_recv(*ctxp, aiop);
-
-    nng_aio_wait(aiop);
-    if ((xc = nng_aio_result(aiop))) {
-      nng_aio_free(aiop);
-      goto exitlevel1;
-    }
-
-    msgp = nng_aio_get_msg(aiop);
-    nng_aio_free(aiop);
-    buf = nng_msg_body(msgp);
-    sz = nng_msg_len(msgp);
-    res = nano_decode(buf, sz, mod);
-    nng_msg_free(msgp);
-
-#else
-
     if (flags <= 0) {
 
       xc = nng_ctx_recvmsg(*ctxp, &msgp, (flags < 0 || *NANO_INTEGER(block) != 1) * NNG_FLAG_NONBLOCK);
@@ -1194,8 +1163,6 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
       nng_msg_free(msgp);
 
     }
-
-#endif
 
   } else if (ptrtag == nano_StreamSymbol) {
 
@@ -1678,5 +1645,12 @@ SEXP rnng_next_config(SEXP refhook, SEXP klass, SEXP list, SEXP mark) {
   }
 
   return nano_refHook;
+
+}
+
+SEXP rnng_fini(void) {
+
+  nng_fini();
+  return R_NilValue;
 
 }

@@ -23,7 +23,7 @@
 #'
 #' @inheritParams socket
 #'
-#' @return A nano object of class 'nanoObject'.
+#' @return A nano object of class \sQuote{nanoObject}.
 #'
 #' @details This function encapsulates a Socket, Dialer and/or Listener, and its
 #'     associated methods.
@@ -376,7 +376,7 @@ print.unresolvedValue <- function(x, ...) {
 #'
 print.errorValue <- function(x, ...) {
 
-  cat(sprintf("'errorValue' int %d | %s\n", x, nng_error(x)), file = stdout())
+  cat(sprintf("'errorValue' int %s\n", nng_error(x)), file = stdout())
   invisible(x)
 
 }

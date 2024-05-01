@@ -28,8 +28,7 @@ SEXP mk_error_ncurl(const int xc) {
   const char *names[] = {"status", "headers", "data", ""};
   SEXP out = PROTECT(Rf_mkNamed(VECSXP, names));
   SEXP err = Rf_ScalarInteger(xc);
-  SET_ATTRIB(err, nano_error);
-  SET_OBJECT(err, 1);
+  Rf_classgets(err, nano_error);
   SET_VECTOR_ELT(out, 0, err);
   SET_VECTOR_ELT(out, 1, err);
   SET_VECTOR_ELT(out, 2, err);
@@ -82,7 +81,10 @@ static void tls_finalizer(SEXP xptr) {
 SEXP rnng_strerror(SEXP error) {
 
   const int xc = Rf_asInteger(error);
-  return Rf_mkString(nng_strerror(xc));
+  char nano_errbuf[NANONEXT_ERR_STRLEN];
+  snprintf(nano_errbuf, NANONEXT_ERR_STRLEN, "%d | %s", xc, nng_strerror(xc));
+
+  return Rf_mkString(nano_errbuf);
 
 }
 
@@ -298,7 +300,7 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
   } else {
     vec = Rf_allocVector(RAWSXP, sz);
     if (dat != NULL)
-      memcpy(STDVEC_DATAPTR(vec), dat, sz);
+      memcpy(DATAPTR(vec), dat, sz);
   }
   SET_VECTOR_ELT(out, 2, vec);
 
@@ -657,7 +659,7 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
 
   PROTECT(xp = R_MakeExternalPtr(cfg, nano_TlsSymbol, R_NilValue));
   R_RegisterCFinalizerEx(xp, tls_finalizer, TRUE);
-  NANO_CLASS(xp, "tlsConfig");
+  Rf_classgets(xp, Rf_mkString("tlsConfig"));
   if (client != R_NilValue) {
     Rf_setAttrib(xp, R_SpecSymbol, Rf_mkString("client"));
     Rf_setAttrib(xp, R_ModeSymbol, Rf_mkString(mod == NNG_TLS_AUTH_MODE_REQUIRED ? "required" : "optional"));
