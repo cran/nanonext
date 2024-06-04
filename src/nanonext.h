@@ -72,7 +72,10 @@ typedef enum nano_aio_typ {
   REQAIO,
   IOV_SENDAIO,
   IOV_RECVAIO,
-  HTTP_AIO
+  HTTP_AIO,
+  RECVAIOS,
+  REQAIOS,
+  IOV_RECVAIOS
 } nano_aio_typ;
 
 typedef struct nano_aio_s {
@@ -200,10 +203,12 @@ void listener_finalizer(SEXP);
 void socket_finalizer(SEXP);
 
 SEXP rnng_aio_call(SEXP);
+SEXP rnng_aio_collect(SEXP);
+SEXP rnng_aio_collect_safe(SEXP);
 SEXP rnng_aio_get_msg(SEXP);
-SEXP rnng_aio_get_msg2(SEXP);
-SEXP rnng_aio_get_msg3(SEXP);
-SEXP rnng_aio_http(SEXP, SEXP, SEXP);
+SEXP rnng_aio_http_data(SEXP);
+SEXP rnng_aio_http_headers(SEXP);
+SEXP rnng_aio_http_status(SEXP);
 SEXP rnng_aio_result(SEXP);
 SEXP rnng_aio_stop(SEXP);
 SEXP rnng_base64dec(SEXP, SEXP);
@@ -234,7 +239,7 @@ SEXP rnng_listener_start(SEXP);
 SEXP rnng_messenger(SEXP);
 SEXP rnng_messenger_thread_create(SEXP);
 SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_ncurl_session(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_ncurl_session_close(SEXP);
 SEXP rnng_ncurl_transact(SEXP);
@@ -244,10 +249,8 @@ SEXP rnng_protocol_open(SEXP, SEXP);
 SEXP rnng_random(SEXP, SEXP);
 SEXP rnng_reap(SEXP);
 SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_recv_aio_signal(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_request_signal(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_set_promise_context(SEXP, SEXP);
@@ -296,13 +299,15 @@ extern SEXP nano_UrlSymbol;
 extern SEXP nano_ValueSymbol;
 
 extern SEXP nano_aioFormals;
-extern SEXP nano_aioFuncs;
+extern SEXP nano_aioFuncMsg;
+extern SEXP nano_aioFuncRes;
 extern SEXP nano_aioNFuncs;
 extern SEXP nano_error;
 extern SEXP nano_klassString;
 extern SEXP nano_onLoad;
 extern SEXP nano_precious;
 extern SEXP nano_recvAio;
+extern SEXP nano_reqAio;
 extern SEXP nano_refHook;
 extern SEXP nano_success;
 extern SEXP nano_unresolved;

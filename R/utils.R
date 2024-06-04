@@ -251,7 +251,8 @@ is_nul_byte <- function(x) .Call(rnng_is_nul_byte, x)
 #'
 #' @param x numeric HTTP status code to translate.
 #'
-#' @return A character vector.
+#' @return A character vector comprising the status code and explanation
+#'     separated by \sQuote{ | }.
 #'
 #' @examples
 #' status_code(200)
@@ -264,6 +265,7 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #' Concatenate Strings
 #'
 #' A fast implementation that combines two character values into a single string.
+#'     This function is deprecated and will be removed in a future version.
 #'
 #' @param a character value.
 #' @param b character value.
@@ -276,6 +278,7 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #' @examples
 #' strcat("hello ", "world!")
 #'
+#' @keywords internal
 #' @export
 #'
 strcat <- function(a, b) .Call(rnng_strcat, a, b)
@@ -328,10 +331,12 @@ next_config <- function(refhook = list(), class = "", vec = FALSE, mark = FALSE)
 #'     to run the examples.
 #'
 #' @examples
-#' rm(list = ls())
-#' gc()
-#' Sys.sleep(1L)
-#' .Call(nanonext:::rnng_fini)
+#' if (Sys.info()[["sysname"]] == "Linux") {
+#'   rm(list = ls())
+#'   gc()
+#'   Sys.sleep(1L)
+#'   .Call(nanonext:::rnng_fini)
+#' }
 #'
 #' @keywords internal
 #'

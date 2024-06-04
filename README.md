@@ -7,8 +7,6 @@
 
 [![CRAN
 status](https://www.r-pkg.org/badges/version/nanonext?color=112d4e)](https://CRAN.R-project.org/package=nanonext)
-[![R-multiverse
-status](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fr-multiverse.r-universe.dev%2Fapi%2Fpackages%2Fnanonext&query=%24.Version&label=R-multiverse&color=112d4e)](https://r-multiverse.r-universe.dev/nanonext)
 [![R-universe
 status](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https://shikokuchuo.r-universe.dev/nanonext)
 [![R-CMD-check](https://github.com/shikokuchuo/nanonext/workflows/R-CMD-check/badge.svg)](https://github.com/shikokuchuo/nanonext/actions)
@@ -63,7 +61,7 @@ Supported transports:
   (over TCP and WebSocket)
 
 Development of the TLS implementation was generously supported by the
-<a href="https://www.r-consortium.org/all-projects/awarded-projects/2023-group-1" alt="R Consortium ISC Grant 2023"><img src="man/figures/RConsortium.png" alt="R Consortium" width="100" /></a>
+<a href="https://www.r-consortium.org/blog/2024/03/12/isc-funded-grant-secure-tls-connections-in-nanonext-and-mirai-facilitating-high-performance-computing-in-the-life-sciences" alt="R Consortium ISC Grant 2023"><img src="https://www.r-consortium.org/wp-content/uploads/sites/13/2016/09/RConsortium_Horizontal_Pantone.png" alt="R Consortium" width="100" height="22" /></a>
 .
 
 Web utilities:
@@ -178,8 +176,8 @@ vignette("nanonext", package = "nanonext")
 
 Installation from source requires ‘libnng’ \>= v1.6.0 and ‘libmbedtls’
 \>= 2.5.0 (suitable installations are automatically detected), or else
-‘cmake’ to compile ‘libnng’ v1.8.0 and ‘libmbedtls’ v3.5.2 included
-within the package sources.
+‘cmake’ to compile ‘libnng’ v1.8.0 (patched) and ‘libmbedtls’ v3.5.2
+included within the package sources.
 
 **It is recommended for optimal performance and stability to let the
 package automatically compile bundled versions of ‘libmbedtls’ and
@@ -202,11 +200,12 @@ OpenCSW - refer to the ‘cmake’ website for the latest source file.*
 #### Windows
 
 For R \>= 4.2 using the ‘Rtools42’ or newer toolchains, ‘libnng’ v1.8.0
-and ‘libmbedtls’ v3.5.2 will be automatically compiled from the package
-sources during installation.
+(patched) and ‘libmbedtls’ v3.5.2 will be automatically compiled from
+the package sources during installation.
 
-For previous R versions, pre-compiled ‘libnng’ v1.8.0 and ‘libmbedtls’
-v3.5.2 libraries are downloaded and used for installation instead.
+For previous R versions, pre-compiled ‘libnng’ v1.8.0 (patched) and
+‘libmbedtls’ v3.5.2 libraries are downloaded and used for installation
+instead.
 
 ### Acknowledgements and Links
 

@@ -176,11 +176,13 @@ reply <- function(context,
 #'
 #' @inheritParams reply
 #' @inheritParams recv
+#' @inheritParams recv_aio
 #' @param data an object (if send_mode = \sQuote{raw}, a vector).
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout.
 #'
-#' @return A \sQuote{recvAio} (object of class \sQuote{recvAio}) (invisibly).
+#' @return A \sQuote{recvAio} (object of class \sQuote{mirai} and
+#'     \sQuote{recvAio}) (invisibly).
 #'
 #' @details Sending the request and receiving the result are both performed
 #'     async, hence the function will return immediately with a \sQuote{recvAio}
@@ -203,19 +205,39 @@ reply <- function(context,
 #'     removed and the object is garbage collected.
 #'
 #' @inheritSection send Send Modes
+#' @inheritSection recv_aio Signalling
 #'
 #' @examples
+#' \dontrun{
+#'
 #' # works if req and rep are running in parallel in different processes
 #'
-#' # req <- socket("req", listen = "tcp://127.0.0.1:6546")
-#' # rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
+#' req <- socket("req", listen = "tcp://127.0.0.1:6546")
+#' rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
 #'
-#' # reply(.context(rep), execute = function(x) x + 1, timeout = 50)
-#' # aio <- request(.context(req), data = 2022)
-#' # aio$data
+#' reply(.context(rep), execute = function(x) x + 1, timeout = 50)
+#' aio <- request(.context(req), data = 2022)
+#' aio$data
 #'
-#' # close(req)
-#' # close(rep)
+#' close(req)
+#' close(rep)
+#'
+#' # Signalling a condition variable
+#'
+#' req <- socket("req", listen = "tcp://127.0.0.1:6546")
+#' ctxq <- context(req)
+#' cv <- cv()
+#' aio <- request_signal(ctxq, data = 2022, cv = cv)
+#' until(cv, 10L)
+#' close(req)
+#'
+#' # The following should be run in another process
+#' rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
+#' ctxp <- context(rep)
+#' reply(ctxp, execute = function(x) x + 1)
+#' close(rep)
+#'
+#' }
 #'
 #' @export
 #'
@@ -224,38 +246,17 @@ request <- function(context,
                     send_mode = c("serial", "raw", "next"),
                     recv_mode = c("serial", "character", "complex", "double",
                                   "integer", "logical", "numeric", "raw", "string"),
-                    timeout = NULL)
-  data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, environment())
+                    timeout = NULL,
+                    cv = NULL)
+  data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, cv, environment())
 
 #' Request and Signal a Condition Variable (RPC Client for Req/Rep Protocol)
 #'
-#' A signalling version of the function takes a \sQuote{conditionVariable} as an
-#'     additional argument and signals it when the async receive is complete.
+#' Deprecated function - use \code{request} instead.
 #'
-#' @inheritParams recv_aio_signal
+#' @inheritParams request
 #'
-#' @details \strong{For the signalling version}: when the receive is complete,
-#'     the supplied \sQuote{conditionVariable} is signalled by incrementing its
-#'     value by 1. This happens asynchronously and independently of the R
-#'     execution thread.
-#'
-#' @examples
-#' # Signalling a condition variable
-#'
-#' # req <- socket("req", listen = "tcp://127.0.0.1:6546")
-#' # ctxq <- context(req)
-#' # cv <- cv()
-#' # aio <- request_signal(ctxq, data = 2022, cv = cv)
-#' # until(cv, 10L)
-#' # close(req)
-#'
-#' # The following should be run in another process
-#' # rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
-#' # ctxp <- context(rep)
-#' # reply(ctxp, execute = function(x) x + 1)
-#' # close(rep)
-#'
-#' @rdname request
+#' @keywords internal
 #' @export
 #'
 request_signal <- function(context,
@@ -265,7 +266,7 @@ request_signal <- function(context,
                            recv_mode = c("serial", "character", "complex", "double",
                                          "integer", "logical", "numeric", "raw", "string"),
                            timeout = NULL)
-  data <- .Call(rnng_request_signal, context, data, cv, send_mode, recv_mode, timeout, environment())
+  data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, cv, environment())
 
 #' Set Promise Context
 #'

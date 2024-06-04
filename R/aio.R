@@ -66,6 +66,8 @@ send_aio <- function(con, data, mode = c("serial", "raw", "next"), timeout = NUL
 #'
 #' @inheritParams recv
 #' @inheritParams send_aio
+#' @param cv (optional) a \sQuote{conditionVariable} to signal when the async
+#'     receive is complete.
 #'
 #' @return A \sQuote{recvAio} (object of class \sQuote{recvAio}) (invisibly).
 #'
@@ -90,6 +92,13 @@ send_aio <- function(con, data, mode = c("serial", "raw", "next"), timeout = NUL
 #'     to the specified mode, a raw vector will be returned instead to allow
 #'     recovery (accompanied by a warning).
 #'
+#' @section Signalling:
+#'
+#'     By supplying a \sQuote{conditionVariable}, when the receive is complete,
+#'     the \sQuote{conditionVariable} is signalled by incrementing its value by
+#'     1. This happens asynchronously and independently of the R execution
+#'     thread.
+#'
 #' @examples
 #' s1 <- socket("pair", listen = "inproc://nanonext")
 #' s2 <- socket("pair", dial = "inproc://nanonext")
@@ -112,29 +121,6 @@ send_aio <- function(con, data, mode = c("serial", "raw", "next"), timeout = NUL
 #' close(s1)
 #' close(s2)
 #'
-#' @export
-#'
-recv_aio <- function(con,
-                     mode = c("serial", "character", "complex", "double",
-                              "integer", "logical", "numeric", "raw", "string"),
-                     timeout = NULL,
-                     n = 65536L)
-  data <- .Call(rnng_recv_aio, con, mode, timeout, n, environment())
-
-#' Receive Async and Signal a Condition
-#'
-#' A signalling version of the function takes a \sQuote{conditionVariable} as an
-#'     additional argument and signals it when the async receive is complete.
-#'
-#' @param cv \strong{For the signalling version}: a \sQuote{conditionVariable}
-#'     to signal when the async receive is complete.
-#'
-#' @details \strong{For the signalling version}: when the receive is complete,
-#'     the supplied \sQuote{conditionVariable} is signalled by incrementing its
-#'     value by 1. This happens asynchronously and independently of the R
-#'     execution thread.
-#'
-#' @examples
 #' # Signalling a condition variable
 #'
 #' s1 <- socket("pair", listen = "tcp://127.0.0.1:6546")
@@ -149,7 +135,23 @@ recv_aio <- function(con,
 #' res <- send_aio(s2, c(1.1, 2.2, 3.3), mode = "raw", timeout = 100)
 #' close(s2)
 #'
-#' @rdname recv_aio
+#' @export
+#'
+recv_aio <- function(con,
+                     mode = c("serial", "character", "complex", "double",
+                              "integer", "logical", "numeric", "raw", "string"),
+                     timeout = NULL,
+                     cv = NULL,
+                     n = 65536L)
+  data <- .Call(rnng_recv_aio, con, mode, timeout, cv, n, environment())
+
+#' Receive Async and Signal a Condition
+#'
+#' Deprecated function - use \code{recv_aio} instead.
+#'
+#' @inheritParams recv_aio
+#'
+#' @keywords internal
 #' @export
 #'
 recv_aio_signal <- function(con,
@@ -158,17 +160,18 @@ recv_aio_signal <- function(con,
                                      "integer", "logical", "numeric", "raw", "string"),
                             timeout = NULL,
                             n = 65536L)
-  data <- .Call(rnng_recv_aio_signal, con, cv, mode, timeout, n, environment())
+  data <- .Call(rnng_recv_aio, con, mode, timeout, cv, n, environment())
 
 # Core aio functions -----------------------------------------------------------
 
 #' Call the Value of an Asynchronous Aio Operation
 #'
 #' \code{call_aio} retrieves the value of an asynchronous Aio operation, waiting
-#'     for the operation to complete if still in progress.
+#'     for the operation to complete if still in progress. For a list of Aios,
+#'     waits for all asynchronous operations to complete before returning.
 #'
 #' @param aio an Aio (object of class \sQuote{sendAio}, \sQuote{recvAio} or
-#'     \sQuote{ncurlAio}).
+#'     \sQuote{ncurlAio}), or a list of Aios.
 #'
 #' @return The passed object (invisibly).
 #'
@@ -186,12 +189,9 @@ recv_aio_signal <- function(con,
 #'     conversion of the message data to the specified mode, a raw vector will
 #'     be returned instead to allow recovery (accompanied by a warning).
 #'
-#'     Once the value has been successfully retrieved, the Aio is deallocated
-#'     and only the value is stored in the Aio object.
-#'
-#'     Note this function operates silently and does not error even if
-#'     \sQuote{aio} is not an active Aio, always returning invisibly the passed
-#'     object.
+#'     Note: this function operates silently and does not error even if
+#'     \sQuote{aio} is not an active Aio or list of Aios, always returning
+#'     invisibly the passed object.
 #'
 #' @section Alternatively:
 #'
@@ -234,9 +234,50 @@ call_aio <- function(aio) invisible(.Call(rnng_aio_call, aio))
 #'
 call_aio_ <- function(aio) invisible(.Call(rnng_wait_thread_create, aio))
 
+#' Collect Data of an Aio or List of Aios
+#'
+#' \code{collect_aio} collects the data of an Aio or list of Aios, waiting for
+#'     resolution if still in progress.
+#'
+#' @param x an Aio or list of Aios (objects of class \sQuote{sendAio},
+#'     \sQuote{recvAio} or \sQuote{ncurlAio}).
+#'
+#' @return Depending on the type of \sQuote{x} supplied, an object or list of
+#'     objects (the same length as \sQuote{x}, preserving names).
+#'
+#' @details This function will wait for the asynchronous operation(s) to
+#'     complete if still in progress (blocking).
+#'
+#' @examples
+#' s1 <- socket("pair", listen = "inproc://nanonext")
+#' s2 <- socket("pair", dial = "inproc://nanonext")
+#'
+#' res <- send_aio(s1, data.frame(a = 1, b = 2), timeout = 100)
+#' collect_aio(res)
+#'
+#' msg <- recv_aio(s2, timeout = 100)
+#' collect_aio_(msg)
+#'
+#' close(s1)
+#' close(s2)
+#'
+#' @export
+#'
+collect_aio <- function(x) .Call(rnng_aio_collect, x)
+
+#' Collect Data of an Aio or List of Aios
+#'
+#' \code{collect_aio_} is a variant that allows user interrupts, suitable for
+#'     interactive use.
+#'
+#' @rdname collect_aio
+#' @export
+#'
+collect_aio_ <- function(x) .Call(rnng_aio_collect_safe, x)
+
 #' Stop Asynchronous Aio Operation
 #'
-#' Stop an asynchronous Aio operation.
+#' Stop an asynchronous Aio operation, or a list of Aio operations.
 #'
 #' @inheritParams call_aio
 #'
@@ -257,14 +298,15 @@ stop_aio <- function(aio) invisible(.Call(rnng_aio_stop, aio))
 
 #' Query if an Aio is Unresolved
 #'
-#' Query whether an Aio or Aio value remains unresolved. Unlike
+#' Query whether an Aio, Aio value or list of Aios remains unresolved. Unlike
 #'     \code{\link{call_aio}}, this function does not wait for completion.
 #'
-#' @param aio an Aio (object of class \sQuote{sendAio} or \sQuote{recvAio}), or
-#'     Aio value stored in \code{$result} or \code{$data} as the case may be.
+#' @param aio an Aio or list of Aios (objects of class \sQuote{sendAio},
+#'     \sQuote{recvAio} or \sQuote{ncurlAio}), or Aio value stored at
+#'     \code{$result} or \code{$data} etc.
 #'
-#' @return Logical TRUE if \sQuote{aio} is an unresolved Aio or Aio value, or
-#'     FALSE otherwise.
+#' @return Logical TRUE if \sQuote{aio} is an unresolved Aio or Aio value or the
+#'     list of Aios contains at least one unresolved Aio, or FALSE otherwise.
 #'
 #' @details Suitable for use in control flow statements such as \code{while} or
 #'     \code{if}.
@@ -292,20 +334,23 @@ unresolved <- function(aio) .Call(rnng_unresolved, aio)
 
 #' Technical Utility: Query if an Aio is Unresolved
 #'
-#' Query whether an Aio remains unresolved. This is an experimental technical
-#'     utility version of \code{\link{unresolved}} not intended for ordinary
-#'     use. Provides a method of querying the busy status of an Aio without
-#'     altering its state in any way i.e. not attempting to retrieve the result
-#'     or message.
+#' Query whether an Aio or list of Aios remains unresolved. This is an
+#'     experimental technical utility version of \code{\link{unresolved}} not
+#'     intended for ordinary use. Provides a method of querying the busy status
+#'     of an Aio without altering its state in any way i.e. not attempting to
+#'     retrieve the result or message.
 #'
-#' @param aio an Aio (object of class \sQuote{sendAio} or \sQuote{recvAio}).
+#' @inheritParams collect_aio
 #'
-#' @return Logical TRUE if \sQuote{aio} is an unresolved Aio, or FALSE otherwise.
+#' @return Logical TRUE if \sQuote{aio} is an unresolved Aio or else FALSE, or
+#'     if \sQuote{aio} is a list, the integer number of unresolved Aios in the
+#'     list.
 #'
 #' @details \code{.unresolved()} is not intended to be used for \sQuote{recvAio}
 #'     returned by a signalling function, in which case \code{\link{unresolved}}
 #'     must be used in all cases.
 #'
+#' @keywords internal
 #' @export
 #'
-.unresolved <- function(aio) .Call(rnng_unresolved2, aio)
+.unresolved <- function(x) .Call(rnng_unresolved2, x)

@@ -8,13 +8,13 @@ stop_aio(aio)
 }
 \arguments{
 \item{aio}{an Aio (object of class \sQuote{sendAio}, \sQuote{recvAio} or
-\sQuote{ncurlAio}).}
+\sQuote{ncurlAio}), or a list of Aios.}
 }
 \value{
 Invisible NULL.
 }
 \description{
-Stop an asynchronous Aio operation.
+Stop an asynchronous Aio operation, or a list of Aio operations.
 }
 \details{
 Stops the asynchronous I/O operation associated with \sQuote{aio} by

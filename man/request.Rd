@@ -2,7 +2,6 @@
 % Please edit documentation in R/context.R
 \name{request}
 \alias{request}
-\alias{request_signal}
 \title{Request over Context (RPC Client for Req/Rep Protocol)}
 \usage{
 request(
@@ -11,17 +10,8 @@ request(
   send_mode = c("serial", "raw", "next"),
   recv_mode = c("serial", "character", "complex", "double", "integer", "logical",
     "numeric", "raw", "string"),
-  timeout = NULL
-)
-
-request_signal(
-  context,
-  data,
-  cv,
-  send_mode = c("serial", "raw", "next"),
-  recv_mode = c("serial", "character", "complex", "double", "integer", "logical",
-    "numeric", "raw", "string"),
-  timeout = NULL
+  timeout = NULL,
+  cv = NULL
 )
 }
 \arguments{
@@ -45,19 +35,17 @@ modes, received bytes are converted into the respective mode.
 \item{timeout}{[default NULL] integer value in milliseconds or NULL, which
 applies a socket-specific default, usually the same as no timeout.}
 
-\item{cv}{\strong{For the signalling version}: a \sQuote{conditionVariable}
-to signal when the async receive is complete.}
+\item{cv}{(optional) a \sQuote{conditionVariable} to signal when the async
+receive is complete.}
 }
 \value{
-A \sQuote{recvAio} (object of class \sQuote{recvAio}) (invisibly).
+A \sQuote{recvAio} (object of class \sQuote{mirai} and
+    \sQuote{recvAio}) (invisibly).
 }
 \description{
 Implements a caller/client for the req node of the req/rep protocol. Sends
     data to the rep node (executor/server) and returns an Aio, which can be
     called for the value when required.
-
-A signalling version of the function takes a \sQuote{conditionVariable} as an
-    additional argument and signals it when the async receive is complete.
 }
 \details{
 Sending the request and receiving the result are both performed
@@ -79,11 +67,6 @@ Sending the request and receiving the result are both performed
     consistent state tracking. For safety, the context used for the request
     is closed when all references to the returned \sQuote{recvAio} are
     removed and the object is garbage collected.
-
-\strong{For the signalling version}: when the receive is complete,
-    the supplied \sQuote{conditionVariable} is signalled by incrementing its
-    value by 1. This happens asynchronously and independently of the R
-    execution thread.
 }
 \section{Send Modes}{
 
@@ -104,32 +87,45 @@ Sending the request and receiving the result are both performed
     fully compatible.
 }
 
+\section{Signalling}{
+
+
+    By supplying a \sQuote{conditionVariable}, when the receive is complete,
+    the \sQuote{conditionVariable} is signalled by incrementing its value by
+    1. This happens asynchronously and independently of the R execution
+    thread.
+}
+
 \examples{
+\dontrun{
+
 # works if req and rep are running in parallel in different processes
 
-# req <- socket("req", listen = "tcp://127.0.0.1:6546")
-# rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
+req <- socket("req", listen = "tcp://127.0.0.1:6546")
+rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
 
-# reply(.context(rep), execute = function(x) x + 1, timeout = 50)
-# aio <- request(.context(req), data = 2022)
-# aio$data
+reply(.context(rep), execute = function(x) x + 1, timeout = 50)
+aio <- request(.context(req), data = 2022)
+aio$data
 
-# close(req)
-# close(rep)
+close(req)
+close(rep)
 
 # Signalling a condition variable
 
-# req <- socket("req", listen = "tcp://127.0.0.1:6546")
-# ctxq <- context(req)
-# cv <- cv()
-# aio <- request_signal(ctxq, data = 2022, cv = cv)
-# until(cv, 10L)
-# close(req)
+req <- socket("req", listen = "tcp://127.0.0.1:6546")
+ctxq <- context(req)
+cv <- cv()
+aio <- request_signal(ctxq, data = 2022, cv = cv)
+until(cv, 10L)
+close(req)
 
 # The following should be run in another process
-# rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
-# ctxp <- context(rep)
-# reply(ctxp, execute = function(x) x + 1)
-# close(rep)
+rep <- socket("rep", dial = "tcp://127.0.0.1:6546")
+ctxp <- context(rep)
+reply(ctxp, execute = function(x) x + 1)
+close(rep)
+
+}
 
 }

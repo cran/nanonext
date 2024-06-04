@@ -93,15 +93,7 @@
 #'     (\href{https://orcid.org/0000-0002-0750-061X}{ORCID})
 #'
 #' @importFrom stats start
-#' @importFrom tools md5sum
 #' @importFrom utils .DollarNames
 #' @useDynLib nanonext, .registration = TRUE
 #'
 "_PACKAGE"
-
-# nocov start
-# tested implicitly
-
-.onUnload <- function(libpath) library.dynam.unload("nanonext", libpath)
-
-# nocov end

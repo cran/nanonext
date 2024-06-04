@@ -1,3 +1,20 @@
+# nanonext 1.1.0
+
+#### New Features
+
+* Adds `collect_aio()` and `collect_aio_()` to wait for and collect the data of an Aio or list of Aios.
+* `unresolved()`, `call_aio()`,  `call_aio()_` and `stop_aio()` now all accept a list of Aios.
+* `pipe_notify()` gains the ability to specify 'cv' as NULL to cancel previously-set signals.
+* `ncurl_aio()` modified internally to support conversion of 'ncurlAio' to event-driven promises.
+
+#### Updates
+
+* `recv_aio()` and `request()` add argument 'cv' allowing optional signalling of a condition variable. The separate functions `recv_aio_signal()` and `request_signal()` are deprecated.
+* `strcat()` is deprecated as considered non-core - it is recommended to replace usage with `sprintf()`.
+* `status_code()` now returns the status code combined with the explanation as a character string.
+* Performance enhancements for `unresolved()`, `call_aio()` and `call_aio_()`.
+* Updates bundled 'libnng' v1.8.0 with latest patches.
+
 # nanonext 1.0.0
 
 #### New Features

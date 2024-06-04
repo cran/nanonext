@@ -43,13 +43,15 @@ SEXP nano_UrlSymbol;
 SEXP nano_ValueSymbol;
 
 SEXP nano_aioFormals;
-SEXP nano_aioFuncs;
+SEXP nano_aioFuncMsg;
+SEXP nano_aioFuncRes;
 SEXP nano_aioNFuncs;
 SEXP nano_error;
 SEXP nano_klassString;
 SEXP nano_onLoad;
 SEXP nano_precious;
 SEXP nano_recvAio;
+SEXP nano_reqAio;
 SEXP nano_refHook;
 SEXP nano_success;
 SEXP nano_unresolved;
@@ -94,15 +96,12 @@ static void RegisterSymbols(void) {
 
 static void PreserveObjects(void) {
   R_PreserveObject(nano_aioFormals = Rf_cons(nano_AioSymbol, R_NilValue));
-  R_PreserveObject(nano_aioFuncs = Rf_allocVector(LISTSXP, 4));
-  SETCAR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
-  SETCADR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg"), nano_DataSymbol));
-  SETCADDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg2"), nano_DataSymbol));
-  SETCADDDR(nano_aioFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg3"), nano_DataSymbol));
+  R_PreserveObject(nano_aioFuncMsg = Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg"), nano_DataSymbol));
+  R_PreserveObject(nano_aioFuncRes = Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
   R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 3));
-  SETCAR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(0)));
-  SETCADR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(1)));
-  SETCADDR(nano_aioNFuncs, Rf_lang5(nano_DotcallSymbol, Rf_install("rnng_aio_http"), nano_DataSymbol, nano_ResponseSymbol, Rf_ScalarLogical(NA_LOGICAL)));
+  SETCAR(nano_aioNFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_http_status"), nano_DataSymbol));
+  SETCADR(nano_aioNFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_http_headers"), nano_DataSymbol));
+  SETCADDR(nano_aioNFuncs, Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_http_data"), nano_DataSymbol));
   R_PreserveObject(nano_error = Rf_allocVector(STRSXP, 2));
   SET_STRING_ELT(nano_error, 0, Rf_mkChar("errorValue"));
   SET_STRING_ELT(nano_error, 1, Rf_mkChar("try-error"));
@@ -110,32 +109,41 @@ static void PreserveObjects(void) {
   R_PreserveObject(nano_onLoad = Rf_lcons(nano_LNSymbol, Rf_cons(Rf_mkString("later"), R_NilValue)));
   R_PreserveObject(nano_precious = Rf_cons(R_NilValue, Rf_cons(R_NilValue, R_NilValue)));
   R_PreserveObject(nano_recvAio = Rf_mkString("recvAio"));
+  R_PreserveObject(nano_reqAio = Rf_allocVector(STRSXP, 2));
+  SET_STRING_ELT(nano_reqAio, 0, Rf_mkChar("mirai"));
+  SET_STRING_ELT(nano_reqAio, 1, Rf_mkChar("recvAio"));
   R_PreserveObject(nano_refHook = Rf_list2(R_NilValue, R_NilValue));
   R_PreserveObject(nano_success = Rf_ScalarInteger(0));
   R_PreserveObject(nano_unresolved = Rf_shallow_duplicate(Rf_ScalarLogical(NA_LOGICAL)));
   Rf_classgets(nano_unresolved, Rf_mkString("unresolvedValue"));
 }
 
+// # nocov start
 static void ReleaseObjects(void) {
   R_ReleaseObject(nano_unresolved);
   R_ReleaseObject(nano_success);
   R_ReleaseObject(nano_refHook);
+  R_ReleaseObject(nano_reqAio);
   R_ReleaseObject(nano_recvAio);
   R_ReleaseObject(nano_precious);
   R_ReleaseObject(nano_onLoad);
   R_ReleaseObject(nano_klassString);
   R_ReleaseObject(nano_error);
   R_ReleaseObject(nano_aioNFuncs);
-  R_ReleaseObject(nano_aioFuncs);
+  R_ReleaseObject(nano_aioFuncRes);
+  R_ReleaseObject(nano_aioFuncMsg);
   R_ReleaseObject(nano_aioFormals);
 }
+// # nocov end
 
 static const R_CallMethodDef callMethods[] = {
   {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
+  {"rnng_aio_collect", (DL_FUNC) &rnng_aio_collect, 1},
+  {"rnng_aio_collect_safe", (DL_FUNC) &rnng_aio_collect_safe, 1},
   {"rnng_aio_get_msg", (DL_FUNC) &rnng_aio_get_msg, 1},
-  {"rnng_aio_get_msg2", (DL_FUNC) &rnng_aio_get_msg2, 1},
-  {"rnng_aio_get_msg3", (DL_FUNC) &rnng_aio_get_msg3, 1},
-  {"rnng_aio_http", (DL_FUNC) &rnng_aio_http, 3},
+  {"rnng_aio_http_data", (DL_FUNC) &rnng_aio_http_data, 1},
+  {"rnng_aio_http_headers", (DL_FUNC) &rnng_aio_http_headers, 1},
+  {"rnng_aio_http_status", (DL_FUNC) &rnng_aio_http_status, 1},
   {"rnng_aio_result", (DL_FUNC) &rnng_aio_result, 1},
   {"rnng_aio_stop", (DL_FUNC) &rnng_aio_stop, 1},
   {"rnng_clock", (DL_FUNC) &rnng_clock, 0},
@@ -165,7 +173,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
   {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 9},
-  {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 8},
+  {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 9},
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
   {"rnng_ncurl_session_close", (DL_FUNC) &rnng_ncurl_session_close, 1},
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
@@ -175,10 +183,8 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
   {"rnng_reap", (DL_FUNC) &rnng_reap, 1},
   {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
-  {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 5},
-  {"rnng_recv_aio_signal", (DL_FUNC) &rnng_recv_aio_signal, 6},
-  {"rnng_request", (DL_FUNC) &rnng_request, 6},
-  {"rnng_request_signal", (DL_FUNC) &rnng_request_signal, 7},
+  {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 6},
+  {"rnng_request", (DL_FUNC) &rnng_request, 7},
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
   {"rnng_set_promise_context", (DL_FUNC) &rnng_set_promise_context, 2},
@@ -219,6 +225,8 @@ void attribute_visible R_init_nanonext(DllInfo* dll) {
   R_forceSymbols(dll, TRUE);
 }
 
+// # nocov start
 void attribute_visible R_unload_nanonext(DllInfo *info) {
   ReleaseObjects();
 }
+// # nocov end

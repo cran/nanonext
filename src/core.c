@@ -673,9 +673,8 @@ SEXP rnng_ctx_open(SEXP socket) {
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   nng_ctx *ctx = R_Calloc(1, nng_ctx);
   SEXP context;
-  int xc;
 
-  xc = nng_ctx_open(ctx, *sock);
+  const int xc = nng_ctx_open(ctx, *sock);
   if (xc) {
     R_Free(ctx);
     ERROR_OUT(xc);
@@ -703,9 +702,8 @@ SEXP rnng_ctx_create(SEXP socket) {
   nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
   nng_ctx *ctx = R_Calloc(1, nng_ctx);
   SEXP context;
-  int xc;
 
-  xc = nng_ctx_open(ctx, *sock);
+  const int xc = nng_ctx_open(ctx, *sock);
   if (xc) {
     R_Free(ctx);
     ERROR_OUT(xc);
@@ -723,8 +721,8 @@ SEXP rnng_ctx_close(SEXP context) {
   if (R_ExternalPtrTag(context) != nano_ContextSymbol)
     Rf_error("'context' is not a valid Context");
   nng_ctx *ctx = (nng_ctx *) R_ExternalPtrAddr(context);
-  const int xc = nng_ctx_close(*ctx);
 
+  const int xc = nng_ctx_close(*ctx);
   if (xc)
     ERROR_RET(xc);
 
@@ -791,8 +789,9 @@ SEXP rnng_dial(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP error) {
   attr = Rf_getAttrib(socket, nano_DialerSymbol);
   R_xlen_t xlen = Rf_xlength(attr);
   PROTECT(newattr = Rf_allocVector(VECSXP, xlen + 1));
-  for (R_xlen_t i = 0; i < xlen; i++)
+  for (R_xlen_t i = 0; i < xlen; i++) {
     SET_VECTOR_ELT(newattr, i, VECTOR_ELT(attr, i));
+  }
   SET_VECTOR_ELT(newattr, xlen, dialer);
   Rf_setAttrib(socket, nano_DialerSymbol, newattr);
 
@@ -861,8 +860,9 @@ SEXP rnng_listen(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP error) {
   attr = Rf_getAttrib(socket, nano_ListenerSymbol);
   R_xlen_t xlen = Rf_xlength(attr);
   PROTECT(newattr = Rf_allocVector(VECSXP, xlen + 1));
-  for (R_xlen_t i = 0; i < xlen; i++)
+  for (R_xlen_t i = 0; i < xlen; i++) {
     SET_VECTOR_ELT(newattr, i, VECTOR_ELT(attr, i));
+  }
   SET_VECTOR_ELT(newattr, xlen, listener);
   Rf_setAttrib(socket, nano_ListenerSymbol, newattr);
 
