@@ -7,6 +7,8 @@
 
 [![CRAN
 status](https://www.r-pkg.org/badges/version/nanonext?color=112d4e)](https://CRAN.R-project.org/package=nanonext)
+[![R-multiverse
+status](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcommunity.r-multiverse.org%2Fapi%2Fpackages%2Fnanonext&query=%24.Version&label=r-multiverse)](https://community.r-multiverse.org/nanonext)
 [![R-universe
 status](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https://shikokuchuo.r-universe.dev/nanonext)
 [![R-CMD-check](https://github.com/shikokuchuo/nanonext/workflows/R-CMD-check/badge.svg)](https://github.com/shikokuchuo/nanonext/actions)
@@ -70,22 +72,7 @@ Web utilities:
   (async) http(s) client
 - [stream](https://shikokuchuo.net/nanonext/articles/nanonext.html#stream-websocket-client) -
   secure websockets client / generic low-level socket interface
-- `base64enc()` / `base64dec()`
 - `messenger()` - console-based instant messaging with authentication
-
-### Installation
-
-Install the latest release from CRAN:
-
-``` r
-install.packages("nanonext")
-```
-
-Or the development version from R-universe:
-
-``` r
-install.packages("nanonext", repos = "https://shikokuchuo.r-universe.dev")
-```
 
 ### Quick Start
 
@@ -170,6 +157,20 @@ This may be accessed within R by:
 vignette("nanonext", package = "nanonext")
 ```
 
+### Installation
+
+Install the latest release from CRAN or R-multiverse:
+
+``` r
+install.packages("nanonext")
+```
+
+The current development version is available from R-universe:
+
+``` r
+install.packages("nanonext", repos = "https://shikokuchuo.r-universe.dev")
+```
+
 ### Building from Source
 
 #### Linux / Mac / Solaris
@@ -236,10 +237,11 @@ Links:
 
 ◈ nanonext R package: <https://shikokuchuo.net/nanonext/>
 
-nanonext is listed in CRAN Task Views:<br /> - High Performance
-Computing:
-<https://cran.r-project.org/view=HighPerformanceComputing><br /> - Web
-Technologies: <https://cran.r-project.org/view=WebTechnologies>
+nanonext is listed in CRAN Task Views:
+
+- High Performance Computing:
+  <https://cran.r-project.org/view=HighPerformanceComputing>
+- Web Technologies: <https://cran.r-project.org/view=WebTechnologies>
 
 NNG: <https://nng.nanomsg.org/><br /> Mbed TLS:
 <https://www.trustedfirmware.org/projects/mbed-tls/>

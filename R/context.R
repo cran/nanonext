@@ -176,10 +176,13 @@ reply <- function(context,
 #'
 #' @inheritParams reply
 #' @inheritParams recv
-#' @inheritParams recv_aio
 #' @param data an object (if send_mode = \sQuote{raw}, a vector).
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout.
+#' @param cv (optional) a \sQuote{conditionVariable} to signal when the async
+#'     receive is complete, or NULL. If any other value is supplied, this will
+#'     cause the pipe connection to be dropped when the async receive is
+#'     complete.
 #'
 #' @return A \sQuote{recvAio} (object of class \sQuote{mirai} and
 #'     \sQuote{recvAio}) (invisibly).
@@ -227,7 +230,7 @@ reply <- function(context,
 #' req <- socket("req", listen = "tcp://127.0.0.1:6546")
 #' ctxq <- context(req)
 #' cv <- cv()
-#' aio <- request_signal(ctxq, data = 2022, cv = cv)
+#' aio <- request(ctxq, data = 2022, cv = cv)
 #' until(cv, 10L)
 #' close(req)
 #'
@@ -250,31 +253,12 @@ request <- function(context,
                     cv = NULL)
   data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, cv, environment())
 
-#' Request and Signal a Condition Variable (RPC Client for Req/Rep Protocol)
-#'
-#' Deprecated function - use \code{request} instead.
-#'
-#' @inheritParams request
-#'
-#' @keywords internal
-#' @export
-#'
-request_signal <- function(context,
-                           data,
-                           cv,
-                           send_mode = c("serial", "raw", "next"),
-                           recv_mode = c("serial", "character", "complex", "double",
-                                         "integer", "logical", "numeric", "raw", "string"),
-                           timeout = NULL)
-  data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, cv, environment())
-
 #' Set Promise Context
 #'
 #' If called from an appropriate context, creates an event-driven promise that
 #'     will resolve asynchronously when the request is complete.
 #'
-#' @param x a 'recvAio' object returned by \code{\link{request}} or
-#'     \code{\link{request_signal}}.
+#' @param x a 'recvAio' object returned by \code{\link{request}}.
 #' @param ctx the context environment.
 #'
 #' @details The object passed as \sQuote{x} is returned regardless of whether

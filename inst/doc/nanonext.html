@@ -183,10 +183,14 @@ print(array)
 
 msg = array.tobytes()
 socket.send(msg)
+
+socket.close()
 </code></pre>
 <p>Receive in R, specifying the receive mode as ‘double’:</p>
 <pre><code class="language-r">n$recv(mode = &quot;double&quot;)
 #&gt; [1] 1.1 2.2 3.3 4.4 5.5
+
+n$close()
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="async-and-concurrency">Async and Concurrency</h3>
@@ -244,6 +248,10 @@ call_aio(msg)$data
 collect_aio(msg)
 #&gt; [1] &quot;resolved&quot;
 
+# or user-interruptible:
+msg[]
+#&gt; [1] &quot;resolved&quot;
+
 close(s1)
 close(s2)
 </code></pre>
@@ -256,6 +264,7 @@ close(s2)
   library(nanonext)
   rep &lt;- socket(&quot;rep&quot;, listen = &quot;tcp://127.0.0.1:6556&quot;)
   reply(context(rep), execute = rnorm, send_mode = &quot;raw&quot;)
+  Sys.sleep(2) # linger period to flush system socket send
 })
 </code></pre>
 <p>[C] Client process: <code>request()</code> performs an async send and receive request and returns immediately with a <code>recvAio</code> object.</p>
@@ -269,7 +278,7 @@ aio &lt;- request(context(req), data = 1e8, recv_mode = &quot;double&quot;)
 <p>When the result of the server calculation is required, the <code>recvAio</code> may be called using <code>call_aio()</code>.</p>
 <p>The return value from the server request is then retrieved and stored in the Aio as <code>$data</code>.</p>
 <pre><code class="language-r">call_aio(aio)$data |&gt; str()
-#&gt;  num [1:100000000] 0.257 -0.413 0.946 0.545 0.071 ...
+#&gt;  num [1:100000000] 0.749 0.181 -0.535 -0.276 -0.429 ...
 </code></pre>
 <p>As <code>call_aio()</code> is blocking and will wait for completion, an alternative is to query <code>aio$data</code> directly. This will return an ‘unresolved’ logical NA value if the calculation is yet to complete.</p>
 <p>In this example the calculation is returned, but other operations may reside entirely on the server side, for example writing data to disk.</p>
@@ -325,7 +334,7 @@ pipe_notify(sock, cv = cv, add = FALSE, remove = TRUE, flag = TRUE)
 send(sock2, &quot;this message will wake waiting thread&quot;) # in real usage happens concurrently with wait()
 #&gt; [1] 0
 
-r &lt;- recv_aio_signal(sock, cv = cv) # same cv passed to signalling form of recv_aio()
+r &lt;- recv_aio(sock, cv = cv) # same cv passed to recv_aio()
 
 # wakes as soon as the asynchronous receive completes
 wait(cv) || stop(&quot;peer disconnected&quot;)
@@ -353,7 +362,7 @@ ii) Passing a TLS configuration object to the ‘tls’ argument of <code>listen
 <pre><code class="language-r">cert &lt;- write_cert(cn = &quot;127.0.0.1&quot;)
 str(cert)
 #&gt; List of 2
-#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJKgIBAAKCAgEA3CPAXY45HOTzvo4z+U15qFP3jvrcATlNio/qO4HU4L0E82k+\nQ2P1aDuWUg7h&quot;| __truncated__
+#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJKgIBAAKCAgEArFwZuGL3hukCWoijdPuVDVz/WP68jbSue6bNCsuZxoLTGWGp\nWrKWR2tCMJZp&quot;| __truncated__
 #&gt;  $ client: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;&quot;
 
 ser &lt;- tls_config(server = cert$server)
@@ -484,7 +493,7 @@ close(res2)
 #&gt; NULL
 #&gt; 
 #&gt; $data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-665dccb1-6374c8162c8a5951767e475b\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1718802982.715\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-6672da26-2a89a683165fc22d595ba158\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
 </code></pre>
 <p>For advanced use, supports additional HTTP methods such as POST or PUT.</p>
 <pre><code class="language-r">res &lt;- ncurl_aio(&quot;https://postman-echo.com/post&quot;,
@@ -497,10 +506,10 @@ res
 
 call_aio(res)$headers
 #&gt; $date
-#&gt; [1] &quot;Mon, 03 Jun 2024 14:01:21 GMT&quot;
+#&gt; [1] &quot;Wed, 19 Jun 2024 13:16:23 GMT&quot;
 
 res$data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-665dccb1-74cd2d7d4fe4282876bfb176\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1718802983.344\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-6672da27-5cf9a608751ac05b26cff98c\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
 </code></pre>
 <p>In this respect, it may be used as a performant and lightweight method for making REST API requests.</p>
 <p><code>ncurl_session()</code> creates a re-usable open connection and presents a much faster and more efficient solution for repeated polling of an API endpoint. <code>transact()</code> is then used to request data multiple times as required. This method allows a polling frequency that exceeds a server’s new connection limits, where this is permitted.</p>
@@ -518,29 +527,24 @@ transact(sess)
 #&gt; 
 #&gt; $headers
 #&gt; $headers$Date
-#&gt; [1] &quot;Mon, 03 Jun 2024 14:01:22 GMT&quot;
+#&gt; [1] &quot;Wed, 19 Jun 2024 13:16:23 GMT&quot;
 #&gt; 
 #&gt; $headers$`Content-Type`
 #&gt; [1] &quot;application/json; charset=utf-8&quot;
 #&gt; 
 #&gt; 
 #&gt; $data
-#&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 78 2d 66
-#&gt;  [40] 6f 72 77 61 72 64 65 64 2d 70 72 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72
-#&gt;  [79] 64 65 64 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20 22 68 6f 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d
-#&gt; [118] 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74
-#&gt; [157] 3d 31 2d 36 36 35 64 63 63 62 32 2d 31 39 34 62 62 66 39 35 30 64 30 32 64 65 36 33 36 30 32 38 66 32 34 31 22 2c 0a
-#&gt; [196] 20 20 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c
-#&gt; [235] 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20
-#&gt; [274] 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f
-#&gt; [313] 67 65 74 22 0a 7d
-</code></pre>
-<p>Optimised functions for base64 encoding and decoding from the ‘Mbed TLS’ library are also exposed as convenience utilities:</p>
-<pre><code class="language-r">base64enc(&quot;hello world!&quot;)
-#&gt; [1] &quot;aGVsbG8gd29ybGQh&quot;
-
-base64dec(base64enc(&quot;hello world!&quot;))
-#&gt; [1] &quot;hello world!&quot;
+#&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 68 6f
+#&gt;  [39] 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 72 65 71 75 65 73
+#&gt;  [77] 74 2d 73 74 61 72 74 22 3a 20 22 74 3d 31 37 31 38 38 30 32 39 38 33 2e 38 36 37 22 2c 0a 20 20 20 20 22 63 6f 6e
+#&gt; [115] 6e 65 63 74 69 6f 6e 22 3a 20 22 63 6c 6f 73 65 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72
+#&gt; [153] 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 6f 72 74 22 3a
+#&gt; [191] 20 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31
+#&gt; [229] 2d 36 36 37 32 64 61 32 37 2d 31 32 39 64 38 36 64 61 34 30 61 33 30 64 36 39 35 38 39 37 66 31 36 39 22 2c 0a 20
+#&gt; [267] 20 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c
+#&gt; [305] 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a
+#&gt; [343] 20 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f
+#&gt; [381] 6d 2f 67 65 74 22 0a 7d
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="stream-websocket-client">stream: Websocket Client</h3>
@@ -598,6 +602,8 @@ opt(s$listener[[1]], &quot;recv-size-max&quot;)
 #&gt; [1] 8192
 
 start(s$listener[[1]])
+
+close(s)
 </code></pre>
 <p>Similarly <code>stat()</code> has been implemented as the interface to NNG’s statistics framework.</p>
 <p>This can be used on a Socket, Listener or Dialer to query useful statistics such as the total number of connection attempts, the current number of connections etc.</p>
@@ -613,6 +619,8 @@ s1 &lt;- socket(dial = &quot;inproc://stat&quot;)
 # one now that the dialer has conneceted
 stat(s, &quot;pipes&quot;)
 #&gt; [1] 1
+
+close(s)
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 </div>

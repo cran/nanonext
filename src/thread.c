@@ -18,22 +18,8 @@
 
 #define NANONEXT_PROTOCOLS
 #define NANONEXT_SUPPLEMENTALS
-#define NANONEXT_TIME
+#define NANONEXT_IO
 #include "nanonext.h"
-
-// internals -------------------------------------------------------------------
-
-typedef struct nano_thread_aio_s {
-  nng_thread *thr;
-  nano_cv *cv;
-  nng_aio *aio;
-} nano_thread_aio;
-
-typedef struct nano_thread_duo_s {
-  nng_thread *thr;
-  nano_cv *cv;
-  nano_cv *cv2;
-} nano_thread_duo;
 
 // messenger -------------------------------------------------------------------
 
@@ -42,9 +28,23 @@ typedef struct nano_thread_duo_s {
 
 static void thread_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL) return;
-  nng_thread *xp = (nng_thread *) R_ExternalPtrAddr(xptr);
+  if (NANO_PTR(xptr) == NULL) return;
+  nng_thread *xp = (nng_thread *) NANO_PTR(xptr);
   nng_thread_destroy(xp);
+
+}
+
+static void nano_printf(int err, const char *fmt, ...) {
+
+  char buf[NANONEXT_INIT_BUFSIZE];
+  va_list arg_ptr;
+
+  va_start(arg_ptr, fmt);
+  int bytes = vsnprintf(buf, NANONEXT_INIT_BUFSIZE, fmt, arg_ptr);
+  va_end(arg_ptr);
+
+  ssize_t out = write(err ? STDERR_FILENO : STDOUT_FILENO, buf, (size_t) bytes);
+  memset(&out, 0, sizeof(ssize_t));
 
 }
 
@@ -53,7 +53,7 @@ static void rnng_messenger_thread(void *args) {
   SEXP plist = (SEXP) args;
   SEXP socket = CADR(plist);
   SEXP key = CADDR(plist);
-  nng_socket *sock = (nng_socket *) R_ExternalPtrAddr(socket);
+  nng_socket *sock = (nng_socket *) NANO_PTR(socket);
   unsigned char *buf;
   size_t sz;
   time_t now;
@@ -66,42 +66,47 @@ static void rnng_messenger_thread(void *args) {
     tms = localtime(&now);
 
     if (xc) {
-      REprintf("| messenger session ended: %d-%02d-%02d %02d:%02d:%02d\n",
-               tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
-               tms->tm_hour, tms->tm_min, tms->tm_sec);
+      nano_printf(1,
+                  "| messenger session ended: %d-%02d-%02d %02d:%02d:%02d\n",
+                  tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
+                  tms->tm_hour, tms->tm_min, tms->tm_sec);
       break;
     }
 
     if (!strncmp((char *) buf, ":", 1)) {
       if (!strncmp((char *) buf, ":c ", 3)) {
-        REprintf("| <- peer connected: %d-%02d-%02d %02d:%02d:%02d\n",
-                 tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
-                 tms->tm_hour, tms->tm_min, tms->tm_sec);
+        nano_printf(1,
+                    "| <- peer connected: %d-%02d-%02d %02d:%02d:%02d\n",
+                    tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
+                    tms->tm_hour, tms->tm_min, tms->tm_sec);
         nng_free(buf, sz);
         nano_buf enc;
         nano_encode(&enc, key);
         xc = nng_send(*sock, enc.buf, enc.cur, NNG_FLAG_NONBLOCK);
         if (xc) {
-          REprintf("| messenger session ended: %d-%02d-%02d %02d:%02d:%02d\n",
-                   tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
-                   tms->tm_hour, tms->tm_min, tms->tm_sec);
+          nano_printf(1,
+                      "| messenger session ended: %d-%02d-%02d %02d:%02d:%02d\n",
+                      tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
+                      tms->tm_hour, tms->tm_min, tms->tm_sec);
           break;
         }
         continue;
       }
       if (!strncmp((char *) buf, ":d ", 3)) {
-        REprintf("| -> peer disconnected: %d-%02d-%02d %02d:%02d:%02d\n",
-                 tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
-                 tms->tm_hour, tms->tm_min, tms->tm_sec);
+        nano_printf(1,
+                    "| -> peer disconnected: %d-%02d-%02d %02d:%02d:%02d\n",
+                    tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
+                    tms->tm_hour, tms->tm_min, tms->tm_sec);
         nng_free(buf, sz);
         continue;
       }
     }
 
-    Rprintf("%s\n%*s< %d-%02d-%02d %02d:%02d:%02d\n",
-            (char *) buf, (int) sz, "",
-            tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
-            tms->tm_hour, tms->tm_min, tms->tm_sec);
+    nano_printf(0,
+                "%s\n%*s< %d-%02d-%02d %02d:%02d:%02d\n",
+                (char *) buf, (int) sz, "",
+                tms->tm_year + 1900, tms->tm_mon + 1, tms->tm_mday,
+                tms->tm_hour, tms->tm_min, tms->tm_sec);
     nng_free(buf, sz);
 
   }
@@ -162,7 +167,7 @@ SEXP rnng_messenger_thread_create(SEXP args) {
   nng_thread_create(&thr, rnng_messenger_thread, args);
 
   SEXP xptr = R_MakeExternalPtr(thr, R_NilValue, R_NilValue);
-  R_SetExternalPtrProtected(socket, xptr);
+  NANO_SET_PROT(socket, xptr);
   R_RegisterCFinalizerEx(xptr, thread_finalizer, TRUE);
 
   return socket;
@@ -175,8 +180,8 @@ SEXP rnng_messenger_thread_create(SEXP args) {
 
 static void thread_aio_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL) return;
-  nano_thread_aio *xp = (nano_thread_aio *) R_ExternalPtrAddr(xptr);
+  if (NANO_PTR(xptr) == NULL) return;
+  nano_thread_aio *xp = (nano_thread_aio *) NANO_PTR(xptr);
   nano_cv *ncv = xp->cv;
   nng_mtx *mtx = ncv->mtx;
   nng_cv *cv = ncv->cv;
@@ -191,8 +196,8 @@ static void thread_aio_finalizer(SEXP xptr) {
 
 static void thread_duo_finalizer(SEXP xptr) {
 
-  if (R_ExternalPtrAddr(xptr) == NULL) return;
-  nano_thread_duo *xp = (nano_thread_duo *) R_ExternalPtrAddr(xptr);
+  if (NANO_PTR(xptr) == NULL) return;
+  nano_thread_duo *xp = (nano_thread_duo *) NANO_PTR(xptr);
   nano_cv *ncv = xp->cv;
   nng_mtx *mtx = ncv->mtx;
   nng_cv *cv = ncv->cv;
@@ -229,11 +234,11 @@ SEXP rnng_wait_thread_create(SEXP x) {
   if (typ == ENVSXP) {
 
     const SEXP coreaio = Rf_findVarInFrame(x, nano_AioSymbol);
-    if (R_ExternalPtrTag(coreaio) != nano_AioSymbol)
+    if (NANO_TAG(coreaio) != nano_AioSymbol)
       return x;
 
     PROTECT(coreaio);
-    nano_aio *aiop = (nano_aio *) R_ExternalPtrAddr(coreaio);
+    nano_aio *aiop = (nano_aio *) NANO_PTR(coreaio);
 
     nano_thread_aio *taio = R_Calloc(1, nano_thread_aio);
     nano_cv *ncv = R_Calloc(1, nano_cv);
@@ -256,7 +261,7 @@ SEXP rnng_wait_thread_create(SEXP x) {
     nng_thread_create(&taio->thr, rnng_wait_thread, taio);
 
     SEXP xptr = R_MakeExternalPtr(taio, R_NilValue, R_NilValue);
-    R_SetExternalPtrProtected(coreaio, xptr);
+    NANO_SET_PROT(coreaio, xptr);
     R_RegisterCFinalizerEx(xptr, thread_aio_finalizer, TRUE);
     UNPROTECT(1);
 
@@ -309,7 +314,7 @@ SEXP rnng_wait_thread_create(SEXP x) {
 
     const R_xlen_t xlen = Rf_xlength(x);
     for (R_xlen_t i = 0; i < xlen; i++) {
-      rnng_wait_thread_create(VECTOR_ELT(x, i));
+      rnng_wait_thread_create(NANO_VECTOR(x)[i]);
     }
 
   }
@@ -367,10 +372,10 @@ static void rnng_signal_thread(void *args) {
 
 SEXP rnng_signal_thread_create(SEXP cv, SEXP cv2) {
 
-  if (R_ExternalPtrTag(cv) != nano_CvSymbol)
+  if (NANO_TAG(cv) != nano_CvSymbol)
     Rf_error("'cv' is not a valid Condition Variable");
 
-  if (R_ExternalPtrTag(cv2) != nano_CvSymbol)
+  if (NANO_TAG(cv2) != nano_CvSymbol)
     Rf_error("'cv2' is not a valid Condition Variable");
 
   SEXP existing = Rf_getAttrib(cv, R_MissingArg);
@@ -379,8 +384,8 @@ SEXP rnng_signal_thread_create(SEXP cv, SEXP cv2) {
     R_ClearExternalPtr(existing);
   }
 
-  nano_cv *ncv = (nano_cv *) R_ExternalPtrAddr(cv);
-  nano_cv *ncv2 = (nano_cv *) R_ExternalPtrAddr(cv2);
+  nano_cv *ncv = (nano_cv *) NANO_PTR(cv);
+  nano_cv *ncv2 = (nano_cv *) NANO_PTR(cv2);
   nano_thread_duo *duo = R_Calloc(1, nano_thread_duo);
   duo->cv = ncv;
   duo->cv2 = ncv2;

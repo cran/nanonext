@@ -1,6 +1,5 @@
 ---
 title: "nanonext - NNG Lightweight Messaging Library"
-output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{nanonext - NNG Lightweight Messaging Library}
   %\VignetteEngine{knitr::knitr}
@@ -65,12 +64,16 @@ print(array)
 
 msg = array.tobytes()
 socket.send(msg)
+
+socket.close()
 ```
 
 Receive in R, specifying the receive mode as 'double':
 
 ```{r rnpy4}
 n$recv(mode = "double")
+
+n$close()
 ```
 
 [&laquo; Back to ToC](#table-of-contents)
@@ -143,6 +146,9 @@ call_aio(msg)$data
 # or directly:
 collect_aio(msg)
 
+# or user-interruptible:
+msg[]
+
 close(s1)
 close(s2)
 
@@ -163,6 +169,7 @@ m <- mirai::mirai({
   library(nanonext)
   rep <- socket("rep", listen = "tcp://127.0.0.1:6556")
   reply(context(rep), execute = rnorm, send_mode = "raw")
+  Sys.sleep(2) # linger period to flush system socket send
 })
 
 ```
@@ -175,7 +182,6 @@ req <- socket("req", dial = "tcp://127.0.0.1:6556")
 aio <- request(context(req), data = 1e8, recv_mode = "double")
 
 ```
-
 At this point, the client can run additional code concurrent with the server processing the request.
 
 ```{r rpcclient2}
@@ -256,7 +262,7 @@ pipe_notify(sock, cv = cv, add = FALSE, remove = TRUE, flag = TRUE)
 
 send(sock2, "this message will wake waiting thread") # in real usage happens concurrently with wait()
 
-r <- recv_aio_signal(sock, cv = cv) # same cv passed to signalling form of recv_aio()
+r <- recv_aio(sock, cv = cv) # same cv passed to recv_aio()
 
 # wakes as soon as the asynchronous receive completes
 wait(cv) || stop("peer disconnected")
@@ -457,15 +463,6 @@ transact(sess)
 
 ```
 
-Optimised functions for base64 encoding and decoding from the 'Mbed TLS' library are also exposed as convenience utilities:
-
-```{r b64}
-base64enc("hello world!")
-
-base64dec(base64enc("hello world!"))
-
-```
-
 [&laquo; Back to ToC](#table-of-contents)
 
 ### stream: Websocket Client
@@ -527,6 +524,7 @@ opt(s$listener[[1]], "recv-size-max")
 
 start(s$listener[[1]])
 
+close(s)
 ```
 
 Similarly `stat()` has been implemented as the interface to NNG's statistics framework.
@@ -546,6 +544,7 @@ s1 <- socket(dial = "inproc://stat")
 # one now that the dialer has conneceted
 stat(s, "pipes")
 
+close(s)
 ```
 
 [&laquo; Back to ToC](#table-of-contents)

@@ -28,7 +28,6 @@ SEXP nano_DotcallSymbol;
 SEXP nano_HeadersSymbol;
 SEXP nano_IdSymbol;
 SEXP nano_ListenerSymbol;
-SEXP nano_LNSymbol;
 SEXP nano_ProtocolSymbol;
 SEXP nano_RawSymbol;
 SEXP nano_ResolveSymbol;
@@ -42,17 +41,16 @@ SEXP nano_TlsSymbol;
 SEXP nano_UrlSymbol;
 SEXP nano_ValueSymbol;
 
-SEXP nano_aioFormals;
 SEXP nano_aioFuncMsg;
 SEXP nano_aioFuncRes;
 SEXP nano_aioNFuncs;
 SEXP nano_error;
 SEXP nano_klassString;
-SEXP nano_onLoad;
 SEXP nano_precious;
 SEXP nano_recvAio;
 SEXP nano_reqAio;
 SEXP nano_refHook;
+SEXP nano_sendAio;
 SEXP nano_success;
 SEXP nano_unresolved;
 
@@ -79,7 +77,6 @@ static void RegisterSymbols(void) {
   nano_HeadersSymbol = Rf_install("headers");
   nano_IdSymbol = Rf_install("id");
   nano_ListenerSymbol = Rf_install("listener");
-  nano_LNSymbol = Rf_install("loadNamespace");
   nano_ProtocolSymbol = Rf_install("protocol");
   nano_RawSymbol = Rf_install("raw");
   nano_ResolveSymbol = Rf_install("resolve");
@@ -95,7 +92,6 @@ static void RegisterSymbols(void) {
 }
 
 static void PreserveObjects(void) {
-  R_PreserveObject(nano_aioFormals = Rf_cons(nano_AioSymbol, R_NilValue));
   R_PreserveObject(nano_aioFuncMsg = Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_get_msg"), nano_DataSymbol));
   R_PreserveObject(nano_aioFuncRes = Rf_lang3(nano_DotcallSymbol, Rf_install("rnng_aio_result"), nano_DataSymbol));
   R_PreserveObject(nano_aioNFuncs = Rf_allocVector(LISTSXP, 3));
@@ -106,13 +102,13 @@ static void PreserveObjects(void) {
   SET_STRING_ELT(nano_error, 0, Rf_mkChar("errorValue"));
   SET_STRING_ELT(nano_error, 1, Rf_mkChar("try-error"));
   R_PreserveObject(nano_klassString = Rf_cons(R_NilValue, R_NilValue));
-  R_PreserveObject(nano_onLoad = Rf_lcons(nano_LNSymbol, Rf_cons(Rf_mkString("later"), R_NilValue)));
   R_PreserveObject(nano_precious = Rf_cons(R_NilValue, Rf_cons(R_NilValue, R_NilValue)));
   R_PreserveObject(nano_recvAio = Rf_mkString("recvAio"));
   R_PreserveObject(nano_reqAio = Rf_allocVector(STRSXP, 2));
   SET_STRING_ELT(nano_reqAio, 0, Rf_mkChar("mirai"));
   SET_STRING_ELT(nano_reqAio, 1, Rf_mkChar("recvAio"));
   R_PreserveObject(nano_refHook = Rf_list2(R_NilValue, R_NilValue));
+  R_PreserveObject(nano_sendAio = Rf_mkString("sendAio"));
   R_PreserveObject(nano_success = Rf_ScalarInteger(0));
   R_PreserveObject(nano_unresolved = Rf_shallow_duplicate(Rf_ScalarLogical(NA_LOGICAL)));
   Rf_classgets(nano_unresolved, Rf_mkString("unresolvedValue"));
@@ -122,17 +118,16 @@ static void PreserveObjects(void) {
 static void ReleaseObjects(void) {
   R_ReleaseObject(nano_unresolved);
   R_ReleaseObject(nano_success);
+  R_ReleaseObject(nano_sendAio);
   R_ReleaseObject(nano_refHook);
   R_ReleaseObject(nano_reqAio);
   R_ReleaseObject(nano_recvAio);
   R_ReleaseObject(nano_precious);
-  R_ReleaseObject(nano_onLoad);
   R_ReleaseObject(nano_klassString);
   R_ReleaseObject(nano_error);
   R_ReleaseObject(nano_aioNFuncs);
   R_ReleaseObject(nano_aioFuncRes);
   R_ReleaseObject(nano_aioFuncMsg);
-  R_ReleaseObject(nano_aioFormals);
 }
 // # nocov end
 
@@ -162,8 +157,6 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_dial", (DL_FUNC) &rnng_dial, 5},
   {"rnng_dialer_close", (DL_FUNC) &rnng_dialer_close, 1},
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
-  {"rnng_base64dec", (DL_FUNC) &rnng_base64dec, 2},
-  {"rnng_base64enc", (DL_FUNC) &rnng_base64enc, 2},
   {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
   {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
   {"rnng_is_error_value", (DL_FUNC) &rnng_is_error_value, 1},
@@ -198,7 +191,6 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_stream_close", (DL_FUNC) &rnng_stream_close, 1},
   {"rnng_stream_dial", (DL_FUNC) &rnng_stream_dial, 3},
   {"rnng_stream_listen", (DL_FUNC) &rnng_stream_listen, 3},
-  {"rnng_strcat", (DL_FUNC) &rnng_strcat, 2},
   {"rnng_strerror", (DL_FUNC) &rnng_strerror, 1},
   {"rnng_subscribe", (DL_FUNC) &rnng_subscribe, 3},
   {"rnng_tls_config", (DL_FUNC) &rnng_tls_config, 4},

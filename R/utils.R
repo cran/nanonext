@@ -78,9 +78,9 @@ mclock <- function() .Call(rnng_clock)
 #'
 #' @return Invisible NULL.
 #'
-#' @details Non-integer values for \sQuote{time} are coerced to integer, and the
-#'     absolute value is taken (the sign is ignored). Non-numeric values are
-#'     ignored, causing the function to return immediately.
+#' @details Non-integer values for \sQuote{time} are coerced to integer.
+#'     Negative, logical and other non-numeric values are ignored, causing the
+#'     function to return immediately.
 #'
 #'     Note that unlike \code{\link{Sys.sleep}}, this function is not
 #'     user-interruptible by sending SIGINT e.g. with ctrl + c.
@@ -261,27 +261,6 @@ is_nul_byte <- function(x) .Call(rnng_is_nul_byte, x)
 #' @export
 #'
 status_code <- function(x) .Call(rnng_status_code, x)
-
-#' Concatenate Strings
-#'
-#' A fast implementation that combines two character values into a single string.
-#'     This function is deprecated and will be removed in a future version.
-#'
-#' @param a character value.
-#' @param b character value.
-#'
-#' @return A character string.
-#'
-#' @details If either \sQuote{a} or \sQuote{b} is a vector of length greater
-#'     than 1, only the first element of each is concatenated.
-#'
-#' @examples
-#' strcat("hello ", "world!")
-#'
-#' @keywords internal
-#' @export
-#'
-strcat <- function(a, b) .Call(rnng_strcat, a, b)
 
 #' Configure Next Mode
 #'

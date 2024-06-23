@@ -1,6 +1,5 @@
 ---
 title: "nanonext - NNG Lightweight Messaging Library"
-output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{nanonext - NNG Lightweight Messaging Library}
   %\VignetteEngine{knitr::knitr}
@@ -64,6 +63,8 @@ print(array)
 
 msg = array.tobytes()
 socket.send(msg)
+
+socket.close()
 ```
 
 Receive in R, specifying the receive mode as 'double':
@@ -72,6 +73,8 @@ Receive in R, specifying the receive mode as 'double':
 ``` r
 n$recv(mode = "double")
 #> [1] 1.1 2.2 3.3 4.4 5.5
+
+n$close()
 ```
 
 [&laquo; Back to ToC](#table-of-contents)
@@ -156,6 +159,10 @@ call_aio(msg)$data
 collect_aio(msg)
 #> [1] "resolved"
 
+# or user-interruptible:
+msg[]
+#> [1] "resolved"
+
 close(s1)
 close(s2)
 ```
@@ -176,6 +183,7 @@ m <- mirai::mirai({
   library(nanonext)
   rep <- socket("rep", listen = "tcp://127.0.0.1:6556")
   reply(context(rep), execute = rnorm, send_mode = "raw")
+  Sys.sleep(2) # linger period to flush system socket send
 })
 ```
 
@@ -187,7 +195,6 @@ library(nanonext)
 req <- socket("req", dial = "tcp://127.0.0.1:6556")
 aio <- request(context(req), data = 1e8, recv_mode = "double")
 ```
-
 At this point, the client can run additional code concurrent with the server processing the request.
 
 
@@ -202,7 +209,7 @@ The return value from the server request is then retrieved and stored in the Aio
 
 ``` r
 call_aio(aio)$data |> str()
-#>  num [1:100000000] 0.257 -0.413 0.946 0.545 0.071 ...
+#>  num [1:100000000] 0.749 0.181 -0.535 -0.276 -0.429 ...
 ```
 
 As `call_aio()` is blocking and will wait for completion, an alternative is to query `aio$data` directly. This will return an 'unresolved' logical NA value if the calculation is yet to complete.
@@ -278,7 +285,7 @@ pipe_notify(sock, cv = cv, add = FALSE, remove = TRUE, flag = TRUE)
 send(sock2, "this message will wake waiting thread") # in real usage happens concurrently with wait()
 #> [1] 0
 
-r <- recv_aio_signal(sock, cv = cv) # same cv passed to signalling form of recv_aio()
+r <- recv_aio(sock, cv = cv) # same cv passed to recv_aio()
 
 # wakes as soon as the asynchronous receive completes
 wait(cv) || stop("peer disconnected")
@@ -321,7 +328,7 @@ Additionally, the convenience function `write_cert()` can automatically generate
 cert <- write_cert(cn = "127.0.0.1")
 str(cert)
 #> List of 2
-#>  $ server: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV"| __truncated__ "-----BEGIN RSA PRIVATE KEY-----\nMIIJKgIBAAKCAgEA3CPAXY45HOTzvo4z+U15qFP3jvrcATlNio/qO4HU4L0E82k+\nQ2P1aDuWUg7h"| __truncated__
+#>  $ server: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV"| __truncated__ "-----BEGIN RSA PRIVATE KEY-----\nMIIJKgIBAAKCAgEArFwZuGL3hukCWoijdPuVDVz/WP68jbSue6bNCsuZxoLTGWGp\nWrKWR2tCMJZp"| __truncated__
 #>  $ client: chr [1:2] "-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV"| __truncated__ ""
 
 ser <- tls_config(server = cert$server)
@@ -479,7 +486,7 @@ ncurl("https://postman-echo.com/get")
 #> NULL
 #> 
 #> $data
-#> [1] "{\n  \"args\": {},\n  \"headers\": {\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"host\": \"postman-echo.com\",\n    \"x-amzn-trace-id\": \"Root=1-665dccb1-6374c8162c8a5951767e475b\"\n  },\n  \"url\": \"https://postman-echo.com/get\"\n}"
+#> [1] "{\n  \"args\": {},\n  \"headers\": {\n    \"host\": \"postman-echo.com\",\n    \"x-request-start\": \"t=1718802982.715\",\n    \"connection\": \"close\",\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"x-amzn-trace-id\": \"Root=1-6672da26-2a89a683165fc22d595ba158\"\n  },\n  \"url\": \"https://postman-echo.com/get\"\n}"
 ```
 
 For advanced use, supports additional HTTP methods such as POST or PUT.
@@ -496,10 +503,10 @@ res
 
 call_aio(res)$headers
 #> $date
-#> [1] "Mon, 03 Jun 2024 14:01:21 GMT"
+#> [1] "Wed, 19 Jun 2024 13:16:23 GMT"
 
 res$data
-#> [1] "{\n  \"args\": {},\n  \"data\": {\n    \"key\": \"value\"\n  },\n  \"files\": {},\n  \"form\": {},\n  \"headers\": {\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"host\": \"postman-echo.com\",\n    \"x-amzn-trace-id\": \"Root=1-665dccb1-74cd2d7d4fe4282876bfb176\",\n    \"content-length\": \"16\",\n    \"content-type\": \"application/json\",\n    \"authorization\": \"Bearer APIKEY\"\n  },\n  \"json\": {\n    \"key\": \"value\"\n  },\n  \"url\": \"https://postman-echo.com/post\"\n}"
+#> [1] "{\n  \"args\": {},\n  \"data\": {\n    \"key\": \"value\"\n  },\n  \"files\": {},\n  \"form\": {},\n  \"headers\": {\n    \"host\": \"postman-echo.com\",\n    \"x-request-start\": \"t=1718802983.344\",\n    \"connection\": \"close\",\n    \"content-length\": \"16\",\n    \"x-forwarded-proto\": \"https\",\n    \"x-forwarded-port\": \"443\",\n    \"x-amzn-trace-id\": \"Root=1-6672da27-5cf9a608751ac05b26cff98c\",\n    \"content-type\": \"application/json\",\n    \"authorization\": \"Bearer APIKEY\"\n  },\n  \"json\": {\n    \"key\": \"value\"\n  },\n  \"url\": \"https://postman-echo.com/post\"\n}"
 ```
 
 In this respect, it may be used as a performant and lightweight method for making REST API requests.
@@ -523,33 +530,24 @@ transact(sess)
 #> 
 #> $headers
 #> $headers$Date
-#> [1] "Mon, 03 Jun 2024 14:01:22 GMT"
+#> [1] "Wed, 19 Jun 2024 13:16:23 GMT"
 #> 
 #> $headers$`Content-Type`
 #> [1] "application/json; charset=utf-8"
 #> 
 #> 
 #> $data
-#>   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 78 2d 66
-#>  [40] 6f 72 77 61 72 64 65 64 2d 70 72 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72
-#>  [79] 64 65 64 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20 22 68 6f 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d
-#> [118] 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74
-#> [157] 3d 31 2d 36 36 35 64 63 63 62 32 2d 31 39 34 62 62 66 39 35 30 64 30 32 64 65 36 33 36 30 32 38 66 32 34 31 22 2c 0a
-#> [196] 20 20 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c
-#> [235] 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20
-#> [274] 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f
-#> [313] 67 65 74 22 0a 7d
-```
-
-Optimised functions for base64 encoding and decoding from the 'Mbed TLS' library are also exposed as convenience utilities:
-
-
-``` r
-base64enc("hello world!")
-#> [1] "aGVsbG8gd29ybGQh"
-
-base64dec(base64enc("hello world!"))
-#> [1] "hello world!"
+#>   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 68 6f
+#>  [39] 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 72 65 71 75 65 73
+#>  [77] 74 2d 73 74 61 72 74 22 3a 20 22 74 3d 31 37 31 38 38 30 32 39 38 33 2e 38 36 37 22 2c 0a 20 20 20 20 22 63 6f 6e
+#> [115] 6e 65 63 74 69 6f 6e 22 3a 20 22 63 6c 6f 73 65 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72
+#> [153] 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 6f 72 74 22 3a
+#> [191] 20 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31
+#> [229] 2d 36 36 37 32 64 61 32 37 2d 31 32 39 64 38 36 64 61 34 30 61 33 30 64 36 39 35 38 39 37 66 31 36 39 22 2c 0a 20
+#> [267] 20 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c
+#> [305] 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a
+#> [343] 20 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f
+#> [381] 6d 2f 67 65 74 22 0a 7d
 ```
 
 [&laquo; Back to ToC](#table-of-contents)
@@ -626,6 +624,8 @@ opt(s$listener[[1]], "recv-size-max")
 #> [1] 8192
 
 start(s$listener[[1]])
+
+close(s)
 ```
 
 Similarly `stat()` has been implemented as the interface to NNG's statistics framework.
@@ -647,6 +647,8 @@ s1 <- socket(dial = "inproc://stat")
 # one now that the dialer has conneceted
 stat(s, "pipes")
 #> [1] 1
+
+close(s)
 ```
 
 [&laquo; Back to ToC](#table-of-contents)
