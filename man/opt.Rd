@@ -43,6 +43,22 @@ Note: once a dialer or listener has started, it is not generally
     For an authoritative guide please refer to the online documentation for
     the NNG library at \url{https://nng.nanomsg.org/man/}.
 }
+\section{Serialization}{
+
+
+    Apart from the NNG options documented below, there is the following
+    special option:
+
+    \itemize{
+      \item 'serial' [type list]
+
+      For Sockets only. This accepts a configuration created by
+      \code{\link{serial_config}}. Setting a new configuration replaces any
+      already set. To remove entirely, supply an empty list. Note: this
+      option is write-only and can be set but not retrieved.
+    }
+}
+
 \section{Global Options}{
 
 
@@ -111,6 +127,21 @@ Note: once a dialer or listener has started, it is not generally
       be queued for delivery by the socket for this period of time (such as
       if send buffers are full), the operation will fail with a return value
       of 5L ('timed out').
+
+    \item 'recv-fd' [type 'int']
+
+      This is the socket receive file descriptor. For supported protocols,
+      this will become readable when a message is available for receiving on
+      the socket. Attempts should not be made to read or write to the
+      returned file descriptor, but it is suitable for use with poll(),
+      select(), or WSAPoll() on Windows, and similar functions.
+
+    \item 'send-fd' [type 'int']
+
+      This is the socket send file descriptor. Attempts should not be made to
+      read or write to the returned file descriptor, but it is suitable for
+      use with poll(), select(), or WSAPoll() on Windows, and similar
+      functions.
 
     \item 'socket-name' [type 'string']
 

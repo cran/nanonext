@@ -156,7 +156,7 @@ section.footnotes::before {
 <li><a href="#surveyor-respondent-model">Surveyor / Respondent Model</a></li>
 <li><a href="#ncurl-async-http-client">ncurl: (Async) HTTP Client</a></li>
 <li><a href="#stream-websocket-client">stream: Websocket Client</a></li>
-<li><a href="#options-and-statistics">Options and Statistics</a></li>
+<li><a href="#options-serialization-and-statistics">Options, Serialization and Statistics</a></li>
 </ol>
 <h3 id="cross-language-exchange">Cross-language Exchange</h3>
 <p><code>nanonext</code> provides a fast and reliable data interface between different programming languages where NNG has an implementation, including C, C++, Java, Python, Go, Rust etc.</p>
@@ -278,7 +278,7 @@ aio &lt;- request(context(req), data = 1e8, recv_mode = &quot;double&quot;)
 <p>When the result of the server calculation is required, the <code>recvAio</code> may be called using <code>call_aio()</code>.</p>
 <p>The return value from the server request is then retrieved and stored in the Aio as <code>$data</code>.</p>
 <pre><code class="language-r">call_aio(aio)$data |&gt; str()
-#&gt;  num [1:100000000] 0.749 0.181 -0.535 -0.276 -0.429 ...
+#&gt;  num [1:100000000] 0.6728 -0.3481 0.0848 -0.8578 1.3597 ...
 </code></pre>
 <p>As <code>call_aio()</code> is blocking and will wait for completion, an alternative is to query <code>aio$data</code> directly. This will return an ‘unresolved’ logical NA value if the calculation is yet to complete.</p>
 <p>In this example the calculation is returned, but other operations may reside entirely on the server side, for example writing data to disk.</p>
@@ -362,7 +362,7 @@ ii) Passing a TLS configuration object to the ‘tls’ argument of <code>listen
 <pre><code class="language-r">cert &lt;- write_cert(cn = &quot;127.0.0.1&quot;)
 str(cert)
 #&gt; List of 2
-#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJKgIBAAKCAgEArFwZuGL3hukCWoijdPuVDVz/WP68jbSue6bNCsuZxoLTGWGp\nWrKWR2tCMJZp&quot;| __truncated__
+#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJKAIBAAKCAgEApNpyb6e4sxAJSx1QOT2WdzehBe9KU6Bu5ZQdxI8NBvNMN6G5\nggqJfrjzuSDL&quot;| __truncated__
 #&gt;  $ client: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;&quot;
 
 ser &lt;- tls_config(server = cert$server)
@@ -493,7 +493,7 @@ close(res2)
 #&gt; NULL
 #&gt; 
 #&gt; $data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1718802982.715\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-6672da26-2a89a683165fc22d595ba158\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1721818842.737\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-66a0deda-0db8c42415e8c85d44cffba4\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
 </code></pre>
 <p>For advanced use, supports additional HTTP methods such as POST or PUT.</p>
 <pre><code class="language-r">res &lt;- ncurl_aio(&quot;https://postman-echo.com/post&quot;,
@@ -506,12 +506,22 @@ res
 
 call_aio(res)$headers
 #&gt; $date
-#&gt; [1] &quot;Wed, 19 Jun 2024 13:16:23 GMT&quot;
+#&gt; [1] &quot;Wed, 24 Jul 2024 11:00:43 GMT&quot;
 
 res$data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1718802983.344\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-6672da27-5cf9a608751ac05b26cff98c\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1721818843.323\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-66a0dedb-12ff61117f32cbfc258ff9a1\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
 </code></pre>
 <p>In this respect, it may be used as a performant and lightweight method for making REST API requests.</p>
+<h5 id="ncurl-promises">ncurl Promises</h5>
+<p><code>ncurl_aio()</code> may also be used anywhere that accepts a ‘promise’ from the promises package, including with Shiny ExtendedTask.</p>
+<p>If a status code of 200 (OK) is returned then the promise is resolved with the reponse body, otherwise it is rejected with a translation of the status code or ‘errorValue’ as the case may be.</p>
+<pre><code class="language-r">library(promises)
+
+p &lt;- ncurl_aio(&quot;https://postman-echo.com/get&quot;) %...&gt;% cat
+is.promise(p)
+#&gt; [1] TRUE
+</code></pre>
+<h5 id="ncurl-session">ncurl Session</h5>
 <p><code>ncurl_session()</code> creates a re-usable open connection and presents a much faster and more efficient solution for repeated polling of an API endpoint. <code>transact()</code> is then used to request data multiple times as required. This method allows a polling frequency that exceeds a server’s new connection limits, where this is permitted.</p>
 <p>By specifying <code>convert = FALSE</code>, the received binary data is made available as a raw vector. This may be fed into ‘json’ parsers which can operate directly on such data etc.</p>
 <pre><code class="language-r">sess &lt;- ncurl_session(&quot;https://postman-echo.com/get&quot;,
@@ -527,24 +537,23 @@ transact(sess)
 #&gt; 
 #&gt; $headers
 #&gt; $headers$Date
-#&gt; [1] &quot;Wed, 19 Jun 2024 13:16:23 GMT&quot;
+#&gt; [1] &quot;Wed, 24 Jul 2024 11:00:43 GMT&quot;
 #&gt; 
 #&gt; $headers$`Content-Type`
 #&gt; [1] &quot;application/json; charset=utf-8&quot;
 #&gt; 
 #&gt; 
 #&gt; $data
-#&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 68 6f
-#&gt;  [39] 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 72 65 71 75 65 73
-#&gt;  [77] 74 2d 73 74 61 72 74 22 3a 20 22 74 3d 31 37 31 38 38 30 32 39 38 33 2e 38 36 37 22 2c 0a 20 20 20 20 22 63 6f 6e
-#&gt; [115] 6e 65 63 74 69 6f 6e 22 3a 20 22 63 6c 6f 73 65 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72
-#&gt; [153] 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 6f 72 74 22 3a
-#&gt; [191] 20 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31
-#&gt; [229] 2d 36 36 37 32 64 61 32 37 2d 31 32 39 64 38 36 64 61 34 30 61 33 30 64 36 39 35 38 39 37 66 31 36 39 22 2c 0a 20
-#&gt; [267] 20 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c
-#&gt; [305] 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a
-#&gt; [343] 20 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f
-#&gt; [381] 6d 2f 67 65 74 22 0a 7d
+#&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 68 6f 73
+#&gt;  [40] 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 72 65 71 75 65 73 74 2d
+#&gt;  [79] 73 74 61 72 74 22 3a 20 22 74 3d 31 37 32 31 38 31 38 38 34 33 2e 37 35 38 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77
+#&gt; [118] 61 72 64 65 64 2d 70 72 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64
+#&gt; [157] 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22
+#&gt; [196] 52 6f 6f 74 3d 31 2d 36 36 61 30 64 65 64 62 2d 35 36 34 30 35 37 31 66 36 37 39 34 63 62 39 33 37 64 33 63 66 32 39
+#&gt; [235] 36 22 2c 0a 20 20 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73
+#&gt; [274] 6f 6e 22 2c 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45
+#&gt; [313] 59 22 0a 20 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e
+#&gt; [352] 63 6f 6d 2f 67 65 74 22 0a 7d
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="stream-websocket-client">stream: Websocket Client</h3>
@@ -585,7 +594,7 @@ r$data
 close(s)
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="options-and-statistics">Options and Statistics</h3>
+<h3 id="options-serialization-and-statistics">Options, Serialization and Statistics</h3>
 <p>Use <code>opt()</code> and <code>'opt&lt;-'()</code> to get and set options on a Socket, Context, Stream, Listener or Dialer.</p>
 <p>See the function documentation page for a list of common options.</p>
 <p>Once a dialer or listener has started, it is not generally possible to change its configuration. In this case, the dialer or listener should be created specifying ‘autostart = FALSE’.</p>
@@ -602,6 +611,10 @@ opt(s$listener[[1]], &quot;recv-size-max&quot;)
 #&gt; [1] 8192
 
 start(s$listener[[1]])
+</code></pre>
+<p>There is the special write-only option ‘serial’ for Sockets, which sets a serialization configuration returned by <code>serial_config()</code>. This registers custom functions to handle serialization and unserialization of reference objects, plugging into the ‘refhook’ system of native R serialization. This allows the transparent send and receive of such objects using mode ‘serial’ without the need for a separate ‘marshalling’ step. Once set, configurations apply to the Socket and all Contexts created from the Socket.</p>
+<pre><code class="language-r">serial &lt;- serial_config(&quot;obj_class&quot;, function(x) serialize(x, NULL), unserialize)
+opt(s, &quot;serial&quot;) &lt;- serial
 
 close(s)
 </code></pre>

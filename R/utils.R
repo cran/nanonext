@@ -173,8 +173,10 @@ parse_url <- function(url) .Call(rnng_url_parse, url)
 #'     \sQuote{recvAio}).
 #'
 #'     Is the object an object inheriting from class \sQuote{nano} i.e. a
-#'     nanoSocket, nanoContext, nanoStream, nanoListener, nanoDialer, or nano
-#'     Object.
+#'     nanoSocket, nanoContext, nanoStream, nanoListener, nanoDialer, nanoPipe
+#'     or nano Object.
+#'
+#'     Is the object an ncurlSession (object of class \sQuote{ncurlSession}).
 #'
 #' @examples
 #' sock <- socket(listen = "inproc://isaio")
@@ -200,6 +202,16 @@ is_aio <- function(x) inherits(x, c("recvAio", "sendAio"))
 #' @export
 #'
 is_nano <- function(x) inherits(x, c("nano", "nanoObject"))
+
+#' @examples
+#' s <- ncurl_session("https://www.r-project.org/")
+#' is_ncurl_session(s)
+#' if (is_ncurl_session(s)) close(s)
+#'
+#' @rdname is_aio
+#' @export
+#'
+is_ncurl_session <- function(x) inherits(x, "ncurlSession")
 
 #' Error Validators
 #'
@@ -262,47 +274,98 @@ is_nul_byte <- function(x) .Call(rnng_is_nul_byte, x)
 #'
 status_code <- function(x) .Call(rnng_status_code, x)
 
-#' Configure Next Mode
+#' Configure Custom Serialization
 #'
-#' Configures send mode \sQuote{next} by registering functions for custom
-#'     serialization and unserialization of non-system reference objects,
-#'     allowing these to be sent and received between different R sessions.
+#' This function is defunct. Please refer to \link{serial_config} instead.
 #'
-#' @param refhook \strong{either} a list or pairlist of two functions: the
-#'     signature for the first must accept a reference object inheriting from
-#'     \sQuote{class} (or a list of such objects) and return a raw vector, and
-#'     the second must accept a raw vector and return reference objects (or a
-#'     list of such objects), \cr \strong{or else} NULL to reset.
-#' @param class [default ""] a character string representing the class of object
-#'     that these serialization function will be applied to, e.g.
-#'     \sQuote{ArrowTabular} or \sQuote{torch_tensor}.
-#' @param vec [default FALSE] the serialization functions accept and return
-#'     reference object individually e.g. \code{arrow::write_to_raw} and
-#'     \code{arrow::read_ipc_stream}. If TRUE, the serialization functions are
-#'     vectorized and accept and return a list of reference objects, e.g.
-#'     \code{torch::torch_serialize} and \code{torch::torch_load}.
+#' @param refhook not used.
+#' @param class [default ""] not used.
+#' @param vec [default FALSE] not used.
 #' @param mark [default FALSE] (for advanced use only) logical value, whether to
 #'     mark serialized data with a special bit.
 #'
-#' @return A pairlist comprising the currently-registered \sQuote{refhook}
-#'     functions.
-#'
-#' @details Calling this function without any arguments returns the pairlist of
-#'     currently-registered \sQuote{refhook} functions (and resets \sQuote{mark}
-#'     to FALSE).
-#'
-#' @examples
-#' g <- next_config(refhook = list(function(x) serialize(x, NULL), unserialize))
-#' next_config()
-#' next_config(g, mark = TRUE)
-#'
-#' next_config(NULL)
-#' next_config()
+#' @return NULL.
 #'
 #' @export
 #'
 next_config <- function(refhook = list(), class = "", vec = FALSE, mark = FALSE)
   .Call(rnng_next_config, refhook, class, vec, mark)
+
+#' Create Serialization Configuration
+#'
+#' Returns a serialization configuration, which may be set on a Socket for
+#'     custom serialization and unserialization of non-system reference objects,
+#'     allowing these to be sent and received between different R sessions. This
+#'     utilises the 'refhook' system of R native serialization. Once set, the
+#'     functions apply to all send and receive operations performed in mode
+#'     \sQuote{serial} over the Socket or Context created from the Socket.
+#'
+#' @param class character string of the class of object custom serialization
+#'     functions are applied to, e.g. \sQuote{ArrowTabular} or
+#'     \sQuote{torch_tensor}.
+#' @param sfunc a function that accepts a reference object inheriting from
+#'     \sQuote{class} (or a list of such objects) and returns a raw vector.
+#' @param ufunc a function that accepts a raw vector and returns a reference
+#'     object (or list of such objects).
+#' @param vec [default FALSE] whether or not the serialization functions are
+#'     vectorized. If FALSE, they should accept and return reference objects
+#'     individually e.g. \code{arrow::write_to_raw} and
+#'     \code{arrow::read_ipc_stream}. If TRUE, they should accept and return a
+#'     list of reference objects, e.g. \code{torch::torch_serialize} and
+#'     \code{torch::torch_load}.
+#'
+#' @return A list comprising the configuration. This should be set on a Socket
+#'     using \code{\link{opt<-}} with option name \sQuote{serial}.
+#'
+#' @examples
+#' cfg <- serial_config("test_cls", function(x) serialize(x, NULL), unserialize)
+#' cfg
+#'
+#' s <- socket()
+#' opt(s, "serial") <- cfg
+#'
+#' # provide an empty list to remove registered functions
+#' opt(s, "serial") <- list()
+#'
+#' close(s)
+#'
+#' @export
+#'
+serial_config <- function(class, sfunc, ufunc, vec = FALSE)
+  .Call(rnng_serial_config, class, sfunc, ufunc, vec)
+
+#' Set Serialization Marker
+#'
+#' Internal package function.
+#'
+#' @param x logical value.
+#'
+#' @return The logical value 'x' supplied.
+#'
+#' @examples
+#' .mark()
+#' .mark(FALSE)
+#'
+#' @keywords internal
+#' @export
+#'
+.mark <- function(x = TRUE) .Call(rnng_set_marker, x)
+
+#' Advances the RNG State
+#'
+#' Internal package function.
+#'
+#' @return NULL.
+#'
+#' @examples
+#' .Random.seed
+#' invisible(.advance())
+#' .Random.seed
+#'
+#' @keywords internal
+#' @export
+#'
+.advance <- function() .Call(rnng_advance_rng_state)
 
 #' Internal Package Function
 #'

@@ -17,7 +17,6 @@
 // nanonext - C level - Threaded Applications ----------------------------------
 
 #define NANONEXT_PROTOCOLS
-#define NANONEXT_SUPPLEMENTALS
 #define NANONEXT_IO
 #include "nanonext.h"
 
@@ -164,7 +163,9 @@ SEXP rnng_messenger_thread_create(SEXP args) {
   SEXP socket = CADR(args);
   nng_thread *thr;
 
-  nng_thread_create(&thr, rnng_messenger_thread, args);
+  const int xc = nng_thread_create(&thr, rnng_messenger_thread, args);
+  if (xc)
+    ERROR_OUT(xc);
 
   SEXP xptr = R_MakeExternalPtr(thr, R_NilValue, R_NilValue);
   NANO_SET_PROT(socket, xptr);
@@ -258,12 +259,14 @@ SEXP rnng_wait_thread_create(SEXP x) {
     ncv->mtx = mtx;
     ncv->cv = cv;
 
-    nng_thread_create(&taio->thr, rnng_wait_thread, taio);
+    if ((xc = nng_thread_create(&taio->thr, rnng_wait_thread, taio)))
+      goto exitlevel3;
 
-    SEXP xptr = R_MakeExternalPtr(taio, R_NilValue, R_NilValue);
-    NANO_SET_PROT(coreaio, xptr);
+    SEXP xptr;
+    PROTECT(xptr = R_MakeExternalPtr(taio, R_NilValue, R_NilValue));
     R_RegisterCFinalizerEx(xptr, thread_aio_finalizer, TRUE);
-    UNPROTECT(1);
+    R_MakeWeakRef(coreaio, xptr, R_NilValue, TRUE);
+    UNPROTECT(2);
 
     nng_time time = nng_clock();
 
@@ -302,12 +305,13 @@ SEXP rnng_wait_thread_create(SEXP x) {
 
     return x;
 
+    exitlevel3:
+    nng_cv_free(cv);
     exitlevel2:
-    nng_mtx_free(ncv->mtx);
+    nng_mtx_free(mtx);
     exitlevel1:
     R_Free(ncv);
     R_Free(taio);
-    UNPROTECT(1);
     ERROR_OUT(xc);
 
   } else if (typ == VECSXP) {
@@ -395,7 +399,12 @@ SEXP rnng_signal_thread_create(SEXP cv, SEXP cv2) {
   ncv->condition = 0;
   nng_mtx_unlock(dmtx);
 
-  nng_thread_create(&duo->thr, rnng_signal_thread, duo);
+  const int xc = nng_thread_create(&duo->thr, rnng_signal_thread, duo);
+  if (xc) {
+    R_Free(duo);
+    Rf_setAttrib(cv, R_MissingArg, R_NilValue);
+    ERROR_OUT(xc);
+  }
 
   SEXP xptr = R_MakeExternalPtr(duo, R_NilValue, R_NilValue);
   Rf_setAttrib(cv, R_MissingArg, xptr);

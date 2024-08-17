@@ -111,7 +111,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
           lapply(.subset2(nano, "dialer"), opt, name = name) else
             invisible(lapply(.subset2(nano, "dialer"), `opt<-`, name = name, value = value))
       if (isFALSE(autostart)) nano[["dialer_start"]] <- function(async = TRUE) {
-        s <- start(.subset2(nano, "dialer")[[1L]], async = async)
+        s <- start.nanoDialer(.subset2(nano, "dialer")[[1L]], async = async)
         if (s == 0L) rm("dialer_start", envir = nano)
         invisible(s)
       }
@@ -127,7 +127,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
           lapply(.subset2(nano, "listener"), opt, name = name) else
             invisible(lapply(.subset2(nano, "listener"), `opt<-`, name = name, value = value))
       if (isFALSE(autostart)) nano[["listener_start"]] <- function() {
-        s <- start(.subset2(nano, "listener")[[1L]])
+        s <- start.nanoListener(.subset2(nano, "listener")[[1L]])
         if (s == 0L) rm("listener_start", envir = nano)
         invisible(s)
       }
@@ -145,7 +145,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
           lapply(.subset2(nano, "dialer"), opt, name = name) else
             invisible(lapply(.subset2(nano, "dialer"), `opt<-`, name = name, value = value))
       if (isFALSE(autostart)) nano[["dialer_start"]] <- function(async = TRUE) {
-        s <- start((d <- .subset2(nano, "dialer"))[[length(d)]], async = async)
+        s <- start.nanoDialer((d <- .subset2(nano, "dialer"))[[length(d)]], async = async)
         if (s == 0L) rm("dialer_start", envir = nano)
         invisible(s)
       }
@@ -162,7 +162,7 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
           lapply(.subset2(nano, "listener"), opt, name = name) else
             invisible(lapply(.subset2(nano, "listener"), `opt<-`, name = name, value = value))
       if (isFALSE(autostart)) nano[["listener_start"]] <- function() {
-        s <- start((l <- .subset2(nano, "listener"))[[length(l)]])
+        s <- start.nanoListener((l <- .subset2(nano, "listener"))[[length(l)]])
         if (s == 0L) rm("listener_start", envir = nano)
         invisible(s)
       }
@@ -180,10 +180,10 @@ nano <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
                                  timeout = NULL)
     recv_aio(socket, mode = mode, timeout = timeout)
 
-  nano[["send"]] <- function(data, mode = c("serial", "raw", "next"), block = NULL)
+  nano[["send"]] <- function(data, mode = c("serial", "raw"), block = NULL)
     send(socket, data = data, mode = mode, block = block)
 
-  nano[["send_aio"]] <- function(data, mode = c("serial", "raw", "next"), timeout = NULL)
+  nano[["send_aio"]] <- function(data, mode = c("serial", "raw"), timeout = NULL)
     send_aio(socket, data = data, mode = mode, timeout = timeout)
 
   nano[["opt"]] <- function(name, value)
@@ -329,6 +329,15 @@ print.nanoStream <- function(x, ...) {
 
 #' @export
 #'
+print.nanoPipe <- function(x, ...) {
+
+  cat(sprintf("< nanoPipe >\n - id: %s\n", attr(x, "id")), file = stdout())
+  invisible(x)
+
+}
+
+#' @export
+#'
 print.recvAio <- function(x, ...) {
 
   cat("< recvAio | $data >\n", file = stdout())
@@ -358,7 +367,7 @@ print.ncurlAio <- function(x, ...) {
 #'
 print.ncurlSession <- function(x, ...) {
 
-  cat(sprintf("< ncurlSession > - %s\n", if (length(attr(x, "aio"))) "transact() to return data" else "not active"), file = stdout())
+  cat(sprintf("< ncurlSession > - %s\n", if (is.null(attr(x, "state"))) "transact() to return data" else "not active"), file = stdout())
   invisible(x)
 
 }
@@ -446,22 +455,22 @@ print.tlsConfig <- function(x, ...) {
 #'
 `[[<-.sendAio` <- function(x, i, value) x
 
-#' @export
+#' @exportS3Method utils::.DollarNames
 #'
 .DollarNames.nano <- function(x, pattern = "")
   grep(pattern, names(attributes(x)), value = TRUE, fixed = TRUE)
 
-#' @export
+#' @exportS3Method utils::.DollarNames
 #'
 .DollarNames.recvAio <- function(x, pattern = "")
-  grep(pattern, "data", value = TRUE, fixed = TRUE)
+  if (startsWith("data", pattern)) "data" else character()
 
-#' @export
+#' @exportS3Method utils::.DollarNames
 #'
 .DollarNames.sendAio <- function(x, pattern = "")
-  grep(pattern, "result", value = TRUE, fixed = TRUE)
+  if (startsWith("result", pattern)) "result" else character()
 
-#' @export
+#' @exportS3Method utils::.DollarNames
 #'
 .DollarNames.ncurlAio <- function(x, pattern = "")
   grep(pattern, c("status", "headers", "data"), value = TRUE, fixed = TRUE)

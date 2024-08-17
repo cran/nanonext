@@ -3,11 +3,14 @@
 \name{is_aio}
 \alias{is_aio}
 \alias{is_nano}
+\alias{is_ncurl_session}
 \title{Validators}
 \usage{
 is_aio(x)
 
 is_nano(x)
+
+is_ncurl_session(x)
 }
 \arguments{
 \item{x}{an object.}
@@ -23,8 +26,10 @@ Is the object an Aio (inheriting from class \sQuote{sendAio} or
     \sQuote{recvAio}).
 
     Is the object an object inheriting from class \sQuote{nano} i.e. a
-    nanoSocket, nanoContext, nanoStream, nanoListener, nanoDialer, or nano
-    Object.
+    nanoSocket, nanoContext, nanoStream, nanoListener, nanoDialer, nanoPipe
+    or nano Object.
+
+    Is the object an ncurlSession (object of class \sQuote{ncurlSession}).
 }
 \examples{
 sock <- socket(listen = "inproc://isaio")
@@ -40,5 +45,9 @@ n <- nano()
 is_nano(n)
 close(s)
 n$close()
+
+s <- ncurl_session("https://www.r-project.org/")
+is_ncurl_session(s)
+if (is_ncurl_session(s)) close(s)
 
 }

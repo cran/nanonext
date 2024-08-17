@@ -23,9 +23,9 @@
 #'     address.
 #'
 #' @param protocol [default 'bus'] choose protocol - \sQuote{bus}, \sQuote{pair},
-#'     \sQuote{push}, \sQuote{pull}, \sQuote{pub}, \sQuote{sub}, \sQuote{req},
-#'     \sQuote{rep}, \sQuote{surveyor}, or \sQuote{respondent} - see
-#'     \link{protocols}.
+#'     \sQuote{poly}, \sQuote{push}, \sQuote{pull}, \sQuote{pub}, \sQuote{sub},
+#'     \sQuote{req}, \sQuote{rep}, \sQuote{surveyor}, or \sQuote{respondent} -
+#'     see \link{protocols}.
 #' @param dial (optional) a URL to dial, specifying the transport and address as
 #'     a character string e.g. 'inproc://anyvalue' or 'tcp://127.0.0.1:5555'
 #'     (see \link{transports}).
@@ -69,6 +69,7 @@
 #'     \itemize{
 #'     \item Bus (mesh networks) - protocol: 'bus'
 #'     \item Pair (two-way radio) - protocol: 'pair'
+#'     \item Poly (one-to-one of many) - protocol: 'poly'
 #'     \item Pipeline (one-way pipe) - protocol: 'push', 'pull'
 #'     \item Publisher/Subscriber (topics & broadcast) - protocol: 'pub', 'sub'
 #'     \item Request/Reply (RPC) - protocol: 'req', 'rep'
@@ -105,27 +106,56 @@
 #'
 #' @export
 #'
-socket <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
-                                "req", "rep", "surveyor", "respondent"),
+socket <- function(protocol = c("bus", "pair", "poly", "push", "pull", "pub",
+                                "sub", "req", "rep", "surveyor", "respondent"),
                    dial = NULL,
                    listen = NULL,
                    tls = NULL,
                    autostart = TRUE,
-                   raw = FALSE) {
+                   raw = FALSE)
+  .Call(rnng_protocol_open, protocol, dial, listen, tls, autostart, raw)
 
-  sock <- .Call(rnng_protocol_open, protocol, raw)
-  if (length(dial)) .Call(rnng_dial, sock, dial, tls, autostart, TRUE)
-  if (length(listen)) .Call(rnng_listen, sock, listen, tls, autostart, TRUE)
-  sock
-
-}
+#' Collect the Pipe from an Aio
+#'
+#' This function retrieves the Pipe used to receive a message from the Aio. It
+#'     will block if the Aio has yet to complete. The message is still available
+#'     for retrieval by the usual means. A Pipe is a low-level object and it is
+#'     not normally necessary to deal with them directly.
+#'
+#' @param x a 'recvAio' object.
+#'
+#' @details As Pipes are always owned by a Socket, removing (and garbage
+#'     collecting) a Pipe does not close it or free its resources. A Pipe may,
+#'     however, be explicitly closed.
+#'
+#' @return A Pipe (object of class \sQuote{nanoPipe}).
+#'
+#' @examples
+#' s <- socket("rep", listen = "inproc://nanonext")
+#' s1 <- socket("req", dial = "inproc://nanonext")
+#'
+#' r <- recv_aio(s, timeout = 500)
+#'
+#' if (!send(s1, "")) {
+#'   p <- tryCatch(collect_pipe(r), error = identity)
+#'   print(p)
+#'   reap(p)
+#' }
+#'
+#' close(s)
+#' close(s1)
+#'
+#' @export
+#'
+collect_pipe <- function(x) .Call(rnng_aio_collect_pipe, x)
 
 #' Close Connection
 #'
-#' Close Connection on a Socket, Context, Dialer, Listener, Stream, or ncurl
-#'     Session.
+#' Close Connection on a Socket, Context, Dialer, Listener, Stream, Pipe, or
+#'     ncurl Session.
 #'
-#' @param con a Socket, Context, Dialer, Listener, Stream, or 'ncurlSession'.
+#' @param con a Socket, Context, Dialer, Listener, Stream, Pipe, or
+#'     \sQuote{ncurlSession}.
 #' @param ... not used.
 #'
 #' @return Invisibly, an integer exit code (zero on success).
@@ -149,6 +179,12 @@ socket <- function(protocol = c("bus", "pair", "push", "pull", "pub", "sub",
 #'     will be terminated and any new operations will fail after the connection
 #'     is closed.
 #'
+#'     Closing an \sQuote{ncurlSession} closes the http(s) connection.
+#'
+#'     As Pipes are owned by the corresponding Socket, removing (and garbage
+#'     collecting) a Pipe does not close it or free its resources. A Pipe may,
+#'     however, be explicitly closed.
+#'
 #' @seealso \code{\link{reap}}
 #'
 #' @name close
@@ -162,12 +198,18 @@ NULL
 #'
 close.nanoSocket <- function(con, ...) invisible(.Call(rnng_close, con))
 
+#' @rdname close
+#' @method close nanoPipe
+#' @export
+#'
+close.nanoPipe <- function(con, ...) invisible(.Call(rnng_pipe_close, con))
+
 #' Reap
 #'
-#' An alternative to \code{close} for Sockets, Contexts, Listeners and Dialers
-#'     avoiding S3 method dispatch.
+#' An alternative to \code{close} for Sockets, Contexts, Listeners, Dialers and
+#'     Pipes avoiding S3 method dispatch.
 #'
-#' @param con a Socket, Context, Listener or Dialer.
+#' @param con a Socket, Context, Listener, Dialer or Pipe.
 #'
 #' @return An integer exit code (zero on success).
 #'

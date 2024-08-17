@@ -16,8 +16,11 @@
 
 // nanonext - package level registrations --------------------------------------
 
-#define NANONEXT_SUPPLEMENTALS
 #include "nanonext.h"
+
+void (*eln2)(void (*)(void *), void *, double, int);
+
+uint8_t special_bit = 0;
 
 SEXP nano_AioSymbol;
 SEXP nano_ContextSymbol;
@@ -28,8 +31,8 @@ SEXP nano_DotcallSymbol;
 SEXP nano_HeadersSymbol;
 SEXP nano_IdSymbol;
 SEXP nano_ListenerSymbol;
+SEXP nano_PipeSymbol;
 SEXP nano_ProtocolSymbol;
-SEXP nano_RawSymbol;
 SEXP nano_ResolveSymbol;
 SEXP nano_ResponseSymbol;
 SEXP nano_ResultSymbol;
@@ -49,23 +52,9 @@ SEXP nano_klassString;
 SEXP nano_precious;
 SEXP nano_recvAio;
 SEXP nano_reqAio;
-SEXP nano_refHook;
 SEXP nano_sendAio;
 SEXP nano_success;
 SEXP nano_unresolved;
-
-void (*eln2)(void (*)(void *), void *, double, int);
-
-void later2(void (*fun)(void *), void *data) {
-  eln2(fun, data, 0, 0);
-}
-
-void eln2dummy(void (*fun)(void *), void *data, double secs, int loop) {
-  (void) fun;
-  (void) data;
-  (void) secs;
-  (void) loop;
-}
 
 static void RegisterSymbols(void) {
   nano_AioSymbol = Rf_install("aio");
@@ -77,8 +66,8 @@ static void RegisterSymbols(void) {
   nano_HeadersSymbol = Rf_install("headers");
   nano_IdSymbol = Rf_install("id");
   nano_ListenerSymbol = Rf_install("listener");
+  nano_PipeSymbol = Rf_install("pipe");
   nano_ProtocolSymbol = Rf_install("protocol");
-  nano_RawSymbol = Rf_install("raw");
   nano_ResolveSymbol = Rf_install("resolve");
   nano_ResponseSymbol = Rf_install("response");
   nano_ResultSymbol = Rf_install("result");
@@ -107,7 +96,6 @@ static void PreserveObjects(void) {
   R_PreserveObject(nano_reqAio = Rf_allocVector(STRSXP, 2));
   SET_STRING_ELT(nano_reqAio, 0, Rf_mkChar("mirai"));
   SET_STRING_ELT(nano_reqAio, 1, Rf_mkChar("recvAio"));
-  R_PreserveObject(nano_refHook = Rf_list2(R_NilValue, R_NilValue));
   R_PreserveObject(nano_sendAio = Rf_mkString("sendAio"));
   R_PreserveObject(nano_success = Rf_ScalarInteger(0));
   R_PreserveObject(nano_unresolved = Rf_shallow_duplicate(Rf_ScalarLogical(NA_LOGICAL)));
@@ -119,7 +107,6 @@ static void ReleaseObjects(void) {
   R_ReleaseObject(nano_unresolved);
   R_ReleaseObject(nano_success);
   R_ReleaseObject(nano_sendAio);
-  R_ReleaseObject(nano_refHook);
   R_ReleaseObject(nano_reqAio);
   R_ReleaseObject(nano_recvAio);
   R_ReleaseObject(nano_precious);
@@ -132,8 +119,10 @@ static void ReleaseObjects(void) {
 // # nocov end
 
 static const R_CallMethodDef callMethods[] = {
+  {"rnng_advance_rng_state", (DL_FUNC) &rnng_advance_rng_state, 0},
   {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
   {"rnng_aio_collect", (DL_FUNC) &rnng_aio_collect, 1},
+  {"rnng_aio_collect_pipe", (DL_FUNC) &rnng_aio_collect_pipe, 1},
   {"rnng_aio_collect_safe", (DL_FUNC) &rnng_aio_collect_safe, 1},
   {"rnng_aio_get_msg", (DL_FUNC) &rnng_aio_get_msg, 1},
   {"rnng_aio_http_data", (DL_FUNC) &rnng_aio_http_data, 1},
@@ -171,8 +160,9 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_ncurl_session_close", (DL_FUNC) &rnng_ncurl_session_close, 1},
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
   {"rnng_next_config", (DL_FUNC) &rnng_next_config, 4},
+  {"rnng_pipe_close", (DL_FUNC) &rnng_pipe_close, 1},
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
-  {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 2},
+  {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 6},
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
   {"rnng_reap", (DL_FUNC) &rnng_reap, 1},
   {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
@@ -180,6 +170,8 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_request", (DL_FUNC) &rnng_request, 7},
   {"rnng_send", (DL_FUNC) &rnng_send, 4},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
+  {"rnng_serial_config", (DL_FUNC) &rnng_serial_config, 4},
+  {"rnng_set_marker", (DL_FUNC) &rnng_set_marker, 1},
   {"rnng_set_promise_context", (DL_FUNC) &rnng_set_promise_context, 2},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},
   {"rnng_signal_thread_create", (DL_FUNC) &rnng_signal_thread_create, 2},

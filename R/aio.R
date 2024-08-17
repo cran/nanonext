@@ -20,9 +20,10 @@
 
 #' Send Async
 #'
-#' Send data asynchronously over a connection (Socket, Context or Stream).
+#' Send data asynchronously over a connection (Socket, Context, Stream or Pipe).
 #'
 #' @inheritParams send
+#' @param con a Socket, Context, Stream or Pipe.
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'     applies a socket-specific default, usually the same as no timeout.
 #'
@@ -57,7 +58,7 @@
 #'
 #' @export
 #'
-send_aio <- function(con, data, mode = c("serial", "raw", "next"), timeout = NULL)
+send_aio <- function(con, data, mode = c("serial", "raw"), timeout = NULL)
   data <- .Call(rnng_send_aio, con, data, mode, timeout, environment())
 
 #' Receive Async
