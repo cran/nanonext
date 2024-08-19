@@ -286,6 +286,7 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #'
 #' @return NULL.
 #'
+#' @keywords internal
 #' @export
 #'
 next_config <- function(refhook = list(), class = "", vec = FALSE, mark = FALSE)

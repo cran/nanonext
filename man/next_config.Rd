@@ -22,3 +22,4 @@ NULL.
 \description{
 This function is defunct. Please refer to \link{serial_config} instead.
 }
+\keyword{internal}

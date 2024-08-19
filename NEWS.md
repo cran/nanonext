@@ -1,3 +1,9 @@
+# nanonext 1.2.1
+
+#### Updates
+
+* Re-optimizes custom serialization (whilst addressing CRAN clang-UBSAN checks).
+
 # nanonext 1.2.0
 
 #### New Features

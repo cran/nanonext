@@ -245,7 +245,7 @@ void nano_serialize_old(nano_buf *buf, const SEXP object, SEXP hook) {
   buf->buf[0] = 0x7;
   buf->buf[1] = (uint8_t) vec;
   buf->buf[2] = special_bit;
-  buf->cur += 16;
+  buf->cur += 12;
 
   struct R_outpstream_st output_stream;
 
@@ -267,7 +267,8 @@ void nano_serialize_old(nano_buf *buf, const SEXP object, SEXP hook) {
   R_Serialize(object, &output_stream);
 
   if (reg && TAG(hook) != R_NilValue) {
-    ((uint64_t *) (buf->buf))[1] = (uint64_t) buf->cur;
+    const uint64_t cursor = (uint64_t) buf->cur;
+    memcpy(buf->buf + 4, &cursor, sizeof(uint64_t));
     SEXP call, out;
 
     if (vec) {
@@ -333,7 +334,7 @@ void nano_serialize(nano_buf *buf, const SEXP object, SEXP hook) {
     buf->buf[0] = 0x7;
     buf->buf[1] = (uint8_t) vec;
     buf->buf[3] = special_bit;
-    buf->cur += 16;
+    buf->cur += 12;
   }
 
   struct R_outpstream_st output_stream;
@@ -356,7 +357,8 @@ void nano_serialize(nano_buf *buf, const SEXP object, SEXP hook) {
   R_Serialize(object, &output_stream);
 
   if (reg && TAG(hook) != R_NilValue) {
-    ((uint64_t *) (buf->buf))[1] = (uint64_t) buf->cur;
+    const uint64_t cursor = (uint64_t) buf->cur;
+    memcpy(buf->buf + 4, &cursor, sizeof(uint64_t));
     SEXP call, out;
 
     if (vec) {
@@ -426,7 +428,7 @@ SEXP nano_unserialize(unsigned char *buf, const size_t sz, SEXP hook) {
       cur = 0;
       goto resume;
     case 0x7: ;
-      offset = ((uint64_t *) (buf))[1];
+      memcpy(&offset, buf + 4, sizeof(uint64_t));
       if (offset) {
         SEXP raw, call;
         if (buf[1]) {
@@ -457,7 +459,7 @@ SEXP nano_unserialize(unsigned char *buf, const size_t sz, SEXP hook) {
         }
         SET_TAG(hook, reflist);
       }
-      cur = 16;
+      cur = 12;
       goto resume;
     }
   }
