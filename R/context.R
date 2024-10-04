@@ -160,9 +160,7 @@ reply <- function(context,
   block <- if (is.null(timeout)) TRUE else timeout
   res <- recv(context, mode = recv_mode, block = block)
   is_error_value(res) && return(res)
-  on.exit(expr = send(context, data = as.raw(0L), mode = send_mode, block = TRUE))
-  data <- execute(res, ...)
-  on.exit()
+  data <- .Call(rnng_eval_safe, as.call(list(execute, res, ...)))
   send(context, data = data, mode = send_mode, block = block)
 
 }
@@ -251,22 +249,3 @@ request <- function(context,
                     timeout = NULL,
                     cv = NULL)
   data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, cv, environment())
-
-#' Set Promise Context
-#'
-#' If called from an appropriate context, creates an event-driven promise that
-#'     will resolve asynchronously when the request is complete.
-#'
-#' @param x a 'recvAio' object returned by \code{\link{request}}.
-#' @param ctx the context environment.
-#'
-#' @details The object passed as \sQuote{x} is returned regardless of whether
-#'     the promise context was set successfully or not. If successful,
-#'     \sQuote{x} is modified in place with the promise context.
-#'
-#' @return The object \sQuote{x}.
-#'
-#' @keywords internal
-#' @export
-#'
-set_promise_context <- function(x, ctx) .Call(rnng_set_promise_context, x, ctx)

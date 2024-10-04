@@ -218,7 +218,7 @@ transact <- function(session) .Call(rnng_ncurl_transact, session)
 #'
 close.ncurlSession <- function(con, ...) invisible(.Call(rnng_ncurl_session_close, con))
 
-#' Make ncurl Promise
+#' Make ncurlAio Promise
 #'
 #' Creates a \sQuote{promise} from an \sQuote{ncurlAio} object.
 #'
@@ -246,8 +246,7 @@ as.promise.ncurlAio <- function(x) {
     if (unresolved(x)) {
       promise <- promises::then(
         promises::promise(
-          function(resolve, reject)
-            context <- set_promise_context(x, environment())
+          function(resolve, reject) .keep(x, environment())
         ),
         onFulfilled = function(value)
           if (value != 200L)

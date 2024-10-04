@@ -342,3 +342,78 @@ unresolved <- function(x) .Call(rnng_unresolved, x)
 #' @export
 #'
 .unresolved <- function(x) .Call(rnng_unresolved2, x)
+
+#' Make recvAio Promise
+#'
+#' Creates a \sQuote{promise} from an \sQuote{recvAio} object.
+#'
+#' @param x an object of class \sQuote{recvAio}.
+#'
+#' @return A \sQuote{promise} object.
+#'
+#' @details This function is an S3 method for the generic \code{as.promise} for
+#'     class \sQuote{recvAio}.
+#'
+#'     Requires the \pkg{promises} package.
+#'
+#'     Allows an \sQuote{recvAio} to be used with the promise pipe
+#'     \code{\%...>\%}, which schedules a function to run upon resolution of the
+#'     Aio.
+#'
+#' @exportS3Method promises::as.promise
+#'
+as.promise.recvAio <- function(x) {
+
+  promise <- .subset2(x, "promise")
+
+  if (is.null(promise)) {
+
+    if (unresolved(x)) {
+      promise <- promises::then(
+        promises::promise(
+          function(resolve, reject) .keep(x, environment())
+        ),
+        onFulfilled = function(value)
+          if (is_error_value(value)) stop(nng_error(value)) else value
+      )
+
+    } else {
+      value <- .subset2(x, "value")
+      promise <- if (is_error_value(value))
+        promises::promise_reject(nng_error(value)) else
+          promises::promise_resolve(value)
+    }
+
+    assign("promise", promise, x)
+
+  }
+
+  promise
+
+}
+
+#' @exportS3Method promises::is.promising
+#'
+is.promising.recvAio <- function(x) TRUE
+
+#' Keep Promise
+#'
+#' Internal package function.
+#'
+#' @param x a \sQuote{recvAio} or \sQuote{ncurlAio} object.
+#' @param ctx the return value of \sQuote{environment()}.
+#'
+#' @details If successful, both \sQuote{x} and \sQuote{ctx} are preserved and
+#'     accessible from the promise callback.
+#'
+#' @return NULL.
+#'
+#' @keywords internal
+#' @export
+#'
+.keep <- function(x, ctx) .Call(rnng_set_promise_context, x, ctx)
+
+#' @rdname dot-keep
+#' @export
+#'
+set_promise_context <- .keep

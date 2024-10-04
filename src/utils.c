@@ -85,6 +85,83 @@ SEXP rnng_url_parse(SEXP url) {
 
 }
 
+SEXP rnng_status_code(SEXP x) {
+
+  const int status = nano_integer(x);
+  char *code;
+  switch (status) {
+  case 100: code = "Continue"; break;
+  case 101: code = "Switching Protocols"; break;
+  case 102: code = "Processing"; break;
+  case 103: code = "Early Hints"; break;
+  case 200: code = "OK"; break;
+  case 201: code = "Created"; break;
+  case 202: code = "Accepted"; break;
+  case 203: code = "Non-Authoritative Information"; break;
+  case 204: code = "No Content"; break;
+  case 205: code = "Reset Content"; break;
+  case 206: code = "Partial Content"; break;
+  case 207: code = "Multi-Status"; break;
+  case 208: code = "Already Reported"; break;
+  case 226: code = "IM Used"; break;
+  case 300: code = "Multiple Choices"; break;
+  case 301: code = "Moved Permanently"; break;
+  case 302: code = "Found"; break;
+  case 303: code = "See Other"; break;
+  case 304: code = "Not Modified"; break;
+  case 305: code = "Use Proxy"; break;
+  case 306: code = "Switch Proxy"; break;
+  case 307: code = "Temporary Redirect"; break;
+  case 308: code = "Permanent Redirect"; break;
+  case 400: code = "Bad Request"; break;
+  case 401: code = "Unauthorized"; break;
+  case 402: code = "Payment Required"; break;
+  case 403: code = "Forbidden"; break;
+  case 404: code = "Not Found"; break;
+  case 405: code = "Method Not Allowed"; break;
+  case 406: code = "Not Acceptable"; break;
+  case 407: code = "Proxy Authentication Required"; break;
+  case 408: code = "Request Timeout"; break;
+  case 409: code = "Conflict"; break;
+  case 410: code = "Gone"; break;
+  case 411: code = "Length Required"; break;
+  case 412: code = "Precondition Failed"; break;
+  case 413: code = "Payload Too Large"; break;
+  case 414: code = "URI Too Long"; break;
+  case 415: code = "Unsupported Media Type"; break;
+  case 416: code = "Range Not Satisfiable"; break;
+  case 417: code = "Expectation Failed"; break;
+  case 418: code = "I'm a teapot"; break;
+  case 421: code = "Misdirected Request"; break;
+  case 422: code = "Unprocessable Entity"; break;
+  case 423: code = "Locked"; break;
+  case 424: code = "Failed Dependency"; break;
+  case 425: code = "Too Early"; break;
+  case 426: code = "Upgrade Required"; break;
+  case 428: code = "Precondition Required"; break;
+  case 429: code = "Too Many Requests"; break;
+  case 431: code = "Request Header Fields Too Large"; break;
+  case 451: code = "Unavailable For Legal Reasons"; break;
+  case 500: code = "Internal Server Error"; break;
+  case 501: code = "Not Implemented"; break;
+  case 502: code = "Bad Gateway"; break;
+  case 503: code = "Service Unavailable"; break;
+  case 504: code = "Gateway Timeout"; break;
+  case 505: code = "HTTP Version Not Supported"; break;
+  case 506: code = "Variant Also Negotiates"; break;
+  case 507: code = "Insufficient Storage"; break;
+  case 508: code = "Loop Detected"; break;
+  case 510: code = "Not Extended"; break;
+  case 511: code = "Network Authentication Required"; break;
+  default: code = "Unknown HTTP Status"; break;
+  }
+  char out[strlen(code) + 7];
+  snprintf(out, sizeof(out), "%d | %s", status, code);
+
+  return Rf_mkString(out);
+
+}
+
 SEXP rnng_is_nul_byte(SEXP x) {
 
   return Rf_ScalarLogical(TYPEOF(x) == RAWSXP && XLENGTH(x) == 1 && RAW(x)[0] == 0);
@@ -133,9 +210,19 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
     case VECSXP:
       if (strncmp(op, "serial", 6))
         Rf_error("type of 'value' not supported");
-      SEXPTYPE typ = TYPEOF(NANO_VECTOR(value)[0]);
-      if (typ != CHARSXP && typ != NILSXP) {
-        xc = 3; break;
+      R_xlen_t xlen = Rf_xlength(value);
+      if (xlen > 0) {
+        if (Rf_xlength(value) != 4 ||
+            TYPEOF(NANO_VECTOR(value)[0]) != STRSXP ||
+            TYPEOF(NANO_VECTOR(value)[3]) != LGLSXP) {
+          xc = 3; break;
+        }
+        SEXPTYPE typ1 = TYPEOF(NANO_VECTOR(value)[1]);
+        SEXPTYPE typ2 = TYPEOF(NANO_VECTOR(value)[2]);
+        if (!(typ1 == CLOSXP || typ1 == SPECIALSXP || typ1 == BUILTINSXP) ||
+            !(typ2 == CLOSXP || typ2 == SPECIALSXP || typ2 == BUILTINSXP)) {
+            xc = 3; break;
+        }
       }
       NANO_SET_PROT(object, Rf_VectorToPairList(value));
       xc = 0;
@@ -474,21 +561,15 @@ SEXP rnng_stats_get(SEXP object, SEXP stat) {
 
 // serialization config --------------------------------------------------------
 
-SEXP rnng_next_config(SEXP refhook, SEXP klass, SEXP list, SEXP mark) {
-  special_bit = (uint8_t) NANO_INTEGER(mark);
-  (void) refhook;
-  (void) klass;
-  (void) list;
-  Rf_warning("'next_config()' is defunct, please use 'serial_config()' instead");
-  return R_NilValue;
-}
-
 SEXP rnng_serial_config(SEXP klass, SEXP sfunc, SEXP ufunc, SEXP vec) {
 
   SEXP out;
   PROTECT(out = Rf_allocVector(VECSXP, 4));
 
-  SET_VECTOR_ELT(out, 0, STRING_ELT(klass, 0));
+  if (TYPEOF(klass) != STRSXP)
+    Rf_error("'class' must be a character string");
+
+  SET_VECTOR_ELT(out, 0, klass);
 
   SEXPTYPE typ1 = TYPEOF(sfunc);
   SEXPTYPE typ2 = TYPEOF(ufunc);
@@ -497,6 +578,9 @@ SEXP rnng_serial_config(SEXP klass, SEXP sfunc, SEXP ufunc, SEXP vec) {
     Rf_error("both 'sfunc' and 'ufunc' must be functions");
   SET_VECTOR_ELT(out, 1, sfunc);
   SET_VECTOR_ELT(out, 2, ufunc);
+
+  if (TYPEOF(vec) != LGLSXP)
+    Rf_error("'vec' must be a logical value");
 
   SET_VECTOR_ELT(out, 3, Rf_ScalarLogical(NANO_INTEGER(vec) ? 1 : 0));
 

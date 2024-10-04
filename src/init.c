@@ -48,7 +48,6 @@ SEXP nano_aioFuncMsg;
 SEXP nano_aioFuncRes;
 SEXP nano_aioNFuncs;
 SEXP nano_error;
-SEXP nano_klassString;
 SEXP nano_precious;
 SEXP nano_recvAio;
 SEXP nano_reqAio;
@@ -90,7 +89,6 @@ static void PreserveObjects(void) {
   R_PreserveObject(nano_error = Rf_allocVector(STRSXP, 2));
   SET_STRING_ELT(nano_error, 0, Rf_mkChar("errorValue"));
   SET_STRING_ELT(nano_error, 1, Rf_mkChar("try-error"));
-  R_PreserveObject(nano_klassString = Rf_cons(R_NilValue, R_NilValue));
   R_PreserveObject(nano_precious = Rf_cons(R_NilValue, Rf_cons(R_NilValue, R_NilValue)));
   R_PreserveObject(nano_recvAio = Rf_mkString("recvAio"));
   R_PreserveObject(nano_reqAio = Rf_allocVector(STRSXP, 2));
@@ -110,7 +108,6 @@ static void ReleaseObjects(void) {
   R_ReleaseObject(nano_reqAio);
   R_ReleaseObject(nano_recvAio);
   R_ReleaseObject(nano_precious);
-  R_ReleaseObject(nano_klassString);
   R_ReleaseObject(nano_error);
   R_ReleaseObject(nano_aioNFuncs);
   R_ReleaseObject(nano_aioFuncRes);
@@ -146,6 +143,8 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_dial", (DL_FUNC) &rnng_dial, 5},
   {"rnng_dialer_close", (DL_FUNC) &rnng_dialer_close, 1},
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
+  {"rnng_dispatcher_socket", (DL_FUNC) &rnng_dispatcher_socket, 3},
+  {"rnng_eval_safe", (DL_FUNC) &rnng_eval_safe, 1},
   {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
   {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
   {"rnng_is_error_value", (DL_FUNC) &rnng_is_error_value, 1},
@@ -154,7 +153,6 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_listener_close", (DL_FUNC) &rnng_listener_close, 1},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
-  {"rnng_next_config", (DL_FUNC) &rnng_next_config, 4},
   {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 9},
   {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 9},
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
@@ -164,6 +162,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 6},
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
+  {"rnng_read_online", (DL_FUNC) &rnng_read_online, 1},
   {"rnng_reap", (DL_FUNC) &rnng_reap, 1},
   {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
   {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 6},
@@ -172,8 +171,8 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
   {"rnng_serial_config", (DL_FUNC) &rnng_serial_config, 4},
   {"rnng_set_marker", (DL_FUNC) &rnng_set_marker, 1},
-  {"rnng_set_promise_context", (DL_FUNC) &rnng_set_promise_context, 2},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},
+  {"rnng_set_promise_context", (DL_FUNC) &rnng_set_promise_context, 2},
   {"rnng_signal_thread_create", (DL_FUNC) &rnng_signal_thread_create, 2},
   {"rnng_sleep", (DL_FUNC) &rnng_sleep, 1},
   {"rnng_socket_lock", (DL_FUNC) &rnng_socket_lock, 2},
@@ -203,7 +202,7 @@ static const R_ExternalMethodDef externalMethods[] = {
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
-  eln2 = eln2dummy;
+  eln2 = NULL;
   R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);

@@ -20,14 +20,10 @@
 
 // internals -------------------------------------------------------------------
 
+static SEXP nano_eval_res;
 
-static SEXP eval_safe (void *call) {
-  return Rf_eval((SEXP) call, R_GlobalEnv);
-}
-
-static void rl_reset(void *data, Rboolean jump) {
-  if (jump)
-    SET_TAG((SEXP) data, R_NilValue);
+static void nano_eval_safe (void *call) {
+  nano_eval_res = Rf_eval((SEXP) call, R_GlobalEnv);
 }
 
 static void nano_write_bytes(R_outpstream_t stream, void *src, int len) {
@@ -86,7 +82,7 @@ static SEXP rawOneString(unsigned char *bytes, R_xlen_t nbytes, R_xlen_t *np) {
 
 static SEXP nano_inHook(SEXP x, SEXP hook) {
 
-  if (!Rf_inherits(x, CHAR(CAR(hook))))
+  if (!Rf_inherits(x, NANO_STRING(CAR(hook))))
     return R_NilValue;
 
   SEXP newlist, list, newnames, names, out;
@@ -126,13 +122,48 @@ static SEXP nano_outHook(SEXP x, SEXP fun) {
 
 // functions with forward definitions in nanonext.h ----------------------------
 
+void raio_complete_signal(void *arg) {
+
+  nano_aio *raio = (nano_aio *) arg;
+  nano_cv *ncv = (nano_cv *) raio->next;
+  nng_cv *cv = ncv->cv;
+  nng_mtx *mtx = ncv->mtx;
+
+  const int res = nng_aio_result(raio->aio);
+  if (res == 0)
+    raio->data = nng_aio_get_msg(raio->aio);
+
+  nng_mtx_lock(mtx);
+  raio->result = res - !res;
+  ncv->condition++;
+  nng_cv_wake(cv);
+  nng_mtx_unlock(mtx);
+
+}
+
+void sendaio_complete(void *arg) {
+
+  nng_aio *aio = ((nano_saio *) arg)->aio;
+  if (nng_aio_result(aio))
+    nng_msg_free(nng_aio_get_msg(aio));
+
+}
+
+void cv_finalizer(SEXP xptr) {
+
+  if (NANO_PTR(xptr) == NULL) return;
+  nano_cv *xp = (nano_cv *) NANO_PTR(xptr);
+  nng_cv_free(xp->cv);
+  nng_mtx_free(xp->mtx);
+  R_Free(xp);
+
+}
+
 void dialer_finalizer(SEXP xptr) {
 
   if (NANO_PTR(xptr) == NULL) return;
-  nano_dialer *xp = (nano_dialer *) NANO_PTR(xptr);
-  nng_dialer_close(xp->dial);
-  if (xp->tls != NULL)
-    nng_tls_config_free(xp->tls);
+  nng_dialer *xp = (nng_dialer *) NANO_PTR(xptr);
+  nng_dialer_close(*xp);
   R_Free(xp);
 
 }
@@ -140,10 +171,8 @@ void dialer_finalizer(SEXP xptr) {
 void listener_finalizer(SEXP xptr) {
 
   if (NANO_PTR(xptr) == NULL) return;
-  nano_listener *xp = (nano_listener *) NANO_PTR(xptr);
-  nng_listener_close(xp->list);
-  if (xp->tls != NULL)
-    nng_tls_config_free(xp->tls);
+  nng_listener *xp = (nng_listener *) NANO_PTR(xptr);
+  nng_listener_close(*xp);
   R_Free(xp);
 
 }
@@ -157,6 +186,25 @@ void socket_finalizer(SEXP xptr) {
 
 }
 
+void tls_finalizer(SEXP xptr) {
+
+  if (NANO_PTR(xptr) == NULL) return;
+  nng_tls_config *xp = (nng_tls_config *) NANO_PTR(xptr);
+  nng_tls_config_free(xp);
+
+}
+
+#if R_VERSION < R_Version(4, 1, 0)
+
+inline SEXP R_NewEnv(SEXP parent, int hash, int size) {
+  (void) parent;
+  (void) hash;
+  (void) size;
+  return Rf_allocSExp(ENVSXP);
+}
+
+#endif
+
 #if R_VERSION < R_Version(4, 5, 0)
 
 inline SEXP R_mkClosure(SEXP formals, SEXP body, SEXP env) {
@@ -169,28 +217,53 @@ inline SEXP R_mkClosure(SEXP formals, SEXP body, SEXP env) {
 
 #endif
 
+SEXP nano_findVarInFrame(const SEXP env, const SEXP sym) {
+
+  SEXP frame = CAR(env);  // FRAME
+  while (frame != R_NilValue) {
+    if (TAG(frame) == sym)
+      return CAR(frame); // BINDING_VALUE
+    frame = CDR(frame);
+  }
+  return R_UnboundValue;
+
+}
+
+inline SEXP nano_PreserveObject(const SEXP x) {
+
+  SEXP node = Rf_cons(nano_precious, CDR(nano_precious));
+  SETCDR(nano_precious, node);
+  SETCAR(CDR(nano_precious), node);
+  SET_TAG(node, x);
+
+  return node;
+
+}
+
+inline void nano_ReleaseObject(SEXP x) {
+
+  SETCDR(CAR(x), CDR(x));
+  SETCAR(CDR(x), CAR(x));
+
+}
+
 void later2(void (*fun)(void *), void *data) {
   eln2(fun, data, 0, 0);
 }
 
-void eln2dummy(void (*fun)(void *), void *data, double secs, int loop) {
-  (void) fun;
-  (void) data;
-  (void) secs;
-  (void) loop;
+void raio_invoke_cb(void *arg) {
+
+  SEXP call, data, node = (SEXP) arg, x = TAG(node);
+  data = rnng_aio_get_msg(x);
+  PROTECT(call = Rf_lcons(nano_ResolveSymbol, Rf_cons(data, R_NilValue)));
+  Rf_eval(call, NANO_ENCLOS(x));
+  UNPROTECT(1);
+  // unreliable to release linked list node from later cb, just free the payload
+  SET_TAG(node, R_NilValue);
 }
 
-inline int nano_integer(SEXP x) {
-  int out;
-  switch (TYPEOF(x)) {
-  case INTSXP:
-  case LGLSXP:
-    out = NANO_INTEGER(x);
-    break;
-  default:
-    out = Rf_asInteger(x);
-  }
-  return out;
+inline int nano_integer(const SEXP x) {
+  return (TYPEOF(x) == INTSXP || TYPEOF(x) == LGLSXP) ? NANO_INTEGER(x) : Rf_asInteger(x);
 }
 
 SEXP mk_error(const int xc) {
@@ -204,7 +277,7 @@ SEXP mk_error(const int xc) {
 SEXP mk_error_data(const int xc) {
 
   SEXP env, err;
-  PROTECT(env = Rf_allocSExp(ENVSXP));
+  PROTECT(env = R_NewEnv(R_NilValue, 0, 0));
   Rf_classgets(env, xc < 0 ? nano_sendAio : nano_recvAio);
   PROTECT(err = Rf_ScalarInteger(abs(xc)));
   Rf_classgets(err, nano_error);
@@ -221,7 +294,7 @@ SEXP rawToChar(const unsigned char *buf, const size_t sz) {
   int i, j;
   for (i = 0, j = -1; i < sz; i++) if (buf[i]) j = i; else break;
   if (sz - i > 1) {
-    REprintf("data could not be converted to a character string\n");
+    Rf_warningcall_immediate(R_NilValue, "data could not be converted to a character string");
     out = Rf_allocVector(RAWSXP, sz);
     memcpy(NANO_DATAPTR(out), buf, sz);
     return out;
@@ -232,94 +305,6 @@ SEXP rawToChar(const unsigned char *buf, const size_t sz) {
 
   UNPROTECT(1);
   return out;
-
-}
-
-void nano_serialize_old(nano_buf *buf, const SEXP object, SEXP hook) {
-
-  NANO_ALLOC(buf, NANONEXT_INIT_BUFSIZE);
-  const int reg = hook != R_NilValue;
-  int vec;
-
-  vec = reg ? NANO_INTEGER(CADDDR(hook)) : 0;
-  buf->buf[0] = 0x7;
-  buf->buf[1] = (uint8_t) vec;
-  buf->buf[2] = special_bit;
-  buf->cur += 12;
-
-  struct R_outpstream_st output_stream;
-
-  R_InitOutPStream(
-    &output_stream,
-    (R_pstream_data_t) buf,
-#ifdef WORDS_BIGENDIAN
-    R_pstream_xdr_format,
-#else
-    R_pstream_binary_format,
-#endif
-    NANONEXT_SERIAL_VER,
-    NULL,
-    nano_write_bytes,
-    reg ? nano_inHook : NULL,
-    reg ? hook : R_NilValue
-  );
-
-  R_Serialize(object, &output_stream);
-
-  if (reg && TAG(hook) != R_NilValue) {
-    const uint64_t cursor = (uint64_t) buf->cur;
-    memcpy(buf->buf + 4, &cursor, sizeof(uint64_t));
-    SEXP call, out;
-
-    if (vec) {
-
-      PROTECT(call = Rf_lcons(CADR(hook), Rf_cons(TAG(hook), R_NilValue)));
-      PROTECT(out = R_UnwindProtect(eval_safe, call, rl_reset, hook, NULL));
-      if (TYPEOF(out) == RAWSXP) {
-        R_xlen_t xlen = XLENGTH(out);
-        if (buf->cur + xlen > buf->len) {
-          buf->len = buf->cur + xlen;
-          buf->buf = R_Realloc(buf->buf, buf->len, unsigned char);
-        }
-        memcpy(buf->buf + buf->cur, DATAPTR_RO(out), xlen);
-        buf->cur += xlen;
-      }
-      UNPROTECT(2);
-
-    } else {
-
-      SEXP refList = TAG(hook);
-      SEXP func = CADR(hook);
-      R_xlen_t llen = Rf_xlength(refList);
-      if (buf->cur + sizeof(R_xlen_t) > buf->len) {
-        buf->len = buf->cur + NANONEXT_INIT_BUFSIZE;
-        buf->buf = R_Realloc(buf->buf, buf->len, unsigned char);
-      }
-      memcpy(buf->buf + buf->cur, &llen, sizeof(R_xlen_t));
-      buf->cur += sizeof(R_xlen_t);
-
-      for (R_xlen_t i = 0; i < llen; i++) {
-        PROTECT(call = Rf_lcons(func, Rf_cons(NANO_VECTOR(refList)[i], R_NilValue)));
-        PROTECT(out = R_UnwindProtect(eval_safe, call, rl_reset, hook, NULL));
-        if (TYPEOF(out) == RAWSXP) {
-          R_xlen_t xlen = XLENGTH(out);
-          if (buf->cur + xlen + sizeof(R_xlen_t) > buf->len) {
-            buf->len = buf->cur + xlen + sizeof(R_xlen_t);
-            buf->buf = R_Realloc(buf->buf, buf->len, unsigned char);
-          }
-          memcpy(buf->buf + buf->cur, &xlen, sizeof(R_xlen_t));
-          buf->cur += sizeof(R_xlen_t);
-          memcpy(buf->buf + buf->cur, DATAPTR_RO(out), xlen);
-          buf->cur += xlen;
-        }
-        UNPROTECT(2);
-      }
-
-    }
-
-    SET_TAG(hook, R_NilValue);
-
-  }
 
 }
 
@@ -351,7 +336,7 @@ void nano_serialize(nano_buf *buf, const SEXP object, SEXP hook) {
     NULL,
     nano_write_bytes,
     reg ? nano_inHook : NULL,
-    reg ? hook : R_NilValue
+    hook
   );
 
   R_Serialize(object, &output_stream);
@@ -359,22 +344,22 @@ void nano_serialize(nano_buf *buf, const SEXP object, SEXP hook) {
   if (reg && TAG(hook) != R_NilValue) {
     const uint64_t cursor = (uint64_t) buf->cur;
     memcpy(buf->buf + 4, &cursor, sizeof(uint64_t));
-    SEXP call, out;
+    SEXP call;
 
     if (vec) {
 
       PROTECT(call = Rf_lcons(CADR(hook), Rf_cons(TAG(hook), R_NilValue)));
-      PROTECT(out = R_UnwindProtect(eval_safe, call, rl_reset, hook, NULL));
-      if (TYPEOF(out) == RAWSXP) {
-        R_xlen_t xlen = XLENGTH(out);
+      if (R_ToplevelExec(nano_eval_safe, call) &&
+          TYPEOF(nano_eval_res) == RAWSXP) {
+        R_xlen_t xlen = XLENGTH(nano_eval_res);
         if (buf->cur + xlen > buf->len) {
           buf->len = buf->cur + xlen;
           buf->buf = R_Realloc(buf->buf, buf->len, unsigned char);
         }
-        memcpy(buf->buf + buf->cur, DATAPTR_RO(out), xlen);
+        memcpy(buf->buf + buf->cur, DATAPTR_RO(nano_eval_res), xlen);
         buf->cur += xlen;
       }
-      UNPROTECT(2);
+      UNPROTECT(1);
 
     } else {
 
@@ -390,19 +375,19 @@ void nano_serialize(nano_buf *buf, const SEXP object, SEXP hook) {
 
       for (R_xlen_t i = 0; i < llen; i++) {
         PROTECT(call = Rf_lcons(func, Rf_cons(NANO_VECTOR(refList)[i], R_NilValue)));
-        PROTECT(out = R_UnwindProtect(eval_safe, call, rl_reset, hook, NULL));
-        if (TYPEOF(out) == RAWSXP) {
-          R_xlen_t xlen = XLENGTH(out);
+        if (R_ToplevelExec(nano_eval_safe, call) &&
+            TYPEOF(nano_eval_res) == RAWSXP) {
+          R_xlen_t xlen = XLENGTH(nano_eval_res);
           if (buf->cur + xlen + sizeof(R_xlen_t) > buf->len) {
             buf->len = buf->cur + xlen + sizeof(R_xlen_t);
             buf->buf = R_Realloc(buf->buf, buf->len, unsigned char);
           }
           memcpy(buf->buf + buf->cur, &xlen, sizeof(R_xlen_t));
           buf->cur += sizeof(R_xlen_t);
-          memcpy(buf->buf + buf->cur, DATAPTR_RO(out), xlen);
+          memcpy(buf->buf + buf->cur, DATAPTR_RO(nano_eval_res), xlen);
           buf->cur += xlen;
         }
-        UNPROTECT(2);
+        UNPROTECT(1);
       }
 
     }
@@ -464,7 +449,7 @@ SEXP nano_unserialize(unsigned char *buf, const size_t sz, SEXP hook) {
     }
   }
 
-  REprintf("received data could not be unserialized\n");
+  Rf_warningcall_immediate(R_NilValue, "received data could not be unserialized");
   return nano_decode(buf, sz, 8, R_NilValue);
 
   resume: ;
@@ -496,7 +481,7 @@ SEXP nano_unserialize(unsigned char *buf, const size_t sz, SEXP hook) {
 
 }
 
-SEXP nano_decode(unsigned char *buf, const size_t sz, const int mod, SEXP hook) {
+SEXP nano_decode(unsigned char *buf, const size_t sz, const uint8_t mod, SEXP hook) {
 
   SEXP data;
   size_t size;
@@ -519,7 +504,7 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const int mod, SEXP hook) 
   case 3:
     size = 2 * sizeof(double);
     if (sz % size) {
-      REprintf("received data could not be converted to complex\n");
+      Rf_warningcall_immediate(R_NilValue, "received data could not be converted to complex");
       data = Rf_allocVector(RAWSXP, sz);
     } else {
       data = Rf_allocVector(CPLXSXP, sz / size);
@@ -528,7 +513,7 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const int mod, SEXP hook) 
   case 4:
     size = sizeof(double);
     if (sz % size) {
-      REprintf("received data could not be converted to double\n");
+      Rf_warningcall_immediate(R_NilValue, "received data could not be converted to double");
       data = Rf_allocVector(RAWSXP, sz);
     } else {
       data = Rf_allocVector(REALSXP, sz / size);
@@ -537,7 +522,7 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const int mod, SEXP hook) 
   case 5:
     size = sizeof(int);
     if (sz % size) {
-      REprintf("received data could not be converted to integer\n");
+      Rf_warningcall_immediate(R_NilValue, "received data could not be converted to integer");
       data = Rf_allocVector(RAWSXP, sz);
     } else {
       data = Rf_allocVector(INTSXP, sz / size);
@@ -546,7 +531,7 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const int mod, SEXP hook) 
   case 6:
     size = sizeof(int);
     if (sz % size) {
-      REprintf("received data could not be converted to logical\n");
+      Rf_warningcall_immediate(R_NilValue, "received data could not be converted to logical");
       data = Rf_allocVector(RAWSXP, sz);
     } else {
       data = Rf_allocVector(LGLSXP, sz / size);
@@ -555,7 +540,7 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const int mod, SEXP hook) 
   case 7:
     size = sizeof(double);
     if (sz % size) {
-      REprintf("received data could not be converted to numeric\n");
+      Rf_warningcall_immediate(R_NilValue, "received data could not be converted to numeric");
       data = Rf_allocVector(RAWSXP, sz);
     } else {
       data = Rf_allocVector(REALSXP, sz / size);
@@ -631,11 +616,11 @@ int nano_encodes(const SEXP mode) {
     case 1:
     case 2:
     case 3:
-      if (!strncmp(mod, "raw", slen)) return 2;
+      if (!memcmp(mod, "raw", slen)) return 2;
     case 4:
     case 5:
     case 6:
-      if (!strncmp(mod, "serial", slen)) return 1;
+      if (!memcmp(mod, "serial", slen)) return 1;
     default:
       Rf_error("'mode' should be either serial or raw");
     }
@@ -652,25 +637,25 @@ int nano_matcharg(const SEXP mode) {
     size_t slen = strlen(mod);
     switch (slen) {
     case 1:
-      if (!strncmp(mod, "c", slen) || !strncmp(mod, "s", slen))
+      if (!memcmp(mod, "c", slen) || !memcmp(mod, "s", slen))
         Rf_error("'mode' should be one of serial, character, complex, double, integer, logical, numeric, raw, string");
     case 2:
     case 3:
-      if (!strncmp(mod, "raw", slen)) return 8;
+      if (!memcmp(mod, "raw", slen)) return 8;
     case 4:
     case 5:
     case 6:
-      if (!strncmp(mod, "double", slen)) return 4;
-      if (!strncmp(mod, "serial", slen)) return 1;
-      if (!strncmp(mod, "string", slen)) return 9;
+      if (!memcmp(mod, "double", slen)) return 4;
+      if (!memcmp(mod, "serial", slen)) return 1;
+      if (!memcmp(mod, "string", slen)) return 9;
     case 7:
-      if (!strncmp(mod, "integer", slen)) return 5;
-      if (!strncmp(mod, "numeric", slen)) return 7;
-      if (!strncmp(mod, "logical", slen)) return 6;
-      if (!strncmp(mod, "complex", slen)) return 3;
+      if (!memcmp(mod, "integer", slen)) return 5;
+      if (!memcmp(mod, "numeric", slen)) return 7;
+      if (!memcmp(mod, "logical", slen)) return 6;
+      if (!memcmp(mod, "complex", slen)) return 3;
     case 8:
     case 9:
-      if (!strncmp(mod, "character", slen)) return 2;
+      if (!memcmp(mod, "character", slen)) return 2;
     default:
       Rf_error("'mode' should be one of serial, character, complex, double, integer, logical, numeric, raw, string");
     }
@@ -687,24 +672,24 @@ int nano_matchargs(const SEXP mode) {
     size_t slen = strlen(mod);
     switch (slen) {
     case 1:
-      if (!strncmp(mod, "c", slen))
-        Rf_error("'mode' should be one of serial, character, complex, double, integer, logical, numeric, raw, string");
+      if (!memcmp(mod, "c", slen))
+        Rf_error("'mode' should be one of character, complex, double, integer, logical, numeric, raw, string");
     case 2:
     case 3:
-      if (!strncmp(mod, "raw", slen)) return 8;
+      if (!memcmp(mod, "raw", slen)) return 8;
     case 4:
     case 5:
     case 6:
-      if (!strncmp(mod, "double", slen)) return 4;
-      if (!strncmp(mod, "string", slen)) return 9;
+      if (!memcmp(mod, "double", slen)) return 4;
+      if (!memcmp(mod, "string", slen)) return 9;
     case 7:
-      if (!strncmp(mod, "integer", slen)) return 5;
-      if (!strncmp(mod, "numeric", slen)) return 7;
-      if (!strncmp(mod, "logical", slen)) return 6;
-      if (!strncmp(mod, "complex", slen)) return 3;
+      if (!memcmp(mod, "integer", slen)) return 5;
+      if (!memcmp(mod, "numeric", slen)) return 7;
+      if (!memcmp(mod, "logical", slen)) return 6;
+      if (!memcmp(mod, "complex", slen)) return 3;
     case 8:
     case 9:
-      if (!strncmp(mod, "character", slen)) return 2;
+      if (!memcmp(mod, "character", slen)) return 2;
     default:
       Rf_error("'mode' should be one of character, complex, double, integer, logical, numeric, raw, string");
     }
@@ -714,20 +699,8 @@ int nano_matchargs(const SEXP mode) {
 
 }
 
-SEXP nano_PreserveObject(SEXP x) {
+SEXP rnng_eval_safe(SEXP arg) {
 
-  SEXP node = Rf_cons(nano_precious, CDR(nano_precious));
-  SETCDR(nano_precious, node);
-  SETCAR(CDR(nano_precious), node);
-  SET_TAG(node, x);
-
-  return node;
-
-}
-
-void nano_ReleaseObject(SEXP node) {
-
-  SETCDR(CAR(node), CDR(node));
-  SETCAR(CDR(node), CAR(node));
+  return R_ToplevelExec(nano_eval_safe, arg) ? nano_eval_res : Rf_allocVector(RAWSXP, 1);
 
 }

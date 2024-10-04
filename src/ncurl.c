@@ -38,12 +38,12 @@ static SEXP mk_error_ncurl(const int xc) {
 
   const char *names[] = {"status", "headers", "data", ""};
   SEXP out = PROTECT(Rf_mkNamed(VECSXP, names));
-  SEXP err = Rf_ScalarInteger(xc);
+  SEXP err = PROTECT(Rf_ScalarInteger(xc));
   Rf_classgets(err, nano_error);
   SET_VECTOR_ELT(out, 0, err);
   SET_VECTOR_ELT(out, 1, err);
   SET_VECTOR_ELT(out, 2, err);
-  UNPROTECT(1);
+  UNPROTECT(2);
   return out;
 
 }
@@ -51,7 +51,7 @@ static SEXP mk_error_ncurl(const int xc) {
 static SEXP mk_error_ncurlaio(const int xc) {
 
   SEXP env, err;
-  PROTECT(env = Rf_allocSExp(ENVSXP));
+  PROTECT(env = R_NewEnv(R_NilValue, 0, 0));
   NANO_CLASS2(env, "ncurlAio", "recvAio");
   PROTECT(err = Rf_ScalarInteger(xc));
   Rf_classgets(err, nano_error);
@@ -80,14 +80,14 @@ static nano_buf nano_char_buf(const SEXP data) {
 
 static void haio_invoke_cb(void *arg) {
 
-  SEXP call, context, status, ctx = TAG((SEXP) arg);
-  context = Rf_findVarInFrame(ctx, nano_ContextSymbol);
-  if (context == R_UnboundValue) return;
-  PROTECT(context);
-  status = rnng_aio_http_status(context);
+  SEXP call, status, node = (SEXP) arg, x = TAG(node);
+  status = rnng_aio_http_status(x);
   PROTECT(call = Rf_lcons(nano_ResolveSymbol, Rf_cons(status, R_NilValue)));
-  Rf_eval(call, ctx);
-  UNPROTECT(2);
+  Rf_eval(call, NANO_ENCLOS(x));
+  UNPROTECT(1);
+  // unreliable to release linked list node from later cb, just free the payload
+  SET_TAG(node, R_NilValue);
+
 }
 
 static void haio_complete(void *arg) {
@@ -96,8 +96,8 @@ static void haio_complete(void *arg) {
   const int res = nng_aio_result(haio->aio);
   haio->result = res - !res;
 
-  if (haio->data != NULL)
-    later2(haio_invoke_cb, haio->data);
+  if (haio->cb != NULL)
+    later2(haio_invoke_cb, haio->cb);
 
 }
 
@@ -117,8 +117,6 @@ static void haio_finalizer(SEXP xptr) {
   nano_aio *xp = (nano_aio *) NANO_PTR(xptr);
   nano_handle *handle = (nano_handle *) xp->next;
   nng_aio_free(xp->aio);
-  if (xp->data != NULL)
-    nano_ReleaseObject((SEXP) xp->data);
   if (handle->cfg != NULL)
     nng_tls_config_free(handle->cfg);
   nng_http_res_free(handle->res);
@@ -126,6 +124,9 @@ static void haio_finalizer(SEXP xptr) {
   nng_http_client_free(handle->cli);
   nng_url_free(handle->url);
   R_Free(handle);
+  // release linked list node if cb has already run
+  if (xp->cb != NULL && TAG((SEXP) xp->cb) == R_NilValue)
+    nano_ReleaseObject((SEXP) xp->cb);
   R_Free(xp);
 
 }
@@ -339,13 +340,13 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
     Rf_error("'tls' is not a valid TLS Configuration");
   nano_aio *haio = R_Calloc(1, nano_aio);
   nano_handle *handle = R_Calloc(1, nano_handle);
+  SEXP aio, env, fun;
   int xc;
-  SEXP aio;
 
   haio->type = HTTP_AIO;
-  haio->mode = NANO_INTEGER(convert);
+  haio->mode = (uint8_t) NANO_INTEGER(convert);
   haio->next = handle;
-  haio->data = NULL;
+  haio->cb = NULL;
   handle->cfg = NULL;
 
   if ((xc = nng_url_parse(&handle->url, httr)))
@@ -409,8 +410,7 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
   PROTECT(aio = R_MakeExternalPtr(haio, nano_AioSymbol, R_NilValue));
   R_RegisterCFinalizerEx(aio, haio_finalizer, TRUE);
 
-  SEXP env, fun;
-  PROTECT(env = Rf_allocSExp(ENVSXP));
+  PROTECT(env = R_NewEnv(R_NilValue, 0, 0));
   NANO_CLASS2(env, "ncurlAio", "recvAio");
   Rf_defineVar(nano_AioSymbol, aio, env);
   Rf_defineVar(nano_ResponseSymbol, response, env);
@@ -452,14 +452,14 @@ static SEXP rnng_aio_http_impl(SEXP env, const int typ) {
 
   SEXP exist;
   switch (typ) {
-  case 0: exist = Rf_findVarInFrame(env, nano_ResultSymbol); break;
-  case 1: exist = Rf_findVarInFrame(env, nano_ProtocolSymbol); break;
-  default: exist = Rf_findVarInFrame(env, nano_ValueSymbol); break;
+  case 0: exist = nano_findVarInFrame(env, nano_ResultSymbol); break;
+  case 1: exist = nano_findVarInFrame(env, nano_ProtocolSymbol); break;
+  default: exist = nano_findVarInFrame(env, nano_ValueSymbol); break;
   }
   if (exist != R_UnboundValue)
     return exist;
 
-  const SEXP aio = Rf_findVarInFrame(env, nano_AioSymbol);
+  const SEXP aio = nano_findVarInFrame(env, nano_AioSymbol);
 
   nano_aio *haio = (nano_aio *) NANO_PTR(aio);
 
@@ -474,7 +474,7 @@ static SEXP rnng_aio_http_impl(SEXP env, const int typ) {
   SEXP out, vec, rvec, response;
   nano_handle *handle = (nano_handle *) haio->next;
 
-  PROTECT(response = Rf_findVarInFrame(env, nano_ResponseSymbol));
+  PROTECT(response = nano_findVarInFrame(env, nano_ResponseSymbol));
   int chk_resp = response != R_NilValue && TYPEOF(response) == STRSXP;
   const uint16_t code = nng_http_res_get_status(handle->res), relo = code >= 300 && code < 400;
   Rf_defineVar(nano_ResultSymbol, Rf_ScalarInteger(code), env);
@@ -520,9 +520,9 @@ static SEXP rnng_aio_http_impl(SEXP env, const int typ) {
   Rf_defineVar(nano_AioSymbol, R_NilValue, env);
 
   switch (typ) {
-  case 0: out = Rf_findVarInFrame(env, nano_ResultSymbol); break;
-  case 1: out = Rf_findVarInFrame(env, nano_ProtocolSymbol); break;
-  default: out = Rf_findVarInFrame(env, nano_ValueSymbol); break;
+  case 0: out = nano_findVarInFrame(env, nano_ResultSymbol); break;
+  case 1: out = nano_findVarInFrame(env, nano_ProtocolSymbol); break;
+  default: out = nano_findVarInFrame(env, nano_ValueSymbol); break;
   }
   return out;
 
@@ -557,7 +557,7 @@ SEXP rnng_ncurl_session(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP
   SEXP sess;
 
   haio->type = HTTP_AIO;
-  haio->mode = NANO_INTEGER(convert);
+  haio->mode = (uint8_t) NANO_INTEGER(convert);
   haio->next = handle;
   haio->data = NULL;
   handle->cfg = NULL;
@@ -726,84 +726,5 @@ SEXP rnng_ncurl_session_close(SEXP session) {
   Rf_setAttrib(session, nano_StateSymbol, R_MissingArg);
 
   return nano_success;
-
-}
-
-// HTTP utils ------------------------------------------------------------------
-
-SEXP rnng_status_code(SEXP x) {
-
-  const int status = nano_integer(x);
-  char *code;
-  switch (status) {
-  case 100: code = "Continue"; break;
-  case 101: code = "Switching Protocols"; break;
-  case 102: code = "Processing"; break;
-  case 103: code = "Early Hints"; break;
-  case 200: code = "OK"; break;
-  case 201: code = "Created"; break;
-  case 202: code = "Accepted"; break;
-  case 203: code = "Non-Authoritative Information"; break;
-  case 204: code = "No Content"; break;
-  case 205: code = "Reset Content"; break;
-  case 206: code = "Partial Content"; break;
-  case 207: code = "Multi-Status"; break;
-  case 208: code = "Already Reported"; break;
-  case 226: code = "IM Used"; break;
-  case 300: code = "Multiple Choices"; break;
-  case 301: code = "Moved Permanently"; break;
-  case 302: code = "Found"; break;
-  case 303: code = "See Other"; break;
-  case 304: code = "Not Modified"; break;
-  case 305: code = "Use Proxy"; break;
-  case 306: code = "Switch Proxy"; break;
-  case 307: code = "Temporary Redirect"; break;
-  case 308: code = "Permanent Redirect"; break;
-  case 400: code = "Bad Request"; break;
-  case 401: code = "Unauthorized"; break;
-  case 402: code = "Payment Required"; break;
-  case 403: code = "Forbidden"; break;
-  case 404: code = "Not Found"; break;
-  case 405: code = "Method Not Allowed"; break;
-  case 406: code = "Not Acceptable"; break;
-  case 407: code = "Proxy Authentication Required"; break;
-  case 408: code = "Request Timeout"; break;
-  case 409: code = "Conflict"; break;
-  case 410: code = "Gone"; break;
-  case 411: code = "Length Required"; break;
-  case 412: code = "Precondition Failed"; break;
-  case 413: code = "Payload Too Large"; break;
-  case 414: code = "URI Too Long"; break;
-  case 415: code = "Unsupported Media Type"; break;
-  case 416: code = "Range Not Satisfiable"; break;
-  case 417: code = "Expectation Failed"; break;
-  case 418: code = "I'm a teapot"; break;
-  case 421: code = "Misdirected Request"; break;
-  case 422: code = "Unprocessable Entity"; break;
-  case 423: code = "Locked"; break;
-  case 424: code = "Failed Dependency"; break;
-  case 425: code = "Too Early"; break;
-  case 426: code = "Upgrade Required"; break;
-  case 428: code = "Precondition Required"; break;
-  case 429: code = "Too Many Requests"; break;
-  case 431: code = "Request Header Fields Too Large"; break;
-  case 451: code = "Unavailable For Legal Reasons"; break;
-  case 500: code = "Internal Server Error"; break;
-  case 501: code = "Not Implemented"; break;
-  case 502: code = "Bad Gateway"; break;
-  case 503: code = "Service Unavailable"; break;
-  case 504: code = "Gateway Timeout"; break;
-  case 505: code = "HTTP Version Not Supported"; break;
-  case 506: code = "Variant Also Negotiates"; break;
-  case 507: code = "Insufficient Storage"; break;
-  case 508: code = "Loop Detected"; break;
-  case 510: code = "Not Extended"; break;
-  case 511: code = "Network Authentication Required"; break;
-  default: code = "Non-standard Response"; break;
-  }
-  char out[strlen(code) + 7];
-  snprintf(out, sizeof(out), "%d | %s", status, code);
-
-  return Rf_mkString(out);
 
 }

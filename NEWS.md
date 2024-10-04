@@ -1,3 +1,19 @@
+# nanonext 1.3.0
+
+#### New Features
+
+* Adds support for threaded dispatcher in `mirai`.
+* Adds 'recvAio' method for `promises::as.promise()` and `promises::is.promising()` to enable 'recvAio' promises.
+
+#### Updates
+
+* `serial_config()` now validates all arguments and returns them as a list. Full validation is also performed when the option is set for additional safety.
+* Warning messages for unserialization or conversion failures of received data are now suppressable.
+* Upgrades `reply()` to always return even when there is an evaluation error. This allows it to be used safely in a loop without exiting early, for example.
+* Removes deprecated and defunct `next_config()`.
+* Internal performance enhancements.
+* Updates bundled 'libnng' v1.8.0 with latest patches.
+
 # nanonext 1.2.1
 
 #### Updates

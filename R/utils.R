@@ -179,12 +179,8 @@ parse_url <- function(url) .Call(rnng_url_parse, url)
 #'     Is the object an ncurlSession (object of class \sQuote{ncurlSession}).
 #'
 #' @examples
-#' sock <- socket(listen = "inproc://isaio")
-#' r <- recv_aio(sock)
-#' s <- send_aio(sock, "test")
-#' is_aio(r)
-#' is_aio(s)
-#' close(sock)
+#' nc <- call_aio(ncurl_aio("https://postman-echo.com/get", timeout = 1000L))
+#' is_aio(nc)
 #'
 #' @export
 #'
@@ -204,7 +200,7 @@ is_aio <- function(x) inherits(x, c("recvAio", "sendAio"))
 is_nano <- function(x) inherits(x, c("nano", "nanoObject"))
 
 #' @examples
-#' s <- ncurl_session("https://www.r-project.org/")
+#' s <- ncurl_session("https://postman-echo.com/get")
 #' is_ncurl_session(s)
 #' if (is_ncurl_session(s)) close(s)
 #'
@@ -258,8 +254,8 @@ is_nul_byte <- function(x) .Call(rnng_is_nul_byte, x)
 #'
 #' Provides an explanation for HTTP response status codes (in the range 100 to
 #'     599). If the status code is not defined as per RFC 9110,
-#'     \sQuote{Non-standard Response} is returned, which may be a custom code
-#'     used by the server.
+#'     \sQuote{Unknown HTTP Status} is returned - this may be a custom code used
+#'     by the server.
 #'
 #' @param x numeric HTTP status code to translate.
 #'
@@ -273,24 +269,6 @@ is_nul_byte <- function(x) .Call(rnng_is_nul_byte, x)
 #' @export
 #'
 status_code <- function(x) .Call(rnng_status_code, x)
-
-#' Configure Custom Serialization
-#'
-#' This function is defunct. Please refer to \link{serial_config} instead.
-#'
-#' @param refhook not used.
-#' @param class [default ""] not used.
-#' @param vec [default FALSE] not used.
-#' @param mark [default FALSE] (for advanced use only) logical value, whether to
-#'     mark serialized data with a special bit.
-#'
-#' @return NULL.
-#'
-#' @keywords internal
-#' @export
-#'
-next_config <- function(refhook = list(), class = "", vec = FALSE, mark = FALSE)
-  .Call(rnng_next_config, refhook, class, vec, mark)
 
 #' Create Serialization Configuration
 #'
