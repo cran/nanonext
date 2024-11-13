@@ -8,12 +8,13 @@ zzz()
 }
 \description{
 Only present for cleaning up after running examples and tests. Do not attempt
-    to run the examples.
+to run the examples.
 }
 \examples{
 if (Sys.info()[["sysname"]] == "Linux") {
   rm(list = ls())
   gc()
+  .Call(nanonext:::rnng_thread_shutdown)
   Sys.sleep(1L)
   .Call(nanonext:::rnng_fini)
 }

@@ -2,12 +2,9 @@
 % Please edit documentation in R/aio.R
 \name{.keep}
 \alias{.keep}
-\alias{set_promise_context}
 \title{Keep Promise}
 \usage{
 .keep(x, ctx)
-
-set_promise_context(x, ctx)
 }
 \arguments{
 \item{x}{a \sQuote{recvAio} or \sQuote{ncurlAio} object.}
@@ -21,7 +18,7 @@ NULL.
 Internal package function.
 }
 \details{
-If successful, both \sQuote{x} and \sQuote{ctx} are preserved and
-    accessible from the promise callback.
+If successful, both \sQuote{x} and \sQuote{ctx} are preserved and accessible
+from the promise callback.
 }
 \keyword{internal}

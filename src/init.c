@@ -18,9 +18,15 @@
 
 #include "nanonext.h"
 
-void (*eln2)(void (*)(void *), void *, double, int);
+void (*eln2)(void (*)(void *), void *, double, int) = NULL;
 
 uint8_t special_bit = 0;
+
+nng_mtx *nano_wait_mtx;
+nng_cv *nano_wait_cv;
+nng_thread *nano_wait_thr = NULL;
+nng_aio *nano_shared_aio = NULL;
+int nano_wait_condition = 0;
 
 SEXP nano_AioSymbol;
 SEXP nano_ContextSymbol;
@@ -89,7 +95,7 @@ static void PreserveObjects(void) {
   R_PreserveObject(nano_error = Rf_allocVector(STRSXP, 2));
   SET_STRING_ELT(nano_error, 0, Rf_mkChar("errorValue"));
   SET_STRING_ELT(nano_error, 1, Rf_mkChar("try-error"));
-  R_PreserveObject(nano_precious = Rf_cons(R_NilValue, Rf_cons(R_NilValue, R_NilValue)));
+  R_PreserveObject(nano_precious = Rf_cons(R_NilValue, R_NilValue));
   R_PreserveObject(nano_recvAio = Rf_mkString("recvAio"));
   R_PreserveObject(nano_reqAio = Rf_allocVector(STRSXP, 2));
   SET_STRING_ELT(nano_reqAio, 0, Rf_mkChar("mirai"));
@@ -184,7 +190,9 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_stream_listen", (DL_FUNC) &rnng_stream_listen, 3},
   {"rnng_strerror", (DL_FUNC) &rnng_strerror, 1},
   {"rnng_subscribe", (DL_FUNC) &rnng_subscribe, 3},
+  {"rnng_thread_shutdown", (DL_FUNC) &rnng_thread_shutdown, 0},
   {"rnng_tls_config", (DL_FUNC) &rnng_tls_config, 4},
+  {"rnng_traverse_precious", (DL_FUNC) &rnng_traverse_precious, 0},
   {"rnng_unresolved", (DL_FUNC) &rnng_unresolved, 1},
   {"rnng_unresolved2", (DL_FUNC) &rnng_unresolved2, 1},
   {"rnng_url_parse", (DL_FUNC) &rnng_url_parse, 1},
@@ -202,7 +210,6 @@ static const R_ExternalMethodDef externalMethods[] = {
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
-  eln2 = NULL;
   R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
@@ -210,6 +217,7 @@ void attribute_visible R_init_nanonext(DllInfo* dll) {
 
 // # nocov start
 void attribute_visible R_unload_nanonext(DllInfo *info) {
+  rnng_thread_shutdown();
   ReleaseObjects();
 }
 // # nocov end

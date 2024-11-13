@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.2">
+<meta name="generator" content="litedown 0.4">
 <title>nanonext - NNG Lightweight Messaging Library</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.13.34/css/prism-xcode.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.13.44/css/prism-xcode.min.css">
 <style type="text/css">
 body {
   font-family: sans-serif;
@@ -46,6 +46,10 @@ table {
   th, td { padding: 5px; }
   thead, tfoot, tr:nth-child(even) { background: #eee; }
 }
+.table-full {
+  width: 100%;
+  td { vertical-align: baseline; }
+}
 blockquote {
   color: #666;
   margin: 0;
@@ -67,6 +71,7 @@ table, .body h2 { border-bottom: 1px solid #666; }
 .cross-ref-sec::before { content: "Section "; }
 .cross-ref-fig::before, .ref-number-fig::before { content: "Figure "; }
 .cross-ref-tab::before, .ref-number-tab::before { content: "Table "; }
+.cross-ref-eqn::before, .MathJax_ref:has(mjx-mtext > mjx-c + mjx-c)::before { content: "Equation "; }
 .abstract, #refs {
   &::before { display: block; margin: 1em auto; font-weight: bold; }
 }
@@ -100,7 +105,7 @@ section.footnotes {
 <div class="title"><h1>nanonext - NNG Lightweight Messaging Library</h1></div>
 </div>
 <div class="body">
-<h3 id="sec-table-of-contents">Table of Contents</h3>
+<h3 id="sec:table-of-contents">Table of Contents</h3>
 <ol>
 <li><a href="#cross-language-exchange">Cross-language Exchange</a></li>
 <li><a href="#async-and-concurrency">Async and Concurrency</a></li>
@@ -113,7 +118,7 @@ section.footnotes {
 <li><a href="#stream-websocket-client">stream: Websocket Client</a></li>
 <li><a href="#options-serialization-and-statistics">Options, Serialization and Statistics</a></li>
 </ol>
-<h3 id="sec-cross-language-exchange">Cross-language Exchange</h3>
+<h3 id="sec:cross-language-exchange">Cross-language Exchange</h3>
 <p><code>nanonext</code> provides a fast and reliable data interface between different programming languages where NNG has an implementation, including C, C++, Java, Python, Go, Rust etc.</p>
 <p>The following example demonstrates the exchange of numerical data between R and Python (NumPy), two of the most commonly-used languages for data science and machine learning.</p>
 <p>Using a messaging interface provides a clean and robust approach, light on resources with limited and identifiable points of failure.</p>
@@ -148,7 +153,7 @@ socket.close()
 n$close()
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-async-and-concurrency">Async and Concurrency</h3>
+<h3 id="sec:async-and-concurrency">Async and Concurrency</h3>
 <p><code>nanonext</code> implements true async send and receive, leveraging NNG as a massively-scaleable concurrency framework.</p>
 <pre><code class="language-r">s1 &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nano&quot;)
 s2 &lt;- socket(&quot;pair&quot;, dial = &quot;inproc://nano&quot;)
@@ -211,7 +216,7 @@ close(s1)
 close(s2)
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-rpc-and-distributed-computing">RPC and Distributed Computing</h3>
+<h3 id="sec:rpc-and-distributed-computing">RPC and Distributed Computing</h3>
 <p><code>nanonext</code> implements remote procedure calls (RPC) using NNG’s req/rep protocol to provide a basis for distributed computing.</p>
 <p>Can be used to perform computationally-expensive calculations or I/O-bound operations such as writing large amounts of data to disk in a separate ‘server’ process running concurrently.</p>
 <p>[S] Server process: <code>reply()</code> will wait for a message and apply a function, in this case <code>rnorm()</code>, before sending back the result. This is started in a background ‘mirai’ process.</p>
@@ -240,7 +245,7 @@ aio &lt;- request(context(req), data = 1e8, recv_mode = &quot;double&quot;)
 <p>In such a case, calling or querying the value confirms that the operation has completed, and provides the return value of the function, which may typically be NULL or an exit code.</p>
 <p>The <a href="https://doi.org/10.5281/zenodo.7912722"><code>mirai</code></a> package (<a href="https://shikokuchuo.net/mirai/">https://shikokuchuo.net/mirai/</a>) uses <code>nanonext</code> as the back-end to provide asynchronous execution of arbitrary R code using the RPC model.</p>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-synchronisation-primitives">Synchronisation Primitives</h3>
+<h3 id="sec:synchronisation-primitives">Synchronisation Primitives</h3>
 <p><code>nanonext</code> implements cross-platform synchronisation primitives provided by the NNG library.</p>
 <p>As the R interpreter runs on a single thread, synchronisation primitives such as mutexes and condition variables are not natively implemented in the R language. However, as NNG is inherently threaded and messaging can be asynchronous, it is possible to synchronise between NNG events and the main R execution thread.</p>
 <p>The events that can be signalled include asynchronous receive completions, and pipe events - when connections are established or dropped.</p>
@@ -306,7 +311,7 @@ close(sock2)
 <p>As can be seen, this type of mechanism presents a powerful way of waiting simulatenously on multiple events, and also distinguishing between them. <code>pipe_notify()</code> can also be set to signal two condition variables upon each event, providing even more flexibility in creating complex concurrent applications.</p>
 <p>For further details, please refer to the function documentation for <code>cv()</code>.</p>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-tls-secure-connections">TLS Secure Connections</h3>
+<h3 id="sec:tls-secure-connections">TLS Secure Connections</h3>
 <p>Secure connections are enabled through the combination of NNG and Mbed TLS libraries.</p>
 <p>Authentication of endpoints and encryption of the TCP transport layer is achieved transparently by:</p>
 <p>i) Specifying a secure <code>tls+tcp://</code> or <code>wss://</code> URL, and
@@ -337,7 +342,7 @@ close(s1)
 close(s)
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-publisher-subscriber-model">Publisher Subscriber Model</h3>
+<h3 id="sec:publisher-subscriber-model">Publisher Subscriber Model</h3>
 <p><code>nanonext</code> fully implements NNG’s pub/sub protocol as per the below example. A subscriber can subscribe to one or multiple topics broadcast by a publisher.</p>
 <pre><code class="language-r">pub &lt;- socket(&quot;pub&quot;, listen = &quot;inproc://nanobroadcast&quot;)
 sub &lt;- socket(&quot;sub&quot;, dial = &quot;inproc://nanobroadcast&quot;)
@@ -393,7 +398,7 @@ close(pub)
 close(sub)
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-surveyor-respondent-model">Surveyor Respondent Model</h3>
+<h3 id="sec:surveyor-respondent-model">Surveyor Respondent Model</h3>
 <p>This type of pattern is useful for applications such as service discovery.</p>
 <p>A surveyor sends a survey, which is broadcast to all peer respondents. Respondents are then able to reply, but are not obliged to. The survey itself is a timed event, and responses received after the timeout are discarded.</p>
 <pre><code class="language-r">sur &lt;- socket(&quot;surveyor&quot;, listen = &quot;inproc://nanoservice&quot;)
@@ -436,7 +441,7 @@ close(res2)
 <p>Above, <code>msleep()</code> is an uninterruptible sleep function (utilising the NNG library), taking a time in milliseconds.</p>
 <p>It can be seen that the final value resolves into a timeout, which is an integer 5 classed as ‘errorValue’. All integer error codes are classed as ‘errorValue’ to be easily distinguishable from integer message values.</p>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-ncurl-async-http-client">ncurl: Async HTTP Client</h3>
+<h3 id="sec:ncurl-async-http-client">ncurl: Async HTTP Client</h3>
 <p><code>ncurl()</code> is a minimalist http(s) client.</p>
 <p><code>ncurl_aio()</code> is the async edition, performing requests asynchronously, returning immediately with an ‘ncurlAio’.</p>
 <p>For normal use, it takes just the URL. It can follow redirects.</p>
@@ -467,7 +472,7 @@ res$data
 #&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1724104784.075\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-66c3c04f-137ac65c00ca142929b0088a\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
 </code></pre>
 <p>In this respect, it may be used as a performant and lightweight method for making REST API requests.</p>
-<h5 id="sec-ncurl-promises">ncurl Promises</h5>
+<h5 id="sec:ncurl-promises">ncurl Promises</h5>
 <p><code>ncurl_aio()</code> may also be used anywhere that accepts a ‘promise’ from the promises package, including with Shiny ExtendedTask.</p>
 <p>If a status code of 200 (OK) is returned then the promise is resolved with the reponse body, otherwise it is rejected with a translation of the status code or ‘errorValue’ as the case may be.</p>
 <pre><code class="language-r">library(promises)
@@ -476,7 +481,7 @@ p &lt;- ncurl_aio(&quot;https://postman-echo.com/get&quot;) %...&gt;% cat
 is.promise(p)
 #&gt; [1] TRUE
 </code></pre>
-<h5 id="sec-ncurl-session">ncurl Session</h5>
+<h5 id="sec:ncurl-session">ncurl Session</h5>
 <p><code>ncurl_session()</code> creates a re-usable open connection and presents a much faster and more efficient solution for repeated polling of an API endpoint. <code>transact()</code> is then used to request data multiple times as required. This method allows a polling frequency that exceeds a server’s new connection limits, where this is permitted.</p>
 <p>By specifying <code>convert = FALSE</code>, the received binary data is made available as a raw vector. This may be fed into ‘json’ parsers which can operate directly on such data etc.</p>
 <pre><code class="language-r">sess &lt;- ncurl_session(&quot;https://postman-echo.com/get&quot;,
@@ -512,7 +517,7 @@ transact(sess)
 #&gt; [381] 6d 2f 67 65 74 22 0a 7d
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-stream-websocket-client">stream: Websocket Client</h3>
+<h3 id="sec:stream-websocket-client">stream: Websocket Client</h3>
 <p><code>stream()</code> exposes NNG’s low-level byte stream interface for communicating with raw sockets. This may be used for connecting to arbitrary non-NNG endpoints.</p>
 <p>The stream interface can be used to communicate with (secure) websocket servers. The argument <code>textframes = TRUE</code> can be specified where the websocket server uses text rather than binary frames.</p>
 <pre><code class="language-r"># connecting to an echo service
@@ -550,7 +555,7 @@ r$data
 close(s)
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec-options-serialization-and-statistics">Options, Serialization and Statistics</h3>
+<h3 id="sec:options-serialization-and-statistics">Options, Serialization and Statistics</h3>
 <p>Use <code>opt()</code> and <code>'opt&lt;-'()</code> to get and set options on a Socket, Context, Stream, Listener or Dialer.</p>
 <p>See the function documentation page for a list of common options.</p>
 <p>Once a dialer or listener has started, it is not generally possible to change its configuration. In this case, the dialer or listener should be created specifying ‘autostart = FALSE’.</p>
