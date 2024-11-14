@@ -1,3 +1,7 @@
+# nanonext 1.3.2
+
+* Hotfix for CRAN (updates to tests only).
+
 # nanonext 1.3.1
 
 #### Updates

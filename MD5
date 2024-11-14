@@ -1,7 +1,7 @@
-094496bcc40649f2203e6ace38da5d6b *DESCRIPTION
+e836867ee0f96167f0ce6bf6578bb10e *DESCRIPTION
 bcd556d9c8639da1bf79175a0bb9c3a2 *LICENSE.note
 68df02aaad209ba00edfcee51a1a61e3 *NAMESPACE
-70969fef2a6384efe16d23ef809d1520 *NEWS.md
+bdd68d2c58e03abb7f4ce6d0b3e89191 *NEWS.md
 4793410dfd880e5666032277df8918b4 *R/aio.R
 f0808569f740caea50695d19a61cd537 *R/context.R
 c99486f0ab01872b3d44f8b11823f6fb *R/docs.R
@@ -101,7 +101,7 @@ c8d96eac06161861e89556b01580c9b8 *src/proto.c
 69f2230d37bfe5f47e719063488b0c94 *src/thread.c
 695de1685f28f36cf7525d61cd4c161b *src/tls.c
 3f872fa48a1fbbb866dd10c4b8b03f30 *src/utils.c
-9417ea9608d9237a41fe5eee6db13212 *tests/tests.R
+85be453f5355085f2f7c5730e411fbaa *tests/tests.R
 ebec1480332451632c4ad27c4faa4823 *vignettes/nanonext.Rmd
 f51e13b9b8059190f63f6651972436ef *vignettes/nanonext.Rmd.orig
 c9bb8d216a54725af19885d4779bb1ad *vignettes/precompile.R
