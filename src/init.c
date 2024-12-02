@@ -20,6 +20,7 @@
 
 void (*eln2)(void (*)(void *), void *, double, int) = NULL;
 
+int nano_interrupt = 0;
 uint8_t special_bit = 0;
 
 nng_mtx *nano_wait_mtx;
@@ -37,7 +38,7 @@ SEXP nano_DotcallSymbol;
 SEXP nano_HeadersSymbol;
 SEXP nano_IdSymbol;
 SEXP nano_ListenerSymbol;
-SEXP nano_PipeSymbol;
+SEXP nano_MonitorSymbol;
 SEXP nano_ProtocolSymbol;
 SEXP nano_ResolveSymbol;
 SEXP nano_ResponseSymbol;
@@ -71,7 +72,7 @@ static void RegisterSymbols(void) {
   nano_HeadersSymbol = Rf_install("headers");
   nano_IdSymbol = Rf_install("id");
   nano_ListenerSymbol = Rf_install("listener");
-  nano_PipeSymbol = Rf_install("pipe");
+  nano_MonitorSymbol = Rf_install("monitor");
   nano_ProtocolSymbol = Rf_install("protocol");
   nano_ResolveSymbol = Rf_install("resolve");
   nano_ResponseSymbol = Rf_install("response");
@@ -125,7 +126,6 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_advance_rng_state", (DL_FUNC) &rnng_advance_rng_state, 0},
   {"rnng_aio_call", (DL_FUNC) &rnng_aio_call, 1},
   {"rnng_aio_collect", (DL_FUNC) &rnng_aio_collect, 1},
-  {"rnng_aio_collect_pipe", (DL_FUNC) &rnng_aio_collect_pipe, 1},
   {"rnng_aio_collect_safe", (DL_FUNC) &rnng_aio_collect_safe, 1},
   {"rnng_aio_get_msg", (DL_FUNC) &rnng_aio_get_msg, 1},
   {"rnng_aio_http_data", (DL_FUNC) &rnng_aio_http_data, 1},
@@ -153,18 +153,20 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_eval_safe", (DL_FUNC) &rnng_eval_safe, 1},
   {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
   {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
+  {"rnng_interrupt_switch", (DL_FUNC) &rnng_interrupt_switch, 1},
   {"rnng_is_error_value", (DL_FUNC) &rnng_is_error_value, 1},
   {"rnng_is_nul_byte", (DL_FUNC) &rnng_is_nul_byte, 1},
   {"rnng_listen", (DL_FUNC) &rnng_listen, 5},
   {"rnng_listener_close", (DL_FUNC) &rnng_listener_close, 1},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
+  {"rnng_monitor_create", (DL_FUNC) &rnng_monitor_create, 2},
+  {"rnng_monitor_read", (DL_FUNC) &rnng_monitor_read, 1},
   {"rnng_ncurl", (DL_FUNC) &rnng_ncurl, 9},
   {"rnng_ncurl_aio", (DL_FUNC) &rnng_ncurl_aio, 9},
   {"rnng_ncurl_session", (DL_FUNC) &rnng_ncurl_session, 8},
   {"rnng_ncurl_session_close", (DL_FUNC) &rnng_ncurl_session_close, 1},
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
-  {"rnng_pipe_close", (DL_FUNC) &rnng_pipe_close, 1},
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 6},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 6},
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
@@ -173,8 +175,8 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
   {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 6},
   {"rnng_request", (DL_FUNC) &rnng_request, 7},
-  {"rnng_send", (DL_FUNC) &rnng_send, 4},
-  {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 5},
+  {"rnng_send", (DL_FUNC) &rnng_send, 5},
+  {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 6},
   {"rnng_serial_config", (DL_FUNC) &rnng_serial_config, 4},
   {"rnng_set_marker", (DL_FUNC) &rnng_set_marker, 1},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},

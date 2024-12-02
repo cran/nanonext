@@ -328,9 +328,9 @@ print.nanoStream <- function(x, ...) {
 
 #' @export
 #'
-print.nanoPipe <- function(x, ...) {
+print.nanoMonitor <- function(x, ...) {
 
-  cat(sprintf("< nanoPipe >\n - id: %s\n", attr(x, "id")), file = stdout())
+  cat(sprintf("< nanoMonitor >\n - socket: %s\n", attr(x, "socket")), file = stdout())
   invisible(x)
 
 }

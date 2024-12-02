@@ -35,7 +35,7 @@
 #' Alternatively, to stop the async operation, use \code{\link{stop_aio}}.
 #'
 #' @inheritParams send
-#' @param con a Socket, Context, Stream or Pipe.
+#' @param con a Socket, Context or Stream.
 #' @param timeout [default NULL] integer value in milliseconds or NULL, which
 #'   applies a socket-specific default, usually the same as no timeout.
 #'
@@ -57,8 +57,8 @@
 #'
 #' @export
 #'
-send_aio <- function(con, data, mode = c("serial", "raw"), timeout = NULL)
-  data <- .Call(rnng_send_aio, con, data, mode, timeout, environment())
+send_aio <- function(con, data, mode = c("serial", "raw"), timeout = NULL, pipe = 0L)
+  data <- .Call(rnng_send_aio, con, data, mode, timeout, pipe, environment())
 
 #' Receive Async
 #'
@@ -361,7 +361,7 @@ as.promise.recvAio <- function(x) {
 
   if (is.null(promise)) {
 
-    promise <- if (.unresolved(x)) {
+    promise <- if (unresolved(x)) {
 
       promises::promise(
         function(resolve, reject) .keep(x, environment())
@@ -370,7 +370,7 @@ as.promise.recvAio <- function(x) {
           if (is_error_value(value)) stop(nng_error(value)) else value
       )
     } else {
-      value <- collect_aio(x)
+      value <- .subset2(x, "value")
       promises::promise(
         function(resolve, reject)
           if (is_error_value(value)) reject(nng_error(value)) else resolve(value)

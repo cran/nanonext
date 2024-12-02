@@ -40,14 +40,6 @@ static void stream_finalizer(SEXP xptr) {
 
 }
 
-static void pipe_finalizer(SEXP xptr) {
-
-  if (NANO_PTR(xptr) == NULL) return;
-  nng_pipe *xp = (nng_pipe *) NANO_PTR(xptr);
-  R_Free(xp);
-
-}
-
 // sockets ---------------------------------------------------------------------
 
 SEXP rnng_protocol_open(SEXP protocol, SEXP dial, SEXP listen, SEXP tls, SEXP autostart, SEXP raw) {
@@ -203,77 +195,12 @@ SEXP rnng_reap(SEXP con) {
   } else if (ptrtag == nano_DialerSymbol) {
     xc = nng_dialer_close(*(nng_dialer *) NANO_PTR(con));
 
-  } else if (ptrtag == nano_PipeSymbol) {
-    xc = nng_pipe_close(*(nng_pipe *) NANO_PTR(con));
-
   } else {
     xc = 3;
   }
 
   if (xc)
     return mk_error(xc);
-
-  return nano_success;
-
-}
-
-// pipes -----------------------------------------------------------------------
-
-SEXP rnng_aio_collect_pipe(SEXP aio) {
-
-  if (TYPEOF(aio) != ENVSXP)
-    goto exitlevel1;
-  const SEXP coreaio = nano_findVarInFrame(aio, nano_AioSymbol);
-  if (NANO_TAG(coreaio) != nano_AioSymbol)
-    goto exitlevel1;
-
-  nano_aio *aiop = (nano_aio *) NANO_PTR(coreaio);
-  switch (aiop->type) {
-    case RECVAIO:
-    case REQAIO:
-    case IOV_RECVAIO:
-    case RECVAIOS:
-    case REQAIOS:
-    case IOV_RECVAIOS:
-      break;
-    case SENDAIO:
-    case IOV_SENDAIO:
-    case HTTP_AIO:
-      goto exitlevel1;
-  }
-
-  nng_pipe *p;
-  SEXP pipe;
-
-  nng_aio_wait(aiop->aio);
-  const int xc = aiop->result;
-  if (xc > 0)
-    ERROR_OUT(xc);
-
-  p = R_Calloc(1, nng_pipe);
-  *p = nng_msg_get_pipe((nng_msg *) aiop->data);
-  PROTECT(pipe = R_MakeExternalPtr(p, nano_PipeSymbol, R_NilValue));
-  R_RegisterCFinalizerEx(pipe, pipe_finalizer, TRUE);
-  NANO_CLASS2(pipe, "nanoPipe", "nano");
-  Rf_setAttrib(pipe, nano_IdSymbol, Rf_ScalarInteger(nng_pipe_id(*p)));
-
-  UNPROTECT(1);
-  return pipe;
-
-  exitlevel1:
-  Rf_error("'x' is not a valid or active recvAio");
-  return R_NilValue;
-
-}
-
-SEXP rnng_pipe_close(SEXP pipe) {
-
-  if (NANO_TAG(pipe) != nano_PipeSymbol)
-    Rf_error("'pipe' is not a valid Pipe");
-  nng_pipe *p = (nng_pipe *) NANO_PTR(pipe);
-  const int xc = nng_pipe_close(*p);
-  if (xc)
-    ERROR_RET(xc);
 
   return nano_success;
 

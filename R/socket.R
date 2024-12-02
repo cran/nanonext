@@ -115,40 +115,6 @@ socket <- function(protocol = c("bus", "pair", "poly", "push", "pull", "pub",
                    raw = FALSE)
   .Call(rnng_protocol_open, protocol, dial, listen, tls, autostart, raw)
 
-#' Collect the Pipe from an Aio
-#'
-#' This function retrieves the Pipe used to receive a message from the Aio. It
-#' will block if the Aio has yet to complete. The message is still available for
-#' retrieval by the usual means. A Pipe is a low-level object and it is not
-#' normally necessary to deal with them directly.
-#'
-#' As Pipes are always owned by a Socket, removing (and garbage collecting) a
-#' Pipe does not close it or free its resources. A Pipe may, however, be
-#' explicitly closed.
-#'
-#' @param x a 'recvAio' object.
-#'
-#' @return A Pipe (object of class \sQuote{nanoPipe}).
-#'
-#' @examples
-#' s <- socket("rep", listen = "inproc://nanonext")
-#' s1 <- socket("req", dial = "inproc://nanonext")
-#'
-#' r <- recv_aio(s, timeout = 500)
-#'
-#' if (!send(s1, "")) {
-#'   p <- tryCatch(collect_pipe(r), error = identity)
-#'   print(p)
-#'   reap(p)
-#' }
-#'
-#' close(s)
-#' close(s1)
-#'
-#' @export
-#'
-collect_pipe <- function(x) .Call(rnng_aio_collect_pipe, x)
-
 #' Close Connection
 #'
 #' Close Connection on a Socket, Context, Dialer, Listener, Stream, Pipe, or
@@ -174,11 +140,7 @@ collect_pipe <- function(x) .Call(rnng_aio_collect_pipe, x)
 #'
 #' Closing an \sQuote{ncurlSession} closes the http(s) connection.
 #'
-#' As Pipes are owned by the corresponding Socket, removing (and garbage
-#' collecting) a Pipe does not close it or free its resources. A Pipe may,
-#' however, be explicitly closed.
-#'
-#' @param con a Socket, Context, Dialer, Listener, Stream, Pipe, or
+#' @param con a Socket, Context, Dialer, Listener, Stream, or
 #'   \sQuote{ncurlSession}.
 #' @param ... not used.
 #'
@@ -196,12 +158,6 @@ NULL
 #' @export
 #'
 close.nanoSocket <- function(con, ...) invisible(.Call(rnng_close, con))
-
-#' @rdname close
-#' @method close nanoPipe
-#' @export
-#'
-close.nanoPipe <- function(con, ...) invisible(.Call(rnng_pipe_close, con))
 
 #' Reap
 #'
@@ -233,3 +189,45 @@ close.nanoPipe <- function(con, ...) invisible(.Call(rnng_pipe_close, con))
 #' @export
 #'
 reap <- function(con) .Call(rnng_reap, con)
+
+#' Monitor a Socket for Pipe Changes
+#'
+#' This function monitors pipe additions and removals from a socket.
+#'
+#' @param sock a Socket.
+#' @param cv a conditionVariable.
+#'
+#' @return For \code{monitor}: a Monitor (object of class 'nanoMonitor'). \cr
+#'   For \code{read_monitor}: an integer vector of pipe IDs (positive if added,
+#'   negative if removed), or else NULL if there were no changes since the
+#'   previous read.
+#'
+#' @examples
+#' cv <- cv()
+#' s <- socket("poly")
+#' s1 <- socket("poly")
+#'
+#' m <- monitor(s, cv)
+#' m
+#'
+#' listen(s)
+#' dial(s1)
+#'
+#' cv_value(cv)
+#' read_monitor(m)
+#'
+#' close(s)
+#' close(s1)
+#'
+#' read_monitor(m)
+#'
+#' @export
+#'
+monitor <- function(sock, cv) .Call(rnng_monitor_create, sock, cv)
+
+#' @param x an external pointer to a monitor.
+#'
+#' @rdname monitor
+#' @export
+#'
+read_monitor <- function(x) .Call(rnng_monitor_read, x)

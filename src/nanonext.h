@@ -91,6 +91,9 @@ typedef struct nano_handle_s {
 #include <Rinternals.h>
 #include <Rversion.h>
 #include <R_ext/Visibility.h>
+#if defined(NANONEXT_SIGNALS) && defined(_WIN32)
+#include <Rembedded.h>
+#endif
 
 #define NANO_TAG(x) TAG(x)
 #define NANO_PTR(x) (void *) CAR(x)
@@ -190,6 +193,13 @@ typedef struct nano_cv_duo_s {
   nano_cv *cv2;
 } nano_cv_duo;
 
+typedef struct nano_monitor_s {
+  nano_cv *cv;
+  int *ids;
+  int size;
+  int updates;
+} nano_monitor;
+
 typedef struct nano_thread_aio_s {
   nng_thread *thr;
   nano_cv *cv;
@@ -229,6 +239,7 @@ typedef struct nano_buf_s {
 
 extern void (*eln2)(void (*)(void *), void *, double, int);
 extern uint8_t special_bit;
+extern int nano_interrupt;
 
 extern SEXP nano_AioSymbol;
 extern SEXP nano_ContextSymbol;
@@ -239,7 +250,7 @@ extern SEXP nano_DotcallSymbol;
 extern SEXP nano_HeadersSymbol;
 extern SEXP nano_IdSymbol;
 extern SEXP nano_ListenerSymbol;
-extern SEXP nano_PipeSymbol;
+extern SEXP nano_MonitorSymbol;
 extern SEXP nano_ProtocolSymbol;
 extern SEXP nano_ResolveSymbol;
 extern SEXP nano_ResponseSymbol;
@@ -272,6 +283,7 @@ SEXP R_mkClosure(SEXP, SEXP, SEXP);
 SEXP nano_findVarInFrame(const SEXP, const SEXP);
 SEXP nano_PreserveObject(const SEXP);
 void nano_ReleaseObject(SEXP);
+void raio_complete_interrupt(void *);
 void raio_complete_signal(void *);
 void sendaio_complete(void *);
 void cv_finalizer(SEXP);
@@ -298,7 +310,6 @@ void tls_finalizer(SEXP);
 SEXP rnng_advance_rng_state(void);
 SEXP rnng_aio_call(SEXP);
 SEXP rnng_aio_collect(SEXP);
-SEXP rnng_aio_collect_pipe(SEXP);
 SEXP rnng_aio_collect_safe(SEXP);
 SEXP rnng_aio_get_msg(SEXP);
 SEXP rnng_aio_http_data(SEXP);
@@ -326,6 +337,7 @@ SEXP rnng_dispatcher_socket(SEXP, SEXP, SEXP);
 SEXP rnng_eval_safe(SEXP);
 SEXP rnng_fini(void);
 SEXP rnng_get_opt(SEXP, SEXP);
+SEXP rnng_interrupt_switch(SEXP);
 SEXP rnng_is_error_value(SEXP);
 SEXP rnng_is_nul_byte(SEXP);
 SEXP rnng_listen(SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -333,12 +345,13 @@ SEXP rnng_listener_close(SEXP);
 SEXP rnng_listener_start(SEXP);
 SEXP rnng_messenger(SEXP);
 SEXP rnng_messenger_thread_create(SEXP);
+SEXP rnng_monitor_create(SEXP, SEXP);
+SEXP rnng_monitor_read(SEXP);
 SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_ncurl_session(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_ncurl_session_close(SEXP);
 SEXP rnng_ncurl_transact(SEXP);
-SEXP rnng_pipe_close(SEXP);
 SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_protocol_open(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_random(SEXP, SEXP);
@@ -347,8 +360,8 @@ SEXP rnng_reap(SEXP);
 SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_send(SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_send(SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_serial_config(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_set_marker(SEXP);
 SEXP rnng_set_opt(SEXP, SEXP, SEXP);

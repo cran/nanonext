@@ -167,7 +167,7 @@ parse_url <- function(url) .Call(rnng_url_parse, url)
 #' \sQuote{recvAio}).
 #'
 #' Is the object an object inheriting from class \sQuote{nano} i.e. a
-#' nanoSocket, nanoContext, nanoStream, nanoListener, nanoDialer, nanoPipe or
+#' nanoSocket, nanoContext, nanoStream, nanoListener, nanoDialer, nanoMonitor or
 #' nano Object.
 #'
 #' Is the object an ncurlSession (object of class \sQuote{ncurlSession}).
@@ -346,6 +346,24 @@ serial_config <- function(class, sfunc, ufunc, vec = FALSE)
 #' @export
 #'
 .advance <- function() .Call(rnng_advance_rng_state)
+
+#' Interrupt Switch
+#'
+#' Sets whether async receive completions trigger an interrupt.
+#' Internal package function.
+#'
+#' @param x logical value.
+#'
+#' @return The logical value 'x' supplied.
+#'
+#' @examples
+#' .interrupt()
+#' .interrupt(FALSE)
+#'
+#' @keywords internal
+#' @export
+#'
+.interrupt <- function(x = TRUE) .Call(rnng_interrupt_switch, x)
 
 #' Internal Package Function
 #'

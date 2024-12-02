@@ -1,4 +1,20 @@
+# nanonext 1.4.0
+
+#### New Features
+
+* New interface to Pipes moves to using integer pipe IDs rather than Pipe (external pointer) objects:
+  + `send()` and `send_aio()` gain the argument 'pipe' which accepts an integer pipe ID for directed sends (currently only supported by Sockets using the 'poly' protocol).
+  + A 'recvAio' now records the integer pipe ID, where successful, at `$aio` upon resolution.
+  + Pipe objects (of class 'nanoPipe') are obsoleted.
+* Adds `monitor()` and `read_monitor()` for easy monitoring of connection changes (pipe additons and removals) at a Socket.
+
+#### Updates
+
+* `collect_pipe()` is removed given the pipe interface changes.
+
 # nanonext 1.3.2
+
+#### Updates
 
 * Hotfix for CRAN (updates to tests only).
 
