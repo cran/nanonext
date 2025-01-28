@@ -1,3 +1,17 @@
+# nanonext 1.5.0
+
+#### Library Updates
+
+* Bundled 'libnng' updated to latest 1.10.1 release.
+* Bundled 'libmbedtls' updated to latest 3.6.2 LTS branch release.
+
+#### Updates
+
+* `nano()` updated with the 'poly' protocol, with 'pipe' argument enabled for the send methods.
+* `write_cert()` no longer displays a status message when interactive (thanks @wlandau, #74).
+* Removes partial matching when using `$`, `[[` or `[` on an object inheriting from class 'nano'.
+* Fixes a rare hang on socket close that was possible on Windows platforms for IPC connections (#76).
+
 # nanonext 1.4.0
 
 #### New Features

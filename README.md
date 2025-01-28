@@ -6,7 +6,7 @@
 <!-- badges: start -->
 
 [![CRAN
-status](https://www.r-pkg.org/badges/version/nanonext?color=112d4e)](https://CRAN.R-project.org/package=nanonext)
+status](https://www.r-pkg.org/badges/version/nanonext)](https://CRAN.R-project.org/package=nanonext)
 [![R-multiverse
 status](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcommunity.r-multiverse.org%2Fapi%2Fpackages%2Fnanonext&query=%24.Version&label=r-multiverse)](https://community.r-multiverse.org/nanonext)
 [![R-universe
@@ -17,18 +17,18 @@ status](https://shikokuchuo.r-universe.dev/badges/nanonext?color=3f72af)](https:
 <!-- badges: end -->
 
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a
-socket library implementing ‘Scalability Protocols’, a reliable,
-high-performance standard for common communications patterns including
-publish/subscribe, request/reply and service discovery, over in-process,
-IPC, TCP, WebSocket and secure TLS transports.
+socket library for reliable, high-performance messaging over in-process,
+IPC, TCP, WebSocket and secure TLS transports. Implements ‘Scalability
+Protocols’, a standard for common communications patterns including
+publish/subscribe, request/reply and service discovery.
 
 As its own [threaded concurrency
 framework](https://shikokuchuo.net/nanonext/articles/nanonext.html#async-and-concurrency),
 provides a toolkit for asynchronous programming and distributed
-computing, with intuitive ‘aio’ objects which resolve automatically upon
-completion of asynchronous operations, and [synchronisation
+computing. Intuitive ‘aio’ objects resolve automatically when
+asynchronous operations complete, and [synchronisation
 primitives](https://shikokuchuo.net/nanonext/articles/nanonext.html#synchronisation-primitives)
-allowing R to wait upon events signalled by concurrent threads.
+allow R to wait upon events signalled by concurrent threads.
 
 Designed for performance and reliability,
 [`nanonext`](https://doi.org/10.5281/zenodo.7903429) is a lightweight
@@ -178,7 +178,7 @@ install.packages("nanonext", repos = "https://shikokuchuo.r-universe.dev")
 
 Installation from source requires ‘libnng’ \>= v1.6.0 and ‘libmbedtls’
 \>= 2.5.0 (suitable installations are automatically detected), or else
-‘cmake’ to compile ‘libnng’ v1.9.0 and ‘libmbedtls’ v3.5.2 included
+‘cmake’ to compile ‘libnng’ v1.10.1 and ‘libmbedtls’ v3.6.2 included
 within the package sources.
 
 **It is recommended for optimal performance and stability to let the
@@ -201,12 +201,12 @@ OpenCSW - refer to the ‘cmake’ website for the latest source file.*
 
 #### Windows
 
-For R \>= 4.2 using the ‘Rtools42’ or newer toolchains, ‘libnng’ v1.9.0
-and ‘libmbedtls’ v3.5.2 will be automatically compiled from the package
+For R \>= 4.2 using the ‘Rtools42’ or newer toolchains, ‘libnng’ v1.10.1
+and ‘libmbedtls’ v3.6.2 will be automatically compiled from the package
 sources during installation.
 
-For previous R versions, pre-compiled ‘libnng’ v1.9.0 and ‘libmbedtls’
-v3.5.2 libraries are downloaded and used for installation instead.
+For previous R versions, pre-compiled ‘libnng’ v1.10.1 and ‘libmbedtls’
+v3.6.2 libraries are downloaded and used for installation instead.
 
 ### Acknowledgements and Links
 

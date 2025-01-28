@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.4">
+<meta name="generator" content="litedown 0.5">
 <title>nanonext - NNG Lightweight Messaging Library</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.13.48/css/prism-xcode.min.css">
 <style type="text/css">
 body {
   font-family: sans-serif;
@@ -14,20 +13,22 @@ body {
   padding: 1em;
   line-height: 1.5;
 }
-body, .abstract, code, .footnotes, #refs { font-size: .9em; }
+body, .abstract, code, .footnotes, footer, #refs, .caption { font-size: .9em; }
 li li { font-size: .95em; }
 ul:has(li > input[type="checkbox"]) { list-style: none; padding-left: 1em; }
 *, :before, :after { box-sizing: border-box; }
 a { color: steelblue; }
 pre, img { max-width: 100%; }
-pre, pre:hover { white-space: pre-wrap; word-break: break-all; }
+pre { white-space: pre-wrap; word-break: break-word; }
 pre code { display: block; padding: 1em; overflow-x: auto; }
 code { font-family: 'DejaVu Sans Mono', 'Droid Sans Mono', 'Lucida Console', Consolas, Monaco, monospace; }
-:not(pre) > code, code[class], .box > div { background-color: #f8f8f8; }
-pre > code:not([class]), pre > .language-plain, .box { background-color: inherit; border: 1px solid #eee; }
-pre > .message { border-color: #9eeaf9; }
-pre > .warning { background: #fff3cd; border-color: #fff3cd; }
-pre > .error { background: #f8d7da; border-color: #f8d7da; }
+:not(pre) > code, code[class], div > .caption { background-color: #f8f8f8; }
+pre > code:is(:not([class]), .language-plain, .language-none), .box, .figure, .table { background-color: inherit; border: 1px solid #eee; }
+pre > code {
+  &.message { border-color: #9eeaf9; }
+  &.warning { background: #fff3cd; border-color: #fff3cd; }
+  &.error { background: #f8d7da; border-color: #f8d7da; }
+}
 .fenced-chunk { border-left: 1px solid #666; }
 .code-fence {
   opacity: .4;
@@ -35,20 +36,15 @@ pre > .error { background: #f8d7da; border-color: #f8d7da; }
   border-left: 2px solid;
   &:hover { opacity: inherit; }
 }
-.box { margin: 1em 0; }
-.box > :first-child > p:first-child, .box > :last-child > p:last-child { padding: 1em; }
-.box > :first-child, .box > :first-child > p:first-child { margin-top: 0; }
-.box > :last-child, .box > :last-child > p:last-child { margin-bottom: 0; }
-.figure > p:has(img) { text-align: center; }
+.box, .figure, .table, table { margin: 1em auto; }
+div > .caption { padding: 1px 1em; }
+.figure { p:has(img), pre:has(svg) { text-align: center; } }
+.flex-col { display: flex; justify-content: space-between; }
 table {
-  margin: auto; border-top: 1px solid #666;
+  border-top: 1px solid #666;
   thead th { border-bottom: 1px solid #ddd; }
-  th, td { padding: 5px; }
-  thead, tfoot, tr:nth-child(even) { background: #eee; }
-}
-.table-full {
-  width: 100%;
-  td { vertical-align: baseline; }
+  th, td { padding: 5px; font-variant-numeric: tabular-nums; }
+  thead, tfoot, tr:nth-child(even) { background: whitesmoke; }
 }
 blockquote {
   color: #666;
@@ -58,14 +54,16 @@ blockquote {
 }
 hr, .footnotes::before { border: 1px dashed #ddd; }
 .frontmatter { text-align: center; }
-#TOC .numbered {
-  padding-left: 0;
-  li { list-style: none; }
-  ul { padding-left: 1em; }
+#TOC {
+  a { text-decoration: none; }
+  & > ul { padding: 0; }
+  ul { list-style: none; padding-left: 1em; }
+  ul ul { border-left: 1px solid lightsteelblue; }
 }
 table, .body h2 { border-bottom: 1px solid #666; }
 .body .appendix, .appendix ~ h2 { border-bottom-style: dashed; }
 .main-number::after { content: "."; }
+span[class^="ref-number-"] { font-weight: bold; }
 .ref-number-fig::after, .ref-number-tab::after { content: ":"; }
 .cross-ref-chp::before { content: "Chapter "; }
 .cross-ref-sec::before { content: "Section "; }
@@ -90,15 +88,20 @@ section.footnotes {
   margin-top: 2em;
   &::before { content: ""; display: block; max-width: 20em; }
 }
+.fade {
+  background: repeating-linear-gradient(135deg, white, white 30px, #ddd 32px, #ddd 32px);
+  opacity: 0.6;
+}
 
 @media print {
   body { max-width: 100%; }
   tr, img { page-break-inside: avoid; }
 }
 @media only screen and (min-width: 992px) {
-  pre { white-space: pre; }
+  body:not(.pagesjs) pre:has(.line-numbers):not(:hover) { white-space: pre; }
 }
 </style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.13.61/css/prism-xcode.min.css">
 </head>
 <body>
 <div class="frontmatter">
@@ -157,6 +160,7 @@ n$close()
 <p><code>nanonext</code> implements true async send and receive, leveraging NNG as a massively-scaleable concurrency framework.</p>
 <pre><code class="language-r">s1 &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nano&quot;)
 s2 &lt;- socket(&quot;pair&quot;, dial = &quot;inproc://nano&quot;)
+
 </code></pre>
 <p><code>send_aio()</code> and <code>recv_aio()</code> functions return immediately with an ‘Aio’ object, but perform their operations async.</p>
 <p>An ‘Aio’ object returns an unresolved value whilst its asynchronous operation is ongoing, automatically resolving to a final value once complete.</p>
@@ -214,6 +218,7 @@ msg[]
 
 close(s1)
 close(s2)
+
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="sec:rpc-and-distributed-computing">RPC and Distributed Computing</h3>
@@ -226,11 +231,13 @@ close(s2)
   reply(context(rep), execute = rnorm, send_mode = &quot;raw&quot;)
   Sys.sleep(2) # linger period to flush system socket send
 })
+
 </code></pre>
 <p>[C] Client process: <code>request()</code> performs an async send and receive request and returns immediately with a <code>recvAio</code> object.</p>
 <pre><code class="language-r">library(nanonext)
 req &lt;- socket(&quot;req&quot;, dial = &quot;tcp://127.0.0.1:6556&quot;)
 aio &lt;- request(context(req), data = 1e8, recv_mode = &quot;double&quot;)
+
 </code></pre>
 <p>At this point, the client can run additional code concurrent with the server processing the request.</p>
 <pre><code class="language-r"># do more...
@@ -238,7 +245,7 @@ aio &lt;- request(context(req), data = 1e8, recv_mode = &quot;double&quot;)
 <p>When the result of the server calculation is required, the <code>recvAio</code> may be called using <code>call_aio()</code>.</p>
 <p>The return value from the server request is then retrieved and stored in the Aio as <code>$data</code>.</p>
 <pre><code class="language-r">call_aio(aio)$data |&gt; str()
-#&gt;  num [1:100000000] -0.5043 0.3125 0.2775 -0.7714 -0.0508 ...
+#&gt;  num [1:100000000] 1.958 -1.143 -0.492 0.296 -1.137 ...
 </code></pre>
 <p>As <code>call_aio()</code> is blocking and will wait for completion, an alternative is to query <code>aio$data</code> directly. This will return an ‘unresolved’ logical NA value if the calculation is yet to complete.</p>
 <p>In this example the calculation is returned, but other operations may reside entirely on the server side, for example writing data to disk.</p>
@@ -280,6 +287,7 @@ cv_value(cv) # incremented when pipe to 'sock2' was destroyed
 #&gt; [1] 1
 
 close(sock)
+
 </code></pre>
 <p>Example 2: wait until a message is received or connection is dropped:</p>
 <pre><code class="language-r">sock &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nanosignal&quot;)
@@ -305,6 +313,7 @@ r$data
 
 close(sock)
 close(sock2)
+
 </code></pre>
 <p>The above example shows the working of the flag within the condition variable. As the pipe notification was specified to raise a flag, this can be used to distinguish between a pipe event signal and a message receive signal.</p>
 <p>In the case a flag is raised, <code>wait()</code> returns FALSE rather than TRUE. So the above code will stop with the custom error message upon disconnect or else continue. This affords a way of handling disconnects that would not be possible if simply using <code>call_aio()</code>, which is also a blocking wait (on a single message).</p>
@@ -322,7 +331,7 @@ ii) Passing a TLS configuration object to the ‘tls’ argument of <code>listen
 <pre><code class="language-r">cert &lt;- write_cert(cn = &quot;127.0.0.1&quot;)
 str(cert)
 #&gt; List of 2
-#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJKQIBAAKCAgEAnqsWJ7vy38KuMIqzwRSEJffVPVNsi21FQlY4z4n5ipmP/k6F\n/mMhN28Ee/+j&quot;| __truncated__
+#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJJwIBAAKCAgEA1+POiFkmaCuY0f8oPYh8V29XvNaTU/GkcU4apZbZ2BGd7Xqs\nlbn5iI6rLrgm&quot;| __truncated__
 #&gt;  $ client: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;&quot;
 
 ser &lt;- tls_config(server = cert$server)
@@ -340,6 +349,7 @@ s1 &lt;- socket(dial = &quot;tls+tcp://127.0.0.1:5558&quot;, tls = cli)
 
 close(s1)
 close(s)
+
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="sec:publisher-subscriber-model">Publisher Subscriber Model</h3>
@@ -396,6 +406,7 @@ sub |&gt; recv(mode = &quot;double&quot;)
 
 close(pub)
 close(sub)
+
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="sec:surveyor-respondent-model">Surveyor Respondent Model</h3>
@@ -437,6 +448,7 @@ aio2$data
 close(sur)
 close(res1)
 close(res2)
+
 </code></pre>
 <p>Above, <code>msleep()</code> is an uninterruptible sleep function (utilising the NNG library), taking a time in milliseconds.</p>
 <p>It can be seen that the final value resolves into a timeout, which is an integer 5 classed as ‘errorValue’. All integer error codes are classed as ‘errorValue’ to be easily distinguishable from integer message values.</p>
@@ -453,7 +465,7 @@ close(res2)
 #&gt; NULL
 #&gt; 
 #&gt; $data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1724104783.065\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-66c3c04f-35f31c774acc1b8d6e4f150f\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t1737978441.766\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-67977249-634bf8ad590e6fd60e8a847c\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
 </code></pre>
 <p>For advanced use, supports additional HTTP methods such as POST or PUT.</p>
 <pre><code class="language-r">res &lt;- ncurl_aio(&quot;https://postman-echo.com/post&quot;,
@@ -466,10 +478,10 @@ res
 
 call_aio(res)$headers
 #&gt; $date
-#&gt; [1] &quot;Mon, 19 Aug 2024 21:59:44 GMT&quot;
+#&gt; [1] &quot;Mon, 27 Jan 2025 11:47:22 GMT&quot;
 
 res$data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t=1724104784.075\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-66c3c04f-137ac65c00ca142929b0088a\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t1737978442.356\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-6797724a-09ca6ff2789e8f3512f1002f\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
 </code></pre>
 <p>In this respect, it may be used as a performant and lightweight method for making REST API requests.</p>
 <h5 id="sec:ncurl-promises">ncurl Promises</h5>
@@ -497,7 +509,7 @@ transact(sess)
 #&gt; 
 #&gt; $headers
 #&gt; $headers$Date
-#&gt; [1] &quot;Mon, 19 Aug 2024 21:59:44 GMT&quot;
+#&gt; [1] &quot;Mon, 27 Jan 2025 11:47:22 GMT&quot;
 #&gt; 
 #&gt; $headers$`Content-Type`
 #&gt; [1] &quot;application/json; charset=utf-8&quot;
@@ -506,15 +518,15 @@ transact(sess)
 #&gt; $data
 #&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 68 6f
 #&gt;  [39] 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 72 65 71 75 65 73
-#&gt;  [77] 74 2d 73 74 61 72 74 22 3a 20 22 74 3d 31 37 32 34 31 30 34 37 38 34 2e 37 34 35 22 2c 0a 20 20 20 20 22 63 6f 6e
-#&gt; [115] 6e 65 63 74 69 6f 6e 22 3a 20 22 63 6c 6f 73 65 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72
-#&gt; [153] 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 6f 72 74 22 3a
-#&gt; [191] 20 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31
-#&gt; [229] 2d 36 36 63 33 63 30 35 30 2d 34 61 36 33 31 30 63 36 34 61 37 35 63 31 39 37 35 65 61 37 62 31 36 39 22 2c 0a 20
-#&gt; [267] 20 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c
-#&gt; [305] 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a
-#&gt; [343] 20 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f
-#&gt; [381] 6d 2f 67 65 74 22 0a 7d
+#&gt;  [77] 74 2d 73 74 61 72 74 22 3a 20 22 74 31 37 33 37 39 37 38 34 34 32 2e 37 39 30 22 2c 0a 20 20 20 20 22 63 6f 6e 6e
+#&gt; [115] 65 63 74 69 6f 6e 22 3a 20 22 63 6c 6f 73 65 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72 6f
+#&gt; [153] 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 6f 72 74 22 3a 20
+#&gt; [191] 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31 2d
+#&gt; [229] 36 37 39 37 37 32 34 61 2d 32 39 33 61 65 64 35 66 32 63 63 61 38 37 36 39 36 33 30 62 31 38 33 35 22 2c 0a 20 20
+#&gt; [267] 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c 0a
+#&gt; [305] 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20
+#&gt; [343] 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d
+#&gt; [381] 2f 67 65 74 22 0a 7d
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="sec:stream-websocket-client">stream: Websocket Client</h3>
@@ -553,6 +565,7 @@ r$data
 #&gt; [1] &quot;async message&quot;
 
 close(s)
+
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="sec:options-serialization-and-statistics">Options, Serialization and Statistics</h3>
@@ -572,6 +585,7 @@ opt(s$listener[[1]], &quot;recv-size-max&quot;)
 #&gt; [1] 8192
 
 start(s$listener[[1]])
+
 </code></pre>
 <p>There is the special write-only option ‘serial’ for Sockets, which sets a serialization configuration returned by <code>serial_config()</code>. This registers custom functions to handle serialization and unserialization of reference objects, plugging into the ‘refhook’ system of native R serialization. This allows the transparent send and receive of such objects using mode ‘serial’ without the need for a separate ‘marshalling’ step. Once set, configurations apply to the Socket and all Contexts created from the Socket.</p>
 <pre><code class="language-r">serial &lt;- serial_config(&quot;obj_class&quot;, function(x) serialize(x, NULL), unserialize)

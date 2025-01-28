@@ -1,4 +1,4 @@
-// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
+// Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
 //
 // This file is part of nanonext.
 //
@@ -81,6 +81,7 @@ typedef struct nano_handle_s {
 #include <errno.h>
 #endif
 
+#include <stdint.h>
 #ifndef R_NO_REMAP
 #define R_NO_REMAP
 #endif
@@ -212,20 +213,6 @@ typedef struct nano_thread_duo_s {
   nano_cv *cv2;
 } nano_thread_duo;
 
-typedef struct nano_thread_disp_s {
-  nng_thread *thr;
-  nano_cv *cv;
-  nng_tls_config *tls;
-  nano_saio **saio;
-  nano_aio **raio;
-  nano_aio **haio;
-  nng_url *up;
-  const char *host;
-  char **url;
-  int *online;
-  R_xlen_t n;
-} nano_thread_disp;
-
 typedef struct nano_signal_s {
   nano_cv *cv;
   int *online;
@@ -333,7 +320,6 @@ SEXP rnng_cv_wait_safe(SEXP);
 SEXP rnng_dial(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_dialer_close(SEXP);
 SEXP rnng_dialer_start(SEXP, SEXP);
-SEXP rnng_dispatcher_socket(SEXP, SEXP, SEXP);
 SEXP rnng_eval_safe(SEXP);
 SEXP rnng_fini(void);
 SEXP rnng_get_opt(SEXP, SEXP);
@@ -355,7 +341,6 @@ SEXP rnng_ncurl_transact(SEXP);
 SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_protocol_open(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_random(SEXP, SEXP);
-SEXP rnng_read_online(SEXP);
 SEXP rnng_reap(SEXP);
 SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -385,6 +370,6 @@ SEXP rnng_unresolved2(SEXP);
 SEXP rnng_url_parse(SEXP);
 SEXP rnng_version(void);
 SEXP rnng_wait_thread_create(SEXP);
-SEXP rnng_write_cert(SEXP, SEXP, SEXP);
+SEXP rnng_write_cert(SEXP, SEXP);
 
 #endif
