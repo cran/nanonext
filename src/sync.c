@@ -109,57 +109,6 @@ void pipe_cb_signal(nng_pipe p, nng_pipe_ev ev, void *arg) {
 
 }
 
-static void pipe_cb_signal_duo(nng_pipe p, nng_pipe_ev ev, void *arg) {
-
-  int sig;
-  nano_cv_duo *duo = (nano_cv_duo *) arg;
-  nano_cv *ncv = duo->cv;
-  nano_cv *ncv2 = duo->cv2;
-
-  nng_cv *cv = ncv->cv;
-  nng_mtx *mtx = ncv->mtx;
-  nng_cv *cv2 = ncv2->cv;
-  nng_mtx *mtx2 = ncv2->mtx;
-
-  nng_mtx_lock(mtx);
-  sig = ncv->flag;
-  if (sig > 0) ncv->flag = -1;
-  ncv->condition++;
-  nng_cv_wake(cv);
-  nng_mtx_unlock(mtx);
-  nng_mtx_lock(mtx2);
-  if (sig > 0) ncv2->flag = -1;
-  ncv2->condition++;
-  nng_cv_wake(cv2);
-  nng_mtx_unlock(mtx2);
-  if (sig > 1) {
-#ifdef _WIN32
-    raise(sig);
-#else
-    kill(getpid(), sig);
-#endif
-  }
-
-}
-
-static void pipe_cb_dropcon(nng_pipe p, nng_pipe_ev ev, void *arg) {
-
-  if (arg != NULL) {
-    nano_cv *ncv = (nano_cv *) arg;
-    nng_mtx *mtx = ncv->mtx;
-    int cond;
-    nng_mtx_lock(mtx);
-    if ((cond = ncv->condition % 2))
-      ncv->condition--;
-    nng_mtx_unlock(mtx);
-    if (cond)
-      nng_pipe_close(p);
-  } else {
-    nng_pipe_close(p);
-  }
-
-}
-
 static void pipe_cb_monitor(nng_pipe p, nng_pipe_ev ev, void *arg) {
 
   nano_monitor *monitor = (nano_monitor *) arg;
@@ -186,14 +135,6 @@ static void pipe_cb_monitor(nng_pipe p, nng_pipe_ev ev, void *arg) {
 }
 
 // finalizers ------------------------------------------------------------------
-
-static void cv_duo_finalizer(SEXP xptr) {
-
-  if (NANO_PTR(xptr) == NULL) return;
-  nano_cv_duo *xp = (nano_cv_duo *) NANO_PTR(xptr);
-  R_Free(xp);
-
-}
 
 static void request_finalizer(SEXP xptr) {
 
@@ -249,7 +190,7 @@ SEXP rnng_cv_alloc(void) {
 
 SEXP rnng_cv_wait(SEXP cvar) {
 
-  if (NANO_TAG(cvar) != nano_CvSymbol)
+  if (NANO_PTR_CHECK(cvar, nano_CvSymbol))
     Rf_error("'cv' is not a valid Condition Variable");
 
   nano_cv *ncv = (nano_cv *) NANO_PTR(cvar);
@@ -270,7 +211,7 @@ SEXP rnng_cv_wait(SEXP cvar) {
 
 SEXP rnng_cv_until(SEXP cvar, SEXP msec) {
 
-  if (NANO_TAG(cvar) != nano_CvSymbol)
+  if (NANO_PTR_CHECK(cvar, nano_CvSymbol))
     Rf_error("'cv' is not a valid Condition Variable");
 
   nano_cv *ncv = (nano_cv *) NANO_PTR(cvar);
@@ -309,7 +250,7 @@ SEXP rnng_cv_until(SEXP cvar, SEXP msec) {
 
 SEXP rnng_cv_wait_safe(SEXP cvar) {
 
-  if (NANO_TAG(cvar) != nano_CvSymbol)
+  if (NANO_PTR_CHECK(cvar, nano_CvSymbol))
     Rf_error("'cv' is not a valid Condition Variable");
 
   nano_cv *ncv = (nano_cv *) NANO_PTR(cvar);
@@ -344,7 +285,7 @@ SEXP rnng_cv_wait_safe(SEXP cvar) {
 
 SEXP rnng_cv_until_safe(SEXP cvar, SEXP msec) {
 
-  if (NANO_TAG(cvar) != nano_CvSymbol)
+  if (NANO_PTR_CHECK(cvar, nano_CvSymbol))
     Rf_error("'cv' is not a valid Condition Variable");
 
   nano_cv *ncv = (nano_cv *) NANO_PTR(cvar);
@@ -393,7 +334,7 @@ SEXP rnng_cv_until_safe(SEXP cvar, SEXP msec) {
 
 SEXP rnng_cv_reset(SEXP cvar) {
 
-  if (NANO_TAG(cvar) != nano_CvSymbol)
+  if (NANO_PTR_CHECK(cvar, nano_CvSymbol))
     Rf_error("'cv' is not a valid Condition Variable");
 
   nano_cv *ncv = (nano_cv *) NANO_PTR(cvar);
@@ -410,7 +351,7 @@ SEXP rnng_cv_reset(SEXP cvar) {
 
 SEXP rnng_cv_value(SEXP cvar) {
 
-  if (NANO_TAG(cvar) != nano_CvSymbol)
+  if (NANO_PTR_CHECK(cvar, nano_CvSymbol))
     Rf_error("'cv' is not a valid Condition Variable");
   nano_cv *ncv = (nano_cv *) NANO_PTR(cvar);
   nng_mtx *mtx = ncv->mtx;
@@ -425,7 +366,7 @@ SEXP rnng_cv_value(SEXP cvar) {
 
 SEXP rnng_cv_signal(SEXP cvar) {
 
-  if (NANO_TAG(cvar) != nano_CvSymbol)
+  if (NANO_PTR_CHECK(cvar, nano_CvSymbol))
     Rf_error("'cv' is not a valid Condition Variable");
 
   nano_cv *ncv = (nano_cv *) NANO_PTR(cvar);
@@ -445,7 +386,7 @@ SEXP rnng_cv_signal(SEXP cvar) {
 
 SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeout, SEXP cvar, SEXP clo) {
 
-  if (NANO_TAG(con) != nano_ContextSymbol)
+  if (NANO_PTR_CHECK(con, nano_ContextSymbol))
     Rf_error("'con' is not a valid Context");
 
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) nano_integer(timeout);
@@ -455,7 +396,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
     signal = 0;
     drop = 0;
   } else {
-    signal = NANO_TAG(cvar) == nano_CvSymbol;
+    signal = !NANO_PTR_CHECK(cvar, nano_CvSymbol);
     drop = 1 - signal;
   }
   nng_ctx *ctx = (nng_ctx *) NANO_PTR(con);
@@ -526,7 +467,7 @@ SEXP rnng_set_promise_context(SEXP x, SEXP ctx) {
     return R_NilValue;
 
   SEXP aio = nano_findVarInFrame(x, nano_AioSymbol);
-  if (NANO_TAG(aio) != nano_AioSymbol)
+  if (NANO_PTR_CHECK(aio, nano_AioSymbol))
     return R_NilValue;
 
   nano_aio *raio = (nano_aio *) NANO_PTR(aio);
@@ -566,9 +507,9 @@ SEXP rnng_set_promise_context(SEXP x, SEXP ctx) {
 
 // pipes -----------------------------------------------------------------------
 
-SEXP rnng_pipe_notify(SEXP socket, SEXP cv, SEXP cv2, SEXP add, SEXP remove, SEXP flag) {
+SEXP rnng_pipe_notify(SEXP socket, SEXP cv, SEXP add, SEXP remove, SEXP flag) {
 
-  if (NANO_TAG(socket) != nano_SocketSymbol)
+  if (NANO_PTR_CHECK(socket, nano_SocketSymbol))
     Rf_error("'socket' is not a valid Socket");
 
   int xc;
@@ -585,7 +526,7 @@ SEXP rnng_pipe_notify(SEXP socket, SEXP cv, SEXP cv2, SEXP add, SEXP remove, SEX
 
     return nano_success;
 
-  } else if (NANO_TAG(cv) != nano_CvSymbol) {
+  } else if (NANO_PTR_CHECK(cv, nano_CvSymbol)) {
     Rf_error("'cv' is not a valid Condition Variable");
   }
 
@@ -593,74 +534,12 @@ SEXP rnng_pipe_notify(SEXP socket, SEXP cv, SEXP cv2, SEXP add, SEXP remove, SEX
   nano_cv *cvp = (nano_cv *) NANO_PTR(cv);
   const int flg = nano_integer(flag);
 
-  if (cv2 != R_NilValue) {
+  cvp->flag = flg < 0 ? 1 : flg;
 
-    if (NANO_TAG(cv2) != nano_CvSymbol)
-      Rf_error("'cv2' is not a valid Condition Variable");
-
-    cvp->flag = flg < 0 ? 1 : flg;
-    nano_cv_duo *duo = R_Calloc(1, nano_cv_duo);
-    duo->cv = cvp;
-    duo->cv2 = (nano_cv *) NANO_PTR(cv2);
-
-    if (NANO_INTEGER(add) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST, pipe_cb_signal_duo, duo)))
-      ERROR_OUT(xc);
-
-    if (NANO_INTEGER(remove) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST, pipe_cb_signal_duo, duo)))
-      ERROR_OUT(xc);
-
-    SEXP xptr = R_MakeExternalPtr(duo, R_NilValue, R_NilValue);
-    NANO_SET_PROT(cv, xptr);
-    R_RegisterCFinalizerEx(xptr, cv_duo_finalizer, TRUE);
-
-  } else {
-
-    cvp->flag = flg < 0 ? 1 : flg;
-
-    if (NANO_INTEGER(add) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST, pipe_cb_signal, cvp)))
-      ERROR_OUT(xc);
-
-    if (NANO_INTEGER(remove) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST, pipe_cb_signal, cvp)))
-      ERROR_OUT(xc);
-
-  }
-
-  return nano_success;
-
-}
-
-SEXP rnng_socket_lock(SEXP socket, SEXP cv) {
-
-  if (NANO_TAG(socket) != nano_SocketSymbol)
-    Rf_error("'socket' is not a valid Socket");
-  nng_socket *sock = (nng_socket *) NANO_PTR(socket);
-
-  int xc;
-  if (cv != R_NilValue) {
-    if (NANO_TAG(cv) != nano_CvSymbol)
-      Rf_error("'cv' is not a valid Condition Variable");
-    nano_cv *ncv = (nano_cv *) NANO_PTR(cv);
-    xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_PRE, pipe_cb_dropcon, ncv);
-  } else {
-    xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_PRE, pipe_cb_dropcon, NULL);
-  }
-
-  if (xc)
+  if (NANO_INTEGER(add) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST, pipe_cb_signal, cvp)))
     ERROR_OUT(xc);
 
-  return nano_success;
-
-}
-
-SEXP rnng_socket_unlock(SEXP socket) {
-
-  if (NANO_TAG(socket) != nano_SocketSymbol)
-    Rf_error("'socket' is not a valid Socket");
-
-  nng_socket *sock = (nng_socket *) NANO_PTR(socket);
-
-  const int xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_PRE, NULL, NULL);
-  if (xc)
+  if (NANO_INTEGER(remove) && (xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST, pipe_cb_signal, cvp)))
     ERROR_OUT(xc);
 
   return nano_success;
@@ -671,10 +550,10 @@ SEXP rnng_socket_unlock(SEXP socket) {
 
 SEXP rnng_monitor_create(SEXP socket, SEXP cv) {
 
-  if (NANO_TAG(socket) != nano_SocketSymbol)
+  if (NANO_PTR_CHECK(socket, nano_SocketSymbol))
     Rf_error("'socket' is not a valid Socket");
 
-  if (NANO_TAG(cv) != nano_CvSymbol)
+  if (NANO_PTR_CHECK(cv, nano_CvSymbol))
     Rf_error("'cv' is not a valid Condition Variable");
 
   const int n = 8;
@@ -684,6 +563,7 @@ SEXP rnng_monitor_create(SEXP socket, SEXP cv) {
   monitor->cv = (nano_cv *) NANO_PTR(cv);
   nng_socket *sock = (nng_socket *) NANO_PTR(socket);
 
+  SEXP xptr;
   int xc;
 
   if ((xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST, pipe_cb_monitor, monitor)))
@@ -692,10 +572,11 @@ SEXP rnng_monitor_create(SEXP socket, SEXP cv) {
   if ((xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST, pipe_cb_monitor, monitor)))
     ERROR_OUT(xc);
 
-  SEXP xptr = R_MakeExternalPtr(monitor, nano_MonitorSymbol, R_NilValue);
+  PROTECT(xptr = R_MakeExternalPtr(monitor, nano_MonitorSymbol, R_NilValue));
   R_RegisterCFinalizerEx(xptr, monitor_finalizer, TRUE);
   NANO_CLASS2(xptr, "nanoMonitor", "nano");
   Rf_setAttrib(xptr, nano_SocketSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
+  UNPROTECT(1);
 
   return xptr;
 
@@ -703,7 +584,7 @@ SEXP rnng_monitor_create(SEXP socket, SEXP cv) {
 
 SEXP rnng_monitor_read(SEXP x) {
 
-  if (NANO_TAG(x) != nano_MonitorSymbol)
+  if (NANO_PTR_CHECK(x, nano_MonitorSymbol))
     Rf_error("'x' is not a valid Monitor");
 
   nano_monitor *monitor = (nano_monitor *) NANO_PTR(x);

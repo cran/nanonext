@@ -96,8 +96,8 @@ typedef struct nano_handle_s {
 #include <Rembedded.h>
 #endif
 
-#define NANO_TAG(x) TAG(x)
 #define NANO_PTR(x) (void *) CAR(x)
+#define NANO_PTR_CHECK(x, tag) (TAG(x) != tag || NANO_PTR(x) == NULL)
 #define NANO_PROT(x) CDR(x)
 #define NANO_ENCLOS(x) CDR(x)
 #define NANO_SET_TAG(x, v) SET_TAG(x, v)
@@ -188,11 +188,6 @@ typedef struct nano_cv_s {
   nng_mtx *mtx;
   nng_cv *cv;
 } nano_cv;
-
-typedef struct nano_cv_duo_s {
-  nano_cv *cv;
-  nano_cv *cv2;
-} nano_cv_duo;
 
 typedef struct nano_monitor_s {
   nano_cv *cv;
@@ -338,7 +333,7 @@ SEXP rnng_ncurl_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_ncurl_session(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_ncurl_session_close(SEXP);
 SEXP rnng_ncurl_transact(SEXP);
-SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_protocol_open(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_random(SEXP, SEXP);
 SEXP rnng_reap(SEXP);
@@ -353,8 +348,6 @@ SEXP rnng_set_opt(SEXP, SEXP, SEXP);
 SEXP rnng_set_promise_context(SEXP, SEXP);
 SEXP rnng_signal_thread_create(SEXP, SEXP);
 SEXP rnng_sleep(SEXP);
-SEXP rnng_socket_lock(SEXP, SEXP);
-SEXP rnng_socket_unlock(SEXP);
 SEXP rnng_stats_get(SEXP, SEXP);
 SEXP rnng_status_code(SEXP);
 SEXP rnng_stream_close(SEXP);

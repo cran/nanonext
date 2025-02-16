@@ -174,9 +174,6 @@ cv_signal <- function(cv) invisible(.Call(rnng_cv_signal, cv))
 #' @param socket a Socket.
 #' @param cv a \sQuote{conditionVariable} to signal, or NULL to cancel a
 #'   previously set signal.
-#' @param cv2 [default NULL] optionally, if specified, a second
-#'   \sQuote{conditionVariable} to signal. Note that this cv is signalled
-#'   sequentially after the first condition variable.
 #' @param add [default FALSE] logical value whether to signal (or cancel signal)
 #'   when a pipe is added.
 #' @param remove [default FALSE] logical value whether to signal (or cancel
@@ -193,79 +190,28 @@ cv_signal <- function(cv) invisible(.Call(rnng_cv_signal, cv))
 #' @examples
 #' s <- socket(listen = "inproc://nanopipe")
 #' cv <- cv()
-#' cv2 <- cv()
 #'
-#' pipe_notify(s, cv, cv2, add = TRUE, remove = TRUE, flag = TRUE)
+#' pipe_notify(s, cv, add = TRUE, remove = TRUE, flag = TRUE)
 #' cv_value(cv)
-#' cv_value(cv2)
 #'
 #' s1 <- socket(dial = "inproc://nanopipe")
 #' cv_value(cv)
-#' cv_value(cv2)
 #' reap(s1)
 #' cv_value(cv)
-#' cv_value(cv2)
 #'
 #' pipe_notify(s, NULL, add = TRUE, remove = TRUE)
 #' s1 <- socket(dial = "inproc://nanopipe")
 #' cv_value(cv)
-#' cv_value(cv2)
 #' reap(s1)
 #'
 #' (wait(cv))
-#' (wait(cv2))
 #'
 #' close(s)
 #'
 #' @export
 #'
-pipe_notify <- function(socket, cv, cv2 = NULL, add = FALSE, remove = FALSE, flag = FALSE)
-  invisible(.Call(rnng_pipe_notify, socket, cv, cv2, add, remove, flag))
-
-#' Lock / Unlock a Socket
-#'
-#' Prevents further pipe connections from being established at a Socket. If a
-#' socket is locked, new pipe connections are closed before they can be added to
-#' the socket.
-#'
-#' @param socket a Socket.
-#' @param cv (optional) a \sQuote{conditionVariable}. If supplied, the socket is
-#'   locked only whilst the condition variable is an odd value. This is designed
-#'   to allow an initial connection, as well as subsequent re-connections after
-#'   a connection has ended, if the conditon variable is also registered with
-#'   \code{\link{pipe_notify}} for both add and remove pipe events.
-#'
-#' @return Invisibly, zero on success (will otherwise error).
-#'
-#' @examples
-#' s <- socket("bus", listen = "inproc://nanolock")
-#' s1 <- socket("bus", dial = "inproc://nanolock")
-#' lock(s)
-#' s2 <- socket("bus", dial = "inproc://nanolock")
-#'
-#' send(s, "test")
-#' recv(s1)
-#' recv(s2)
-#'
-#' unlock(s)
-#' s3 <- socket("bus", dial = "inproc://nanolock")
-#' send(s, "test")
-#' recv(s1)
-#' recv(s3)
-#'
-#' close(s)
-#' close(s1)
-#' close(s2)
-#' close(s3)
-#'
-#' @export
-#'
-lock <- function(socket, cv = NULL) invisible(.Call(rnng_socket_lock, socket, cv))
-
-#' @rdname lock
-#' @export
-#'
-unlock <- function(socket) invisible(.Call(rnng_socket_unlock, socket))
+pipe_notify <- function(socket, cv, add = FALSE, remove = FALSE, flag = FALSE)
+  invisible(.Call(rnng_pipe_notify, socket, cv, add, remove, flag))
 
 #' Signal Forwarder
 #'
