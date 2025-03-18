@@ -18,17 +18,17 @@ ncurl_aio(
 \arguments{
 \item{url}{the URL address.}
 
-\item{convert}{[default TRUE] logical value whether to attempt conversion of
-the received raw bytes to a character vector. Set to FALSE if downloading
-non-text data.}
+\item{convert}{[default TRUE] logical value whether to attempt conversion
+of the received raw bytes to a character vector. Set to \code{FALSE} if
+downloading non-text data.}
 
 \item{method}{(optional) the HTTP method as a character string. Defaults to
 'GET' if not specified, and could also be 'POST', 'PUT' etc.}
 
 \item{headers}{(optional) a named character vector specifying the HTTP
 request headers, for example: \cr
-\code{c(Authorization = "Bearer APIKEY", `Content-Type` = "text/plain")}
-\cr A non-character or non-named vector will be ignored.}
+\code{c(Authorization = "Bearer APIKEY", "Content-Type" = "text/plain")} \cr
+A non-character or non-named vector will be ignored.}
 
 \item{data}{(optional) character string request data to be submitted. If a
 vector, only the first element is taken, and non-character objects are
@@ -42,24 +42,24 @@ will return NULL if not present. A non-character vector will be ignored.}
 transaction times out if not yet complete.}
 
 \item{tls}{(optional) applicable to secure HTTPS sites only, a client TLS
-Configuration object created by \code{\link{tls_config}}. If missing or
-NULL, certificates are not validated.}
+Configuration object created by \code{\link[=tls_config]{tls_config()}}. If missing or NULL,
+certificates are not validated.}
 }
 \value{
 An 'ncurlAio' (object of class 'ncurlAio' and 'recvAio') (invisibly).
-  The following elements may be accessed:
-  \itemize{
-    \item \code{$status} - integer HTTP repsonse status code (200 - OK).
-    Use \code{\link{status_code}} for a translation of the meaning.
-    \item \code{$headers} - named list of response headers supplied in
-    'response', or NULL otherwise. If the status code is within the 300
-    range, i.e. a redirect, the response header 'Location' is automatically
-    appended to return the redirect address.
-    \item \code{$data} - the response body, as a character string if
-    'convert' = TRUE (may be further parsed as html, json, xml etc. as
-    required), or a raw byte vector if FALSE (use \code{\link{writeBin}} to
-    save as a file).
-  }
+The following elements may be accessed:
+\itemize{
+\item \verb{$status} - integer HTTP repsonse status code (200 - OK).
+Use \code{\link[=status_code]{status_code()}} for a translation of the meaning.
+\item \verb{$headers} - named list of response headers supplied in \code{response},
+or NULL otherwise. If the status code is within the 300 range, i.e. a
+redirect, the response header 'Location' is automatically appended to
+return the redirect address.
+\item \verb{$data} - the response body, as a character string if
+\code{convert = TRUE} (may be further parsed as html, json, xml etc. as
+required), or a raw byte vector if FALSE (use \code{\link[=writeBin]{writeBin()}} to save as a
+file).
+}
 }
 \description{
 nano cURL - a minimalist http(s) client - async edition.
@@ -67,14 +67,14 @@ nano cURL - a minimalist http(s) client - async edition.
 \section{Promises}{
 
 
-\sQuote{ncurlAio} may be used anywhere that accepts a \sQuote{promise} from
-the \CRANpkg{promises} package through the included \code{as.promise} method.
+'ncurlAio' may be used anywhere that accepts a 'promise' from the
+\CRANpkg{promises} package through the included \code{as.promise} method.
 
 The promises created are completely event-driven and non-polling.
 
 If a status code of 200 (OK) is returned then the promise is resolved with
 the reponse body, otherwise it is rejected with a translation of the status
-code or \sQuote{errorValue} as the case may be.
+code or 'errorValue' as the case may be.
 }
 
 \examples{
@@ -86,18 +86,16 @@ nc$status
 nc$headers
 nc$data
 
-if (interactive() && requireNamespace("promises", quietly = TRUE)) {
-
+\dontshow{if (interactive() && requireNamespace("promises", quietly = TRUE)) (if (getRversion() >= "3.4") withAutoprint else force)(\{ # examplesIf}
 library(promises)
 p <- as.promise(nc)
 print(p)
 
 p2 <- ncurl_aio("https://postman-echo.com/get") \%...>\% cat
 is.promise(p2)
-
-}
-
+\dontshow{\}) # examplesIf}
 }
 \seealso{
-\code{\link{ncurl_session}} for persistent connections.
+\code{\link[=ncurl]{ncurl()}} for synchronous http requests; \code{\link[=ncurl_session]{ncurl_session()}} for
+persistent connections.
 }

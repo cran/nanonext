@@ -16,7 +16,6 @@
 
 // nanonext - C level - Core Functions -----------------------------------------
 
-#define NANONEXT_SIGNALS
 #include "nanonext.h"
 
 // internals -------------------------------------------------------------------
@@ -123,73 +122,6 @@ static SEXP nano_outHook(SEXP x, SEXP fun) {
 
 // functions with forward definitions in nanonext.h ----------------------------
 
-void raio_complete_interrupt(void *arg) {
-
-  nano_aio *raio = (nano_aio *) arg;
-  int res = nng_aio_result(raio->aio);
-  if (res == 0) {
-    nng_msg *msg = nng_aio_get_msg(raio->aio);
-    raio->data = msg;
-    nng_pipe p = nng_msg_get_pipe(msg);
-    res = - (int) p.id;
-  }
-
-  raio->result = res;
-
-  if (raio->cb != NULL)
-    later2(raio_invoke_cb, raio->cb);
-
-  if (nano_interrupt) {
-#ifdef _WIN32
-    UserBreak = 1;
-#else
-    kill(getpid(), SIGINT);
-#endif
-  }
-
-}
-
-void raio_complete_signal(void *arg) {
-
-  nano_aio *raio = (nano_aio *) arg;
-  nano_cv *ncv = (nano_cv *) raio->next;
-  nng_cv *cv = ncv->cv;
-  nng_mtx *mtx = ncv->mtx;
-
-  int res = nng_aio_result(raio->aio);
-  if (res == 0) {
-    nng_msg *msg = nng_aio_get_msg(raio->aio);
-    raio->data = msg;
-    nng_pipe p = nng_msg_get_pipe(msg);
-    res = - (int) p.id;
-  }
-
-  nng_mtx_lock(mtx);
-  raio->result = res;
-  ncv->condition++;
-  nng_cv_wake(cv);
-  nng_mtx_unlock(mtx);
-
-}
-
-void sendaio_complete(void *arg) {
-
-  nng_aio *aio = ((nano_saio *) arg)->aio;
-  if (nng_aio_result(aio))
-    nng_msg_free(nng_aio_get_msg(aio));
-
-}
-
-void cv_finalizer(SEXP xptr) {
-
-  if (NANO_PTR(xptr) == NULL) return;
-  nano_cv *xp = (nano_cv *) NANO_PTR(xptr);
-  nng_cv_free(xp->cv);
-  nng_mtx_free(xp->mtx);
-  R_Free(xp);
-
-}
-
 void dialer_finalizer(SEXP xptr) {
 
   if (NANO_PTR(xptr) == NULL) return;
@@ -247,18 +179,6 @@ inline SEXP R_mkClosure(SEXP formals, SEXP body, SEXP env) {
 }
 
 #endif
-
-SEXP nano_findVarInFrame(const SEXP env, const SEXP sym) {
-
-  SEXP frame = CAR(env);  // FRAME
-  while (frame != R_NilValue) {
-    if (TAG(frame) == sym)
-      return CAR(frame); // BINDING_VALUE
-    frame = CDR(frame);
-  }
-  return R_UnboundValue;
-
-}
 
 inline SEXP nano_PreserveObject(const SEXP x) {
 
@@ -324,11 +244,11 @@ SEXP mk_error_data(const int xc) {
 
 }
 
-SEXP rawToChar(const unsigned char *buf, const size_t sz) {
+SEXP nano_raw_char(const unsigned char *buf, const size_t sz) {
 
   SEXP out;
-  int i, j;
-  for (i = 0, j = -1; i < sz; i++) if (buf[i]) j = i; else break;
+  int i;
+  for (i = 0; i < sz; i++) if (!buf[i]) break;
   if (sz - i > 1) {
     Rf_warningcall_immediate(R_NilValue, "data could not be converted to a character string");
     out = Rf_allocVector(RAWSXP, sz);
@@ -337,7 +257,7 @@ SEXP rawToChar(const unsigned char *buf, const size_t sz) {
   }
 
   PROTECT(out = Rf_allocVector(STRSXP, 1));
-  SET_STRING_ELT(out, 0, Rf_mkCharLenCE((const char *) buf, j + 1, CE_NATIVE));
+  SET_STRING_ELT(out, 0, Rf_mkCharLenCE((const char *) buf, i, CE_NATIVE));
 
   UNPROTECT(1);
   return out;
@@ -586,7 +506,7 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const uint8_t mod, SEXP ho
     data = Rf_allocVector(RAWSXP, sz);
     break;
   case 9:
-    data = rawToChar(buf, sz);
+    data = nano_raw_char(buf, sz);
     return data;
   default:
     data = nano_unserialize(buf, sz, hook);

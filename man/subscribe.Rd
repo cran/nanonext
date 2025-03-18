@@ -10,9 +10,9 @@ subscribe(con, topic = NULL)
 unsubscribe(con, topic = NULL)
 }
 \arguments{
-\item{con}{a Socket or Context using the \sQuote{sub} protocol.}
+\item{con}{a Socket or Context using the 'sub' protocol.}
 
-\item{topic}{[default NULL] an atomic type or NULL. The default NULL
+\item{topic}{[default NULL] an atomic type or \code{NULL}. The default \code{NULL}
 subscribes to all topics / unsubscribes from all topics (if all topics were
 previously subscribed).}
 }
@@ -27,8 +27,8 @@ list.
 \details{
 To use pub/sub the publisher must:
 \itemize{
-  \item specify \code{mode = 'raw'} when sending.
-  \item ensure the sent vector starts with the topic.
+\item specify \code{mode = 'raw'} when sending.
+\item ensure the sent vector starts with the topic.
 }
 The subscriber should then receive specifying the correct mode.
 }

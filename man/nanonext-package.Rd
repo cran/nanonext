@@ -9,13 +9,13 @@
 \description{
 R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ. NNG is a socket
 library for reliable, high-performance messaging over in-process, IPC, TCP,
-WebSocket and secure TLS transports. Implements
-\sQuote{Scalability Protocols}, a standard for common communications patterns
-including publish/subscribe, request/reply and service discovery. As its own
-threaded concurrency framework, provides a toolkit for asynchronous
-programming and distributed computing. Intuitive 'aio' objects resolve
-automatically when asynchronous operations complete, and synchronisation
-primitives allow R to wait upon events signalled by concurrent threads.
+WebSocket and secure TLS transports. Implements 'Scalability Protocols', a
+standard for common communications patterns including publish/subscribe,
+request/reply and service discovery. As its own threaded concurrency
+framework, provides a toolkit for asynchronous programming and distributed
+computing. Intuitive 'aio' objects resolve automatically when asynchronous
+operations complete, and synchronisation primitives allow R to wait upon
+events signalled by concurrent threads.
 }
 \section{Usage notes}{
 
@@ -23,15 +23,15 @@ primitives allow R to wait upon events signalled by concurrent threads.
 \pkg{nanonext} offers 2 equivalent interfaces: a functional interface, and an
 object-oriented interface.
 
-The primary object in the functional interface is the Socket. Use
-\code{\link{socket}} to create a socket and dial or listen at an address. The
-socket is then passed as the first argument of subsequent actions such as
-\code{send()} or \code{recv()}.
+The primary object in the functional interface is the Socket. Use \code{\link[=socket]{socket()}}
+to create a socket and dial or listen at an address. The socket is then
+passed as the first argument of subsequent actions such as \code{send()} or
+\code{recv()}.
 
 The primary object in the object-oriented interface is the nano object. Use
-\code{\link{nano}} to create a nano object which encapsulates a Socket and
-Dialer/Listener. Methods such as \code{$send()} or \code{$recv()} can then be
-accessed directly from the object.
+\code{\link[=nano]{nano()}} to create a nano object which encapsulates a Socket and
+Dialer/Listener. Methods such as \verb{$send()} or \verb{$recv()} can then be accessed
+directly from the object.
 }
 
 \section{Documentation}{
@@ -56,18 +56,18 @@ Guide to the options that can be inspected and set using: \link{opt} /
 
 
 NNG presents a socket view of networking. A socket implements precisely one
-protocol, such as \sQuote{bus}, etc.
+protocol, such as 'bus', etc.
 
 Each socket can be used to send and receive messages (if the protocol
 supports it, and implements the appropriate protocol semantics). For example,
-the \sQuote{sub} protocol automatically filters incoming messages to discard
-topics that have not been subscribed.
+the 'sub' protocol automatically filters incoming messages to discard topics
+that have not been subscribed.
 
 NNG sockets are message-oriented, and messages are either delivered wholly,
 or not at all. Partial delivery is not possible. Furthermore, NNG does not
 provide any other delivery or ordering guarantees: messages may be dropped or
-reordered (some protocols, such as \sQuote{req} may offer stronger guarantees
-by performing their own retry and validation schemes).
+reordered (some protocols, such as 'req' may offer stronger guarantees by
+performing their own retry and validation schemes).
 
 Each socket can have zero, one, or many endpoints, which are either listeners
 or dialers (a given socket may use listeners, dialers, or both). These
@@ -96,5 +96,5 @@ Useful links:
 }
 \author{
 Charlie Gao \email{charlie.gao@shikokuchuo.net}
-  (\href{https://orcid.org/0000-0002-0750-061X}{ORCID})
+(\href{https://orcid.org/0000-0002-0750-061X}{ORCID})
 }

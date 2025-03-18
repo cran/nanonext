@@ -19,20 +19,18 @@ is_ncurl_session(x)
 Logical value TRUE or FALSE.
 }
 \description{
-Validator functions for object types created by \{nanonext\}.
+Validator functions for object types created by \pkg{nanonext}.
 }
 \details{
-Is the object an Aio (inheriting from class \sQuote{sendAio} or
-\sQuote{recvAio}).
+Is the object an Aio (inheriting from class 'sendAio' or 'recvAio').
 
-Is the object an object inheriting from class \sQuote{nano} i.e. a
-nanoSocket, nanoContext, nanoStream, nanoListener, nanoDialer, nanoMonitor or
-nano Object.
+Is the object an object inheriting from class 'nano' i.e. a nanoSocket,
+nanoContext, nanoStream, nanoListener, nanoDialer, nanoMonitor or nano
+Object.
 
-Is the object an ncurlSession (object of class \sQuote{ncurlSession}).
+Is the object an ncurlSession (object of class 'ncurlSession').
 
-Is the object a Condition Variable (object of class
-\sQuote{conditionVariable}).
+Is the object a Condition Variable (object of class 'conditionVariable').
 }
 \examples{
 nc <- call_aio(ncurl_aio("https://postman-echo.com/get", timeout = 1000L))
@@ -45,7 +43,7 @@ is_nano(n)
 close(s)
 n$close()
 
-s <- ncurl_session("https://postman-echo.com/get")
+s <- ncurl_session("https://postman-echo.com/get", timeout = 1000L)
 is_ncurl_session(s)
 if (is_ncurl_session(s)) close(s)
 

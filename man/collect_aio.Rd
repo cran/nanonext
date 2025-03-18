@@ -10,12 +10,12 @@ collect_aio(x)
 collect_aio_(x)
 }
 \arguments{
-\item{x}{an Aio or list of Aios (objects of class \sQuote{sendAio},
-\sQuote{recvAio} or \sQuote{ncurlAio}).}
+\item{x}{an Aio or list of Aios (objects of class 'sendAio', 'recvAio' or
+'ncurlAio').}
 }
 \value{
-Depending on the type of \sQuote{x} supplied, an object or list of
-  objects (the same length as \sQuote{x}, preserving names).
+Depending on the type of \code{x} supplied, an object or list of objects
+(the same length as \code{x}, preserving names).
 }
 \description{
 \code{collect_aio} collects the data of an Aio or list of Aios, waiting for

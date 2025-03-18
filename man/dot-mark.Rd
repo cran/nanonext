@@ -10,14 +10,9 @@
 \item{x}{logical value.}
 }
 \value{
-The logical value 'x' supplied.
+The logical value \code{x} supplied.
 }
 \description{
 Internal package function.
-}
-\examples{
-.mark()
-.mark(FALSE)
-
 }
 \keyword{internal}

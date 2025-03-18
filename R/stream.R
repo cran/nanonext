@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2023 Hibiki AI Limited <info@hibiki-ai.com>
+# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
 #
 # This file is part of nanonext.
 #
@@ -25,10 +25,10 @@
 #' A Stream is used for raw byte stream connections. Byte streams are reliable
 #' in that data will not be delivered out of order, or with portions missing.
 #'
-#' Can be used to dial a (secure) websocket address starting 'ws://' or 'wss://'.
-#' It is often the case that 'textframes' needs to be set to TRUE.
+#' Can be used to dial a (secure) websocket address starting 'ws://' or
+#' 'wss://'. It is often the case that `textframes` needs to be set to `TRUE`.
 #'
-#' Specify only one of 'dial' or 'listen'. If both are specified, 'listen' will
+#' Specify only one of `dial` or `listen`. If both are specified, `listen` will
 #' be ignored.
 #'
 #' Closing a stream renders it invalid and attempting to perform additional
@@ -40,13 +40,13 @@
 #' @param listen a URL to listen at, specifying the transport and address as a
 #'   character string e.g. 'ipc:///tmp/anyvalue' or 'tcp://127.0.0.1:5555' (not
 #'   all transports are supported).
-#' @param textframes [default FALSE] applicable to the websocket transport only,
-#'   enables sending and receiving of TEXT frames (ignored otherwise).
+#' @param textframes \[default FALSE\] applicable to the websocket transport
+#'   only, enables sending and receiving of TEXT frames (ignored otherwise).
 #' @param tls (optional) applicable to secure websockets only, a client or
-#'   server TLS configuration object created by \code{\link{tls_config}}. If
-#'   missing or NULL, certificates are not validated.
+#'   server TLS configuration object created by [tls_config()]. If missing or
+#'   NULL, certificates are not validated.
 #'
-#' @return A Stream (object of class \sQuote{nanoStream} and \sQuote{nano}).
+#' @return A Stream (object of class 'nanoStream' and 'nano').
 #'
 #' @examples
 #' # Will succeed only if there is an open connection at the address:
@@ -67,11 +67,7 @@
 #' @export
 #'
 stream <- function(dial = NULL, listen = NULL, textframes = FALSE, tls = NULL)
-  if (length(dial))
-    .Call(rnng_stream_dial, dial, textframes, tls) else
-      if (length(listen))
-        .Call(rnng_stream_listen, listen, textframes, tls) else
-          stop("specify a URL for either 'dial' or 'listen'")
+  .Call(rnng_stream_open, dial, listen, textframes, tls)
 
 #' @rdname close
 #' @method close nanoStream

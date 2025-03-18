@@ -12,10 +12,4 @@ NULL.
 \description{
 Internal package function.
 }
-\examples{
-.Random.seed
-invisible(.advance())
-.Random.seed
-
-}
 \keyword{internal}
