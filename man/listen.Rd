@@ -9,7 +9,8 @@ listen(
   url = "inproc://nanonext",
   tls = NULL,
   autostart = TRUE,
-  error = FALSE
+  fail = c("warn", "error", "none"),
+  ...
 )
 }
 \arguments{
@@ -26,9 +27,11 @@ provide a TLS configuration object created by \code{\link[=tls_config]{tls_confi
 if setting configuration options on the listener as it is not generally
 possible to change these once started.}
 
-\item{error}{[default FALSE] behaviour on error: if FALSE, returns an
-integer exit code accompanied by a warning, or, if TRUE, generates an error
-and halts execution.}
+\item{fail}{[default 'warn'] failure mode - a character value or integer
+equivalent, whether to warn (1L), error (2L), or for none (3L) just return
+an 'errorValue' without any corresponding warning.}
+
+\item{...}{not used (and will be removed).}
 }
 \value{
 Invisibly, an integer exit code (zero on success). A new Listener

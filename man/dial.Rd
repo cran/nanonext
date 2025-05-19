@@ -9,7 +9,8 @@ dial(
   url = "inproc://nanonext",
   tls = NULL,
   autostart = TRUE,
-  error = FALSE
+  fail = c("warn", "error", "none"),
+  ...
 )
 }
 \arguments{
@@ -29,9 +30,11 @@ attempting to use the socket before an asynchronous dial has completed. Set
 to FALSE if setting configuration options on the dialer as it is not
 generally possible to change these once started.}
 
-\item{error}{[default FALSE] behaviour on error: if FALSE, returns an
-integer exit code accompanied by a warning, or, if TRUE, generates an error
-and halts execution.}
+\item{fail}{[default 'warn'] failure mode - a character value or integer
+equivalent, whether to warn (1L), error (2L), or for none (3L) just return
+an 'errorValue' without any corresponding warning.}
+
+\item{...}{not used (and will be removed).}
 }
 \value{
 Invisibly, an integer exit code (zero on success). A new Dialer

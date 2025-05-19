@@ -1,33 +1,8 @@
-// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
-//
-// This file is part of nanonext.
-//
-// nanonext is free software: you can redistribute it and/or modify it under the
-// terms of the GNU General Public License as published by the Free Software
-// Foundation, either version 3 of the License, or (at your option) any later
-// version.
-//
-// nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-// A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License along with
-// nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 // nanonext - package level registrations --------------------------------------
 
 #include "nanonext.h"
 
 void (*eln2)(void (*)(void *), void *, double, int) = NULL;
-
-int nano_interrupt = 0;
-uint8_t special_bit = 0;
-
-nng_mtx *nano_wait_mtx;
-nng_cv *nano_wait_cv;
-nng_thread *nano_wait_thr = NULL;
-nng_aio *nano_shared_aio = NULL;
-int nano_wait_condition = 0;
 
 SEXP nano_AioSymbol;
 SEXP nano_ContextSymbol;
@@ -151,13 +126,19 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
   {"rnng_eval_safe", (DL_FUNC) &rnng_eval_safe, 1},
   {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
+  {"rnng_fini_priors", (DL_FUNC) &rnng_fini_priors, 0},
   {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
+  {"rnng_header_read", (DL_FUNC) &rnng_header_read, 1},
+  {"rnng_header_set", (DL_FUNC) &rnng_header_set, 1},
   {"rnng_interrupt_switch", (DL_FUNC) &rnng_interrupt_switch, 1},
+  {"rnng_ip_addr", (DL_FUNC) &rnng_ip_addr, 0},
   {"rnng_is_error_value", (DL_FUNC) &rnng_is_error_value, 1},
   {"rnng_is_nul_byte", (DL_FUNC) &rnng_is_nul_byte, 1},
   {"rnng_listen", (DL_FUNC) &rnng_listen, 5},
   {"rnng_listener_close", (DL_FUNC) &rnng_listener_close, 1},
   {"rnng_listener_start", (DL_FUNC) &rnng_listener_start, 1},
+  {"rnng_marker_read", (DL_FUNC) &rnng_marker_read, 1},
+  {"rnng_marker_set", (DL_FUNC) &rnng_marker_set, 1},
   {"rnng_messenger", (DL_FUNC) &rnng_messenger, 1},
   {"rnng_monitor_create", (DL_FUNC) &rnng_monitor_create, 2},
   {"rnng_monitor_read", (DL_FUNC) &rnng_monitor_read, 1},
@@ -169,14 +150,14 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 5},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 6},
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
+  {"rnng_read_stdin", (DL_FUNC) &rnng_read_stdin, 1},
   {"rnng_reap", (DL_FUNC) &rnng_reap, 1},
   {"rnng_recv", (DL_FUNC) &rnng_recv, 4},
   {"rnng_recv_aio", (DL_FUNC) &rnng_recv_aio, 6},
-  {"rnng_request", (DL_FUNC) &rnng_request, 7},
+  {"rnng_request", (DL_FUNC) &rnng_request, 8},
   {"rnng_send", (DL_FUNC) &rnng_send, 5},
   {"rnng_send_aio", (DL_FUNC) &rnng_send_aio, 6},
-  {"rnng_serial_config", (DL_FUNC) &rnng_serial_config, 4},
-  {"rnng_set_marker", (DL_FUNC) &rnng_set_marker, 1},
+  {"rnng_serial_config", (DL_FUNC) &rnng_serial_config, 3},
   {"rnng_set_opt", (DL_FUNC) &rnng_set_opt, 3},
   {"rnng_set_promise_context", (DL_FUNC) &rnng_set_promise_context, 2},
   {"rnng_signal_thread_create", (DL_FUNC) &rnng_signal_thread_create, 2},
@@ -187,7 +168,6 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_stream_open", (DL_FUNC) &rnng_stream_open, 4},
   {"rnng_strerror", (DL_FUNC) &rnng_strerror, 1},
   {"rnng_subscribe", (DL_FUNC) &rnng_subscribe, 3},
-  {"rnng_thread_shutdown", (DL_FUNC) &rnng_thread_shutdown, 0},
   {"rnng_tls_config", (DL_FUNC) &rnng_tls_config, 4},
   {"rnng_traverse_precious", (DL_FUNC) &rnng_traverse_precious, 0},
   {"rnng_unresolved", (DL_FUNC) &rnng_unresolved, 1},
@@ -196,6 +176,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_version", (DL_FUNC) &rnng_version, 0},
   {"rnng_wait_thread_create", (DL_FUNC) &rnng_wait_thread_create, 1},
   {"rnng_write_cert", (DL_FUNC) &rnng_write_cert, 2},
+  {"rnng_write_stdout", (DL_FUNC) &rnng_write_stdout, 1},
   {NULL, NULL, 0}
 };
 
@@ -207,6 +188,7 @@ static const R_ExternalMethodDef externalMethods[] = {
 void attribute_visible R_init_nanonext(DllInfo* dll) {
   RegisterSymbols();
   PreserveObjects();
+  nano_list_do(INIT, NULL);
   R_registerRoutines(dll, NULL, callMethods, NULL, externalMethods);
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
@@ -214,7 +196,8 @@ void attribute_visible R_init_nanonext(DllInfo* dll) {
 
 // # nocov start
 void attribute_visible R_unload_nanonext(DllInfo *info) {
-  rnng_thread_shutdown();
+  nano_thread_shutdown();
+  nano_list_do(SHUTDOWN, NULL);
   ReleaseObjects();
 }
 // # nocov end

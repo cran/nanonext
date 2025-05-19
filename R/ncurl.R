@@ -1,19 +1,3 @@
-# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-#
-# This file is part of nanonext.
-#
-# nanonext is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 # nanonext - ncurl - async http client -----------------------------------------
 
 #' ncurl
@@ -63,32 +47,40 @@
 #'   persistent connections.
 #'
 #' @examples
-#' ncurl("https://postman-echo.com/get",
-#'        convert = FALSE,
-#'        response = c("date", "content-type"),
-#'        timeout = 1200L)
-#' ncurl("https://postman-echo.com/put",
-#'       method = "PUT",
-#'       headers = c(Authorization = "Bearer APIKEY"),
-#'       data = "hello world",
-#'       timeout = 1500L)
-#' ncurl("https://postman-echo.com/post",
-#'       method = "POST",
-#'       headers = c(`Content-Type` = "application/json"),
-#'       data = '{"key":"value"}',
-#'       timeout = 1500L)
+#' ncurl(
+#'   "https://postman-echo.com/get",
+#'   convert = FALSE,
+#'   response = c("date", "content-type"),
+#'   timeout = 1200L
+#' )
+#' ncurl(
+#'   "https://postman-echo.com/put",
+#'   method = "PUT",
+#'   headers = c(Authorization = "Bearer APIKEY"),
+#'   data = "hello world",
+#'   timeout = 1500L
+#' )
+#' ncurl(
+#'   "https://postman-echo.com/post",
+#'   method = "POST",
+#'   headers = c(`Content-Type` = "application/json"),
+#'   data = '{"key":"value"}',
+#'   timeout = 1500L
+#' )
 #'
 #' @export
 #'
-ncurl <- function(url,
-                  convert = TRUE,
-                  follow = FALSE,
-                  method = NULL,
-                  headers = NULL,
-                  data = NULL,
-                  response = NULL,
-                  timeout = NULL,
-                  tls = NULL)
+ncurl <- function(
+  url,
+  convert = TRUE,
+  follow = FALSE,
+  method = NULL,
+  headers = NULL,
+  data = NULL,
+  response = NULL,
+  timeout = NULL,
+  tls = NULL
+)
   .Call(rnng_ncurl, url, convert, follow, method, headers, data, response, timeout, tls)
 
 #' ncurl Async
@@ -127,9 +119,11 @@ ncurl <- function(url,
 #'   persistent connections.
 #'
 #' @examples
-#' nc <- ncurl_aio("https://postman-echo.com/get",
-#'                 response = c("date", "server"),
-#'                 timeout = 2000L)
+#' nc <- ncurl_aio(
+#'   "https://postman-echo.com/get",
+#'   response = c("date", "server"),
+#'   timeout = 2000L
+#' )
 #' call_aio(nc)
 #' nc$status
 #' nc$headers
@@ -145,15 +139,17 @@ ncurl <- function(url,
 #'
 #' @export
 #'
-ncurl_aio <- function(url,
-                      convert = TRUE,
-                      method = NULL,
-                      headers = NULL,
-                      data = NULL,
-                      response = NULL,
-                      timeout = NULL,
-                      tls = NULL)
-    data <- .Call(rnng_ncurl_aio, url, convert, method, headers, data, response, timeout, tls, environment())
+ncurl_aio <- function(
+  url,
+  convert = TRUE,
+  method = NULL,
+  headers = NULL,
+  data = NULL,
+  response = NULL,
+  timeout = NULL,
+  tls = NULL
+)
+  data <- .Call(rnng_ncurl_aio, url, convert, method, headers, data, response, timeout, tls, environment())
 
 #' ncurl Session
 #'
@@ -173,24 +169,28 @@ ncurl_aio <- function(url,
 #'   asynchronous http requests.
 #'
 #' @examples
-#' s <- ncurl_session("https://postman-echo.com/get",
-#'                    response = "date",
-#'                    timeout = 2000L)
+#' s <- ncurl_session(
+#'   "https://postman-echo.com/get",
+#'   response = "date",
+#'   timeout = 2000L
+#' )
 #' s
 #' if (is_ncurl_session(s)) transact(s)
 #' if (is_ncurl_session(s)) close(s)
 #'
 #' @export
 #'
-ncurl_session <- function(url,
-                          convert = TRUE,
-                          method = NULL,
-                          headers = NULL,
-                          data = NULL,
-                          response = NULL,
-                          timeout = NULL,
-                          tls = NULL)
-    .Call(rnng_ncurl_session, url, convert, method, headers, data, response, timeout, tls)
+ncurl_session <- function(
+  url,
+  convert = TRUE,
+  method = NULL,
+  headers = NULL,
+  data = NULL,
+  response = NULL,
+  timeout = NULL,
+  tls = NULL
+)
+  .Call(rnng_ncurl_session, url, convert, method, headers, data, response, timeout, tls)
 
 #' @param session an 'ncurlSession' object.
 #'
@@ -238,11 +238,9 @@ close.ncurlSession <- function(con, ...) invisible(.Call(rnng_ncurl_session_clos
 #' @exportS3Method promises::as.promise
 #'
 as.promise.ncurlAio <- function(x) {
-
   promise <- .subset2(x, "promise")
 
   if (is.null(promise)) {
-
     promise <- if (unresolved(x)) {
       promises::promise(
         function(resolve, reject) .keep(x, environment())
@@ -264,11 +262,9 @@ as.promise.ncurlAio <- function(x) {
     }
 
     `[[<-`(x, "promise", promise)
-
   }
 
   promise
-
 }
 
 #' @exportS3Method promises::is.promising

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.6">
+<meta name="generator" content="litedown 0.7">
 <title>nanonext - NNG Lightweight Messaging Library</title>
 <style type="text/css">
 body {
@@ -12,6 +12,8 @@ body {
   margin: auto;
   padding: 1em;
   line-height: 1.5;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 body, .abstract, code, .footnotes, footer, #refs, .caption { font-size: .9em; }
 li li { font-size: .95em; }
@@ -251,12 +253,12 @@ aio &lt;- request(context(req), data = 1e8, recv_mode = &quot;double&quot;)
 <p>When the result of the server calculation is required, the <code>recvAio</code> may be called using <code>call_aio()</code>.</p>
 <p>The return value from the server request is then retrieved and stored in the Aio as <code>$data</code>.</p>
 <pre><code class="language-r">call_aio(aio)$data |&gt; str()
-#&gt;  num [1:100000000] 1.958 -1.143 -0.492 0.296 -1.137 ...
+#&gt;  num [1:100000000] 0.145 0.959 -0.489 -0.896 1.245 ...
 </code></pre>
 <p>As <code>call_aio()</code> is blocking and will wait for completion, an alternative is to query <code>aio$data</code> directly. This will return an ‘unresolved’ logical NA value if the calculation is yet to complete.</p>
 <p>In this example the calculation is returned, but other operations may reside entirely on the server side, for example writing data to disk.</p>
 <p>In such a case, calling or querying the value confirms that the operation has completed, and provides the return value of the function, which may typically be NULL or an exit code.</p>
-<p>The <a href="https://doi.org/10.5281/zenodo.7912722"><code>mirai</code></a> package (<a href="https://shikokuchuo.net/mirai/">https://shikokuchuo.net/mirai/</a>) uses <code>nanonext</code> as the back-end to provide asynchronous execution of arbitrary R code using the RPC model.</p>
+<p>The <a href="https://doi.org/10.5281/zenodo.7912722"><code>mirai</code></a> package (<a href="https://mirai.r-lib.org/">https://mirai.r-lib.org/</a>) uses <code>nanonext</code> as the back-end to provide asynchronous execution of arbitrary R code using the RPC model.</p>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="sec:synchronisation-primitives">Synchronisation Primitives</h3>
 <p><code>nanonext</code> implements cross-platform synchronisation primitives provided by the NNG library.</p>
@@ -337,7 +339,7 @@ ii) Passing a TLS configuration object to the ‘tls’ argument of <code>listen
 <pre><code class="language-r">cert &lt;- write_cert(cn = &quot;127.0.0.1&quot;)
 str(cert)
 #&gt; List of 2
-#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJJwIBAAKCAgEA1+POiFkmaCuY0f8oPYh8V29XvNaTU/GkcU4apZbZ2BGd7Xqs\nlbn5iI6rLrgm&quot;| __truncated__
+#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJKQIBAAKCAgEAr4Spuk5e4qYBfuZ5Qe8QkPXE9APppdgEhXH0hkTcEsxb7Qf4\nF/s1SyUcWQUo&quot;| __truncated__
 #&gt;  $ client: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;&quot;
 
 ser &lt;- tls_config(server = cert$server)
@@ -471,7 +473,7 @@ close(res2)
 #&gt; NULL
 #&gt; 
 #&gt; $data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t1737978441.766\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-67977249-634bf8ad590e6fd60e8a847c\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t1745415451.442\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-6808ed1b-16c5d32d02412c5d4e3a1f5d\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
 </code></pre>
 <p>For advanced use, supports additional HTTP methods such as POST or PUT.</p>
 <pre><code class="language-r">res &lt;- ncurl_aio(&quot;https://postman-echo.com/post&quot;,
@@ -484,10 +486,10 @@ res
 
 call_aio(res)$headers
 #&gt; $date
-#&gt; [1] &quot;Mon, 27 Jan 2025 11:47:22 GMT&quot;
+#&gt; [1] &quot;Wed, 23 Apr 2025 13:37:31 GMT&quot;
 
 res$data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t1737978442.356\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-6797724a-09ca6ff2789e8f3512f1002f\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
+#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t1745415451.986\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-6808ed1b-348ca7b6773f69bb06836afa\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
 </code></pre>
 <p>In this respect, it may be used as a performant and lightweight method for making REST API requests.</p>
 <h5 id="sec:ncurl-promises">ncurl Promises</h5>
@@ -515,24 +517,24 @@ transact(sess)
 #&gt; 
 #&gt; $headers
 #&gt; $headers$Date
-#&gt; [1] &quot;Mon, 27 Jan 2025 11:47:22 GMT&quot;
+#&gt; [1] &quot;Wed, 23 Apr 2025 13:37:32 GMT&quot;
 #&gt; 
 #&gt; $headers$`Content-Type`
 #&gt; [1] &quot;application/json; charset=utf-8&quot;
 #&gt; 
 #&gt; 
 #&gt; $data
-#&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22 68 6f
-#&gt;  [39] 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 72 65 71 75 65 73
-#&gt;  [77] 74 2d 73 74 61 72 74 22 3a 20 22 74 31 37 33 37 39 37 38 34 34 32 2e 37 39 30 22 2c 0a 20 20 20 20 22 63 6f 6e 6e
-#&gt; [115] 65 63 74 69 6f 6e 22 3a 20 22 63 6c 6f 73 65 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72 6f
-#&gt; [153] 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 6f 72 74 22 3a 20
-#&gt; [191] 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31 2d
-#&gt; [229] 36 37 39 37 37 32 34 61 2d 32 39 33 61 65 64 35 66 32 63 63 61 38 37 36 39 36 33 30 62 31 38 33 35 22 2c 0a 20 20
-#&gt; [267] 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c 0a
-#&gt; [305] 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20
-#&gt; [343] 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d
-#&gt; [381] 2f 67 65 74 22 0a 7d
+#&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20 20 22
+#&gt;  [37] 68 6f 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22 78 2d 72 65
+#&gt;  [73] 71 75 65 73 74 2d 73 74 61 72 74 22 3a 20 22 74 31 37 34 35 34 31 35 34 35 32 2e 34 37 34 22 2c 0a 20 20 20
+#&gt; [109] 20 22 63 6f 6e 6e 65 63 74 69 6f 6e 22 3a 20 22 63 6c 6f 73 65 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61
+#&gt; [145] 72 64 65 64 2d 70 72 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20 22 78 2d 66 6f 72 77 61 72 64
+#&gt; [181] 65 64 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d 61 6d 7a 6e 2d 74 72 61 63 65 2d 69
+#&gt; [217] 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 38 30 38 65 64 31 63 2d 34 64 64 34 37 61 35 34 33 34 32 33 36 32 37
+#&gt; [253] 63 34 35 34 63 33 39 35 32 22 2c 0a 20 20 20 20 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70
+#&gt; [289] 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c 0a 20 20 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a
+#&gt; [325] 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22 0a 20 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70
+#&gt; [361] 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f 67 65 74 22 0a 7d
 </code></pre>
 <p><a href="#table-of-contents">« Back to ToC</a></p>
 <h3 id="sec:stream-websocket-client">stream: Websocket Client</h3>

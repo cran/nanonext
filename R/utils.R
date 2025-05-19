@@ -1,19 +1,3 @@
-# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-#
-# This file is part of nanonext.
-#
-# nanonext is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 # nanonext - Utilities ---------------------------------------------------------
 
 #' NNG Library Version
@@ -271,28 +255,34 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #'
 #' Returns a serialization configuration, which may be set on a Socket for
 #' custom serialization and unserialization of non-system reference objects,
-#' allowing these to be sent and received between different R sessions. This
-#' utilises the 'refhook' system of R native serialization. Once set, the
-#' functions apply to all send and receive operations performed in mode
-#' `"serial"` over the Socket or Context created from the Socket.
+#' allowing these to be sent and received between different R sessions. Once
+#' set, the functions apply to all send and receive operations performed in mode
+#' 'serial' over the Socket, or Context created from the Socket.
 #'
-#' @param class character string of the class of object custom serialization
-#'   functions are applied to, e.g. 'ArrowTabular' or 'torch_tensor'.
-#' @param sfunc a function that accepts a reference object inheriting from
-#'   `class` (or a list of such objects) and returns a raw vector.
-#' @param ufunc a function that accepts a raw vector and returns a reference
-#'   object (or list of such objects).
-#' @param vec \[default FALSE\] whether or not the serialization functions are
-#'   vectorized. If `FALSE`, they should accept and return reference objects
-#'   individually e.g. `arrow::write_to_raw` and `arrow::read_ipc_stream`. If
-#'   `TRUE`, they should accept and return a list of reference objects, e.g.
-#'   `torch::torch_serialize` and `torch::torch_load`.
+#' This feature utilises the 'refhook' system of R native serialization.
+#'
+#' @param class a character string (or vector) of the class of object custom
+#'   serialization functions are applied to, e.g. `'ArrowTabular'` or
+#'   `c('torch_tensor', 'ArrowTabular')`.
+#' @param sfunc a function (or list of functions) that accepts a reference
+#'   object inheriting from `class` and returns a raw vector.
+#' @param ufunc a function (or list of functions) that accepts a raw vector and
+#'   returns a reference object.
+#' @param vec do not specify (retained for compatibility only and will be
+#'   removed).
 #'
 #' @return A list comprising the configuration. This should be set on a Socket
 #'   using [opt<-()] with option name `"serial"`.
 #'
 #' @examples
 #' cfg <- serial_config("test_cls", function(x) serialize(x, NULL), unserialize)
+#' cfg
+#'
+#' cfg <- serial_config(
+#'   c("class_one", "class_two"),
+#'   list(function(x) serialize(x, NULL), function(x) serialize(x, NULL)),
+#'   list(unserialize, unserialize)
+#' )
 #' cfg
 #'
 #' s <- socket()
@@ -306,20 +296,64 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #' @export
 #'
 serial_config <- function(class, sfunc, ufunc, vec = FALSE)
-  .Call(rnng_serial_config, class, sfunc, ufunc, vec)
+  .Call(rnng_serial_config, class, sfunc, ufunc)
 
-#' Set Serialization Marker
+#' Write to Stdout
 #'
-#' Internal package function.
+#' Performs a non-buffered write to `stdout` using the C function `writev()` or
+#' equivalent. Avoids interleaved output when writing concurrently from multiple
+#' processes.
 #'
-#' @param x logical value.
+#' This function writes to the C-level `stdout` of the process and hence cannot
+#' be re-directed by [sink()].
 #'
-#' @return The logical value `x` supplied.
+#' A newline character is automatically appended to `x`, hence there is no need
+#' to include this within the input string.
 #'
-#' @keywords internal
+#' @param x character string.
+#'
+#' @return Invisible NULL. As a side effect, `x` is output to `stdout`.
+#'
+#' @examples
+#' write_stdout("")
+#'
 #' @export
 #'
-.mark <- function(x = TRUE) .Call(rnng_set_marker, x)
+write_stdout <- function(x) invisible(.Call(rnng_write_stdout, x))
+
+#' Read stdin
+#'
+#' Reads `stdin` from a background thread, allowing the stream to be accessed as
+#' messages from an NNG 'inproc' socket. As the read is blocking, it can only be
+#' used in non-interactive sessions. Closing `stdin` causes the background
+#' thread to exit and the socket connection to end.
+#'
+#' A 'pull' protocol socket is returned, and hence can only be used with receive
+#' functions.
+#'
+#' @return a Socket.
+#'
+#' @export
+#'
+read_stdin <- function() .Call(rnng_read_stdin, interactive())
+
+#' IP Address
+#'
+#' Returns a character string comprising the local network IPv4 address, or
+#' vector if there are multiple addresses from multiple network adapters, or
+#' an empty character string if unavailable.
+#'
+#' The IP addresses will be named by interface (adapter friendly name on
+#' Windows) e.g. 'eth0' or 'en0'.
+#'
+#' @return A named character string.
+#'
+#' @examples
+#' ip_addr()
+#'
+#' @export
+#'
+ip_addr <- function() .Call(rnng_ip_addr)
 
 #' Advances the RNG State
 #'
@@ -331,6 +365,55 @@ serial_config <- function(class, sfunc, ufunc, vec = FALSE)
 #' @export
 #'
 .advance <- function() .Call(rnng_advance_rng_state)
+
+#' Serialization Headers and Markers
+#'
+#' Internal package functions.
+#'
+#' @param value integer value.
+#'
+#' @return For `.header()`: the integer `value` supplied.
+#'
+#' @keywords internal
+#' @export
+#'
+.header <- function(value = 0L) .Call(rnng_header_set, value)
+
+#' Read Serialization Header
+#'
+#' @param x raw vector.
+#'
+#' @return For `.read_header()`: integer value.
+#'
+#' @keywords internal
+#' @rdname dot-header
+#' @export
+#'
+.read_header <- function(x) .Call(rnng_header_read, x)
+
+#' Set Serialization Marker
+#'
+#' @param bool logical value.
+#'
+#' @return For `.mark()`: the logical `bool` supplied.
+#'
+#' @keywords internal
+#' @rdname dot-header
+#' @export
+#'
+.mark <- function(bool = TRUE) .Call(rnng_marker_set, bool)
+
+#' Read Serialization Marker
+#'
+#' @param x raw vector.
+#'
+#' @return For `.read_marker()`: logical value `TRUE` or `FALSE`.
+#'
+#' @keywords internal
+#' @rdname dot-header
+#' @export
+#'
+.read_marker <- function(x) .Call(rnng_marker_read, x)
 
 #' Interrupt Switch
 #'
@@ -354,8 +437,8 @@ serial_config <- function(class, sfunc, ufunc, vec = FALSE)
 #' @examples
 #' if (Sys.info()[["sysname"]] == "Linux") {
 #'   rm(list = ls())
-#'   gc()
-#'   .Call(nanonext:::rnng_thread_shutdown)
+#'   invisible(gc())
+#'   .Call(nanonext:::rnng_fini_priors)
 #'   Sys.sleep(1L)
 #'   .Call(nanonext:::rnng_fini)
 #' }

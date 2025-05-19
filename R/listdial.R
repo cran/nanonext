@@ -1,19 +1,3 @@
-# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-#
-# This file is part of nanonext.
-#
-# nanonext is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 # nanonext - Listeners / Dialers -----------------------------------------------
 
 #' Dial an Address from a Socket
@@ -42,9 +26,10 @@
 #'   attempting to use the socket before an asynchronous dial has completed. Set
 #'   to FALSE if setting configuration options on the dialer as it is not
 #'   generally possible to change these once started.
-#' @param error \[default FALSE\] behaviour on error: if FALSE, returns an
-#'   integer exit code accompanied by a warning, or, if TRUE, generates an error
-#'   and halts execution.
+#' @param fail \[default 'warn'\] failure mode - a character value or integer
+#'   equivalent, whether to warn (1L), error (2L), or for none (3L) just return
+#'   an 'errorValue' without any corresponding warning.
+#' @param ... not used (and will be removed).
 #'
 #' @return Invisibly, an integer exit code (zero on success). A new Dialer
 #'   (object of class 'nanoDialer' and 'nano') is created and bound to the
@@ -86,8 +71,10 @@
 #'
 #' @export
 #'
-dial <- function(socket, url = "inproc://nanonext", tls = NULL, autostart = TRUE, error = FALSE)
-  invisible(.Call(rnng_dial, socket, url, tls, autostart, error))
+dial <- function(socket, url = "inproc://nanonext", tls = NULL, autostart = TRUE, fail = c("warn", "error", "none"), ...) {
+  ...length() && { fail <- 2L }
+  invisible(.Call(rnng_dial, socket, url, tls, autostart, fail))
+}
 
 #' Listen to an Address from a Socket
 #'
@@ -133,8 +120,10 @@ dial <- function(socket, url = "inproc://nanonext", tls = NULL, autostart = TRUE
 #'
 #' @export
 #'
-listen <- function(socket, url = "inproc://nanonext", tls = NULL, autostart = TRUE, error = FALSE)
-  invisible(.Call(rnng_listen, socket, url, tls, autostart, error))
+listen <- function(socket, url = "inproc://nanonext", tls = NULL, autostart = TRUE, fail = c("warn", "error", "none"), ...) {
+  ...length() && { fail <- 2L }
+  invisible(.Call(rnng_listen, socket, url, tls, autostart, fail))
+}
 
 #' Start Listener/Dialer
 #'

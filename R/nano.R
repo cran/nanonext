@@ -1,19 +1,3 @@
-# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-#
-# This file is part of nanonext.
-#
-# nanonext is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 # nanonext - Core - Nano Object and S3 Methods ---------------------------------
 
 #' Create Nano Object
@@ -86,19 +70,21 @@
 #'
 #' @export
 #'
-nano <- function(protocol = c("bus", "pair", "poly", "push", "pull", "pub",
-                              "sub", "req", "rep", "surveyor", "respondent"),
-                 dial = NULL,
-                 listen = NULL,
-                 tls = NULL,
-                 autostart = TRUE) {
-
+nano <- function(
+  protocol = c("bus", "pair", "poly", "push", "pull", "pub", "sub", "req", "rep", "surveyor", "respondent"),
+  dial = NULL,
+  listen = NULL,
+  tls = NULL,
+  autostart = TRUE
+) {
   nano <- `class<-`(new.env(hash = FALSE), "nanoObject")
   socket <- socket(protocol)
   sock2 <- NULL
-  makeActiveBinding(sym = "socket",
-                    fun = function(x) if (length(sock2)) sock2 else socket,
-                    env = nano)
+  makeActiveBinding(
+    "socket",
+    function(x) if (length(sock2)) sock2 else socket,
+    nano
+  )
   is_poly <- attr(socket, "protocol") == "poly"
 
   if (length(dial)) {
@@ -264,157 +250,198 @@ nano <- function(protocol = c("bus", "pair", "poly", "push", "pull", "pub",
          NULL)
 
   nano
-
 }
 
 #' @export
 #'
 print.nanoObject <- function(x, ...) {
-
-  cat(sprintf("< nano object >\n - socket id: %d\n - state: %s\n - protocol: %s\n",
-      attr(.subset2(x, "socket"), "id"), attr(.subset2(x, "socket"), "state"),
-      attr(.subset2(x, "socket"), "protocol")), file = stdout())
+  cat(
+    sprintf(
+      "< nano object >\n - socket id: %d\n - state: %s\n - protocol: %s\n",
+      attr(.subset2(x, "socket"), "id"),
+      attr(.subset2(x, "socket"), "state"),
+      attr(.subset2(x, "socket"), "protocol")
+    ),
+    file = stdout()
+  )
   if (length(.subset2(x, "listener")))
-    cat(" - listener:", as.character(lapply(.subset2(x, "listener"), attr, "url")), sep = "\n    ", file = stdout())
+    cat(
+      " - listener:", as.character(lapply(.subset2(x, "listener"), attr, "url")),
+      sep = "\n    ",
+      file = stdout()
+    )
   if (length(.subset2(x, "dialer")))
-    cat(" - dialer:", as.character(lapply(.subset2(x, "dialer"), attr, "url")), sep = "\n    ", file = stdout())
+    cat(
+      " - dialer:", as.character(lapply(.subset2(x, "dialer"), attr, "url")),
+      sep = "\n    ",
+      file = stdout()
+    )
   invisible(x)
-
 }
 
 #' @export
 #'
 print.nanoSocket <- function(x, ...) {
-
-  cat(sprintf("< nanoSocket >\n - id: %d\n - state: %s\n - protocol: %s\n",
-              attr(x, "id"), attr(x, "state"), attr(x, "protocol")), file = stdout())
+  cat(
+    sprintf(
+      "< nanoSocket >\n - id: %d\n - state: %s\n - protocol: %s\n",
+      attr(x, "id"),
+      attr(x, "state"),
+      attr(x, "protocol")
+    ),
+    file = stdout()
+  )
   if (length(attr(x, "listener")))
-    cat(" - listener:", as.character(lapply(attr(x, "listener"), attr, "url")), sep = "\n    ", file = stdout())
+    cat(
+      " - listener:", as.character(lapply(attr(x, "listener"), attr, "url")),
+      sep = "\n    ",
+      file = stdout()
+    )
   if (length(attr(x, "dialer")))
-    cat(" - dialer:", as.character(lapply(attr(x, "dialer"), attr, "url")), sep = "\n    ", file = stdout())
+    cat(
+      " - dialer:", as.character(lapply(attr(x, "dialer"), attr, "url")),
+      sep = "\n    ",
+      file = stdout()
+    )
   invisible(x)
-
 }
 
 #' @export
 #'
 print.nanoContext <- function(x, ...) {
-
-  cat(sprintf("< nanoContext >\n - id: %d\n - socket: %d\n - state: %s\n - protocol: %s\n",
-              attr(x, "id"), attr(x, "socket"), attr(x, "state"), attr(x, "protocol")), file = stdout())
+  cat(
+    sprintf(
+      "< nanoContext >\n - id: %d\n - socket: %d\n - state: %s\n - protocol: %s\n",
+      attr(x, "id"),
+      attr(x, "socket"),
+      attr(x, "state"),
+      attr(x, "protocol")
+    ),
+    file = stdout()
+  )
   invisible(x)
-
 }
 
 #' @export
 #'
 print.nanoDialer <- function(x, ...) {
-
-  cat(sprintf("< nanoDialer >\n - id: %d\n - socket: %d\n - state: %s\n - url: %s\n",
-              attr(x, "id"), attr(x, "socket"), attr(x, "state"), attr(x, "url")), file = stdout())
+  cat(
+    sprintf(
+      "< nanoDialer >\n - id: %d\n - socket: %d\n - state: %s\n - url: %s\n",
+      attr(x, "id"),
+      attr(x, "socket"),
+      attr(x, "state"),
+      attr(x, "url")
+    ),
+    file = stdout()
+  )
   invisible(x)
-
 }
 
 #' @export
 #'
 print.nanoListener <- function(x, ...) {
-
-  cat(sprintf("< nanoListener >\n - id: %d\n - socket: %d\n - state: %s\n - url: %s\n",
-              attr(x, "id"), attr(x, "socket"), attr(x, "state"), attr(x, "url")), file = stdout())
+  cat(
+    sprintf(
+      "< nanoListener >\n - id: %d\n - socket: %d\n - state: %s\n - url: %s\n",
+      attr(x, "id"),
+      attr(x, "socket"),
+      attr(x, "state"),
+      attr(x, "url")
+    ),
+    file = stdout()
+  )
   invisible(x)
-
 }
 
 #' @export
 #'
 print.nanoStream <- function(x, ...) {
-
-  cat(sprintf("< nanoStream >\n - mode: %s\n - state: %s\n - url: %s\n",
-              attr(x, "mode"), attr(x, "state"), attr(x, "url")), file = stdout())
+  cat(
+    sprintf(
+      "< nanoStream >\n - mode: %s\n - state: %s\n - url: %s\n",
+      attr(x, "mode"),
+      attr(x, "state"),
+      attr(x, "url")
+    ),
+    file = stdout()
+  )
   invisible(x)
-
 }
 
 #' @export
 #'
 print.nanoMonitor <- function(x, ...) {
-
-  cat(sprintf("< nanoMonitor >\n - socket: %s\n", attr(x, "socket")), file = stdout())
+  cat(
+    sprintf("< nanoMonitor >\n - socket: %s\n", attr(x, "socket")),
+    file = stdout()
+  )
   invisible(x)
-
 }
 
 #' @export
 #'
 print.recvAio <- function(x, ...) {
-
   cat("< recvAio | $data >\n", file = stdout())
   invisible(x)
-
 }
 
 #' @export
 #'
 print.sendAio <- function(x, ...) {
-
   cat("< sendAio | $result >\n", file = stdout())
   invisible(x)
-
 }
 
 #' @export
 #'
 print.ncurlAio <- function(x, ...) {
-
   cat("< ncurlAio | $status $headers $data >\n", file = stdout())
   invisible(x)
-
 }
 
 #' @export
 #'
 print.ncurlSession <- function(x, ...) {
-
-  cat(sprintf("< ncurlSession > - %s\n", if (is.null(attr(x, "state"))) "transact() to return data" else "not active"), file = stdout())
+  cat(
+    sprintf(
+      "< ncurlSession > - %s\n",
+      if (is.null(attr(x, "state"))) "transact() to return data" else "not active"
+    ),
+    file = stdout()
+  )
   invisible(x)
-
 }
 
 #' @export
 #'
 print.unresolvedValue <- function(x, ...) {
-
   cat("'unresolved' logi NA\n", file = stdout())
   invisible(x)
-
 }
 
 #' @export
 #'
 print.errorValue <- function(x, ...) {
-
   cat(sprintf("'errorValue' int %s\n", nng_error(x)), file = stdout())
   invisible(x)
-
 }
 
 #' @export
 #'
 print.conditionVariable <- function(x, ...) {
-
   cat("< conditionVariable >\n", file = stdout())
   invisible(x)
-
 }
 
 #' @export
 #'
 print.tlsConfig <- function(x, ...) {
-
-  cat(sprintf("< TLS %s config | auth mode: %s >\n", attr(x, "spec"), attr(x, "mode")), file = stdout())
+  cat(
+    sprintf("< TLS %s config | auth mode: %s >\n", attr(x, "spec"), attr(x, "mode")),
+    file = stdout()
+  )
   invisible(x)
-
 }
 
 #' @export

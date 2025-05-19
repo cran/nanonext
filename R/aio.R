@@ -1,19 +1,3 @@
-# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-#
-# This file is part of nanonext.
-#
-# nanonext is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 # nanonext - Core - Aio Functions ----------------------------------------------
 
 # send_aio/recv_aio ------------------------------------------------------------
@@ -137,12 +121,13 @@ send_aio <- function(con, data, mode = c("serial", "raw"), timeout = NULL, pipe 
 #'
 #' @export
 #'
-recv_aio <- function(con,
-                     mode = c("serial", "character", "complex", "double",
-                              "integer", "logical", "numeric", "raw", "string"),
-                     timeout = NULL,
-                     cv = NULL,
-                     n = 65536L)
+recv_aio <- function(
+  con,
+  mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric", "raw", "string"),
+  timeout = NULL,
+  cv = NULL,
+  n = 65536L
+)
   data <- .Call(rnng_recv_aio, con, mode, timeout, cv, n, environment())
 
 # Core aio functions -----------------------------------------------------------
@@ -312,6 +297,19 @@ stop_aio <- function(x) invisible(.Call(rnng_aio_stop, x))
 #'
 unresolved <- function(x) .Call(rnng_unresolved, x)
 
+#' Get the Pipe ID of a recvAio
+#'
+#' Caution: must only be used on an already-resolved 'recvAio'. This function
+#' does not perform validation of these pre-conditions.
+#'
+#' @param x a resolved 'recvAio'.
+#'
+#' @return Integer pipe ID.
+#'
+#' @export
+#'
+pipe_id <- function(x) .subset2(x, "aio")
+
 #' Technical Utility: Query if an Aio is Unresolved
 #'
 #' Query whether an Aio or list of Aios remains unresolved. This is an
@@ -352,13 +350,10 @@ unresolved <- function(x) .Call(rnng_unresolved, x)
 #' @exportS3Method promises::as.promise
 #'
 as.promise.recvAio <- function(x) {
-
   promise <- .subset2(x, "promise")
 
   if (is.null(promise)) {
-
     promise <- if (unresolved(x)) {
-
       promises::promise(
         function(resolve, reject) .keep(x, environment())
       )$then(
@@ -379,11 +374,9 @@ as.promise.recvAio <- function(x) {
     }
 
     `[[<-`(x, "promise", promise)
-
   }
 
   promise
-
 }
 
 #' @exportS3Method promises::is.promising

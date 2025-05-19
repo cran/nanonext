@@ -1,19 +1,3 @@
-# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-#
-# This file is part of nanonext.
-#
-# nanonext is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 # nanonext - Contexts and RPC --------------------------------------------------
 
 #' Open Context
@@ -148,20 +132,19 @@ close.nanoContext <- function(con, ...) invisible(.Call(rnng_ctx_close, con))
 #'
 #' @export
 #'
-reply <- function(context,
-                  execute,
-                  recv_mode = c("serial", "character", "complex", "double",
-                                "integer", "logical", "numeric", "raw"),
-                  send_mode = c("serial", "raw"),
-                  timeout = NULL,
-                  ...) {
-
+reply <- function(
+  context,
+  execute,
+  recv_mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric", "raw", "string"),
+  send_mode = c("serial", "raw"),
+  timeout = NULL,
+  ...
+) {
   block <- if (is.null(timeout)) TRUE else timeout
   res <- recv(context, mode = recv_mode, block = block)
   is_error_value(res) && return(res)
   data <- .Call(rnng_eval_safe, as.call(list(execute, res, ...)))
   send(context, data = data, mode = send_mode, block = block)
-
 }
 
 #' Request over Context (RPC Client for Req/Rep Protocol)
@@ -197,6 +180,9 @@ reply <- function(context,
 #' @param cv (optional) a 'conditionVariable' to signal when the async receive
 #'   is complete, or NULL. If any other value is supplied, this will cause the
 #'   pipe connection to be dropped when the async receive is complete.
+#' @param id (optional) integer message ID to send a special payload to the
+#'   context upon timeout (asynchronously) consisting of an integer zero,
+#'   followed by the value of `id` supplied.
 #'
 #' @return A 'recvAio' (object of class 'mirai' and 'recvAio') (invisibly).
 #'
@@ -237,11 +223,13 @@ reply <- function(context,
 #'
 #' @export
 #'
-request <- function(context,
-                    data,
-                    send_mode = c("serial", "raw"),
-                    recv_mode = c("serial", "character", "complex", "double",
-                                  "integer", "logical", "numeric", "raw", "string"),
-                    timeout = NULL,
-                    cv = NULL)
-  data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, cv, environment())
+request <- function(
+  context,
+  data,
+  send_mode = c("serial", "raw"),
+  recv_mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric", "raw", "string"),
+  timeout = NULL,
+  cv = NULL,
+  id = NULL
+)
+  data <- .Call(rnng_request, context, data, send_mode, recv_mode, timeout, cv, id, environment())

@@ -1,25 +1,11 @@
-// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
-//
-// This file is part of nanonext.
-//
-// nanonext is free software: you can redistribute it and/or modify it under the
-// terms of the GNU General Public License as published by the Free Software
-// Foundation, either version 3 of the License, or (at your option) any later
-// version.
-//
-// nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-// A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License along with
-// nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 // nanonext - C level - Async Functions ----------------------------------------
 
 #define NANONEXT_SIGNALS
 #include "nanonext.h"
 
 // internals -------------------------------------------------------------------
+
+static int nano_interrupt = 0;
 
 static SEXP mk_error_aio(const int xc, SEXP env) {
 
@@ -34,6 +20,67 @@ static SEXP mk_error_aio(const int xc, SEXP env) {
 
 // aio completion callbacks ----------------------------------------------------
 
+void nano_list_do(nano_list_op listop, nano_aio *saio) {
+
+  static nano_node *free_list = NULL;
+  static nng_mtx *free_mtx = NULL;
+
+  switch (listop) {
+  case INIT:
+    if (free_mtx == NULL && nng_mtx_alloc(&free_mtx))
+      Rf_error("NNG library init failure");
+    break;
+  case FINALIZE:
+    nng_mtx_lock(free_mtx);
+    nano_list_do(FREE, NULL);
+    if (saio->mode == 0x1) {
+      nng_mtx_unlock(free_mtx);
+      nng_aio_free(saio->aio);
+      if (saio->data != NULL)
+        free(saio->data);
+      free(saio);
+    } else {
+      saio->mode = 0x1;
+      nng_mtx_unlock(free_mtx);
+    }
+    break;
+  case COMPLETE:
+    nng_mtx_lock(free_mtx);
+    if (saio->mode == 0x1) {
+      nano_node *new_node = malloc(sizeof(nano_node));
+      if (new_node == NULL) break;
+      new_node->data = saio;
+      new_node->next = free_list;
+      free_list = new_node;
+    } else {
+      saio->mode = 0x1;
+    }
+    nng_mtx_unlock(free_mtx);
+    break;
+  case SHUTDOWN:
+    if (free_mtx == NULL) break;
+    nng_mtx_lock(free_mtx);
+    nano_list_do(FREE, NULL);
+    nng_mtx_unlock(free_mtx);
+    nng_mtx_free(free_mtx);
+    free_mtx = NULL;
+    break;
+  case FREE: // must be entered under lock
+    while (free_list != NULL) {
+      nano_node *current = free_list;
+      free_list = free_list->next;
+      nano_aio *saio = (nano_aio *) current->data;
+      nng_aio_free(saio->aio);
+      if (saio->data != NULL)
+        free(saio->data);
+      free(saio);
+      free(current);
+    }
+    break;
+  }
+
+}
+
 static void saio_complete(void *arg) {
 
   nano_aio *saio = (nano_aio *) arg;
@@ -42,15 +89,17 @@ static void saio_complete(void *arg) {
     nng_msg_free(nng_aio_get_msg(saio->aio));
   saio->result = res - !res;
 
+  nano_list_do(COMPLETE, saio);
+
 }
 
 static void isaio_complete(void *arg) {
 
   nano_aio *iaio = (nano_aio *) arg;
   const int res = nng_aio_result(iaio->aio);
-  if (iaio->data != NULL)
-    R_Free(iaio->data);
   iaio->result = res - !res;
+
+  nano_list_do(COMPLETE, iaio);
 
 }
 
@@ -65,33 +114,22 @@ static void raio_complete(void *arg) {
     res = - (int) p.id;
   }
 
-  raio->result = res;
+  if (raio->next != NULL) {
+    nano_cv *ncv = (nano_cv *) raio->next;
+    nng_cv *cv = ncv->cv;
+    nng_mtx *mtx = ncv->mtx;
+
+    nng_mtx_lock(mtx);
+    raio->result = res;
+    ncv->condition++;
+    nng_cv_wake(cv);
+    nng_mtx_unlock(mtx);
+  } else {
+    raio->result = res;
+  }
 
   if (raio->cb != NULL)
     later2(raio_invoke_cb, raio->cb);
-
-}
-
-static void raio_complete_signal(void *arg) {
-
-  nano_aio *raio = (nano_aio *) arg;
-  nano_cv *ncv = (nano_cv *) raio->next;
-  nng_cv *cv = ncv->cv;
-  nng_mtx *mtx = ncv->mtx;
-
-  int res = nng_aio_result(raio->aio);
-  if (res == 0) {
-    nng_msg *msg = nng_aio_get_msg(raio->aio);
-    raio->data = msg;
-    nng_pipe p = nng_msg_get_pipe(msg);
-    res = - (int) p.id;
-  }
-
-  nng_mtx_lock(mtx);
-  raio->result = res;
-  ncv->condition++;
-  nng_cv_wake(cv);
-  nng_mtx_unlock(mtx);
 
 }
 
@@ -115,6 +153,7 @@ static void raio_complete_interrupt(void *arg) {
 #ifdef _WIN32
     UserBreak = 1;
 #else
+    R_interrupts_pending = 1;
     kill(getpid(), SIGINT);
 #endif
   }
@@ -125,27 +164,20 @@ static void iraio_complete(void *arg) {
 
   nano_aio *iaio = (nano_aio *) arg;
   const int res = nng_aio_result(iaio->aio);
-  iaio->result = res - !res;
 
-  if (iaio->cb != NULL)
-    later2(raio_invoke_cb, iaio->cb);
+  if (iaio->next != NULL) {
+    nano_cv *ncv = (nano_cv *) iaio->next;
+    nng_cv *cv = ncv->cv;
+    nng_mtx *mtx = ncv->mtx;
 
-}
-
-static void iraio_complete_signal(void *arg) {
-
-  nano_aio *iaio = (nano_aio *) arg;
-  nano_cv *ncv = (nano_cv *) iaio->next;
-  nng_cv *cv = ncv->cv;
-  nng_mtx *mtx = ncv->mtx;
-
-  const int res = nng_aio_result(iaio->aio);
-
-  nng_mtx_lock(mtx);
-  iaio->result = res - !res;
-  ncv->condition++;
-  nng_cv_wake(cv);
-  nng_mtx_unlock(mtx);
+    nng_mtx_lock(mtx);
+    iaio->result = res - !res;
+    ncv->condition++;
+    nng_cv_wake(cv);
+    nng_mtx_unlock(mtx);
+  } else {
+    iaio->result = res - !res;
+  }
 
   if (iaio->cb != NULL)
     later2(raio_invoke_cb, iaio->cb);
@@ -158,8 +190,18 @@ static void saio_finalizer(SEXP xptr) {
 
   if (NANO_PTR(xptr) == NULL) return;
   nano_aio *xp = (nano_aio *) NANO_PTR(xptr);
+  nano_list_do(FINALIZE, xp);
+
+}
+
+static void iaio_finalizer(SEXP xptr) {
+
+  if (NANO_PTR(xptr) == NULL) return;
+  nano_aio *xp = (nano_aio *) NANO_PTR(xptr);
   nng_aio_free(xp->aio);
-  R_Free(xp);
+  if (xp->data != NULL)
+    free(xp->data);
+  free(xp);
 
 }
 
@@ -170,18 +212,7 @@ static void raio_finalizer(SEXP xptr) {
   nng_aio_free(xp->aio);
   if (xp->data != NULL)
     nng_msg_free((nng_msg *) xp->data);
-  R_Free(xp);
-
-}
-
-static void iaio_finalizer(SEXP xptr) {
-
-  if (NANO_PTR(xptr) == NULL) return;
-  nano_aio *xp = (nano_aio *) NANO_PTR(xptr);
-  nng_aio_free(xp->aio);
-  if (xp->data != NULL)
-    R_Free(xp->data);
-  R_Free(xp);
+  free(xp);
 
 }
 
@@ -326,31 +357,32 @@ static SEXP rnng_aio_collect_impl(SEXP x, SEXP (*const func)(SEXP)) {
   switch (TYPEOF(x)) {
   case ENVSXP: ;
     out = Rf_findVarInFrame(func(x), nano_ValueSymbol);
-    if (out == R_UnboundValue) break;
-    goto resume;
+    if (out == R_UnboundValue) goto fail;
+    break;
   case VECSXP: ;
     SEXP env, names;
     const R_xlen_t xlen = Rf_xlength(x);
     PROTECT(out = Rf_allocVector(VECSXP, xlen));
     for (R_xlen_t i = 0; i < xlen; i++) {
       env = func(NANO_VECTOR(x)[i]);
-      if (TYPEOF(env) != ENVSXP) goto exit;
+      if (TYPEOF(env) != ENVSXP) goto fail;
       env = Rf_findVarInFrame(env, nano_ValueSymbol);
-      if (env == R_UnboundValue) goto exit;
+      if (env == R_UnboundValue) goto fail;
       SET_VECTOR_ELT(out, i, env);
     }
     names = Rf_getAttrib(x, R_NamesSymbol);
     if (names != R_NilValue)
       out = Rf_namesgets(out, names);
     UNPROTECT(1);
-    goto resume;
+    break;
+  default:
+    goto fail;
   }
 
-  exit:
-  Rf_error("object is not an Aio or list of Aios");
-
-  resume:
   return out;
+
+  fail:
+  Rf_error("object is not an Aio or list of Aios");
 
 }
 
@@ -478,32 +510,37 @@ SEXP rnng_unresolved2(SEXP x) {
 SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP clo) {
 
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) nano_integer(timeout);
-  nano_aio *saio;
+  const int raw = nano_encode_mode(mode);
   SEXP aio, env, fun;
+  nano_aio *saio = NULL;
   nano_buf buf;
   int sock, xc;
 
   if ((sock = !NANO_PTR_CHECK(con, nano_SocketSymbol)) || !NANO_PTR_CHECK(con, nano_ContextSymbol)) {
 
     const int pipeid = sock ? nano_integer(pipe) : 0;
-    nano_encodes(mode) == 2 ? nano_encode(&buf, data) : nano_serialize(&buf, data, NANO_PROT(con));
-    nng_msg *msg;
-    saio = R_Calloc(1, nano_aio);
+    if (raw) {
+      nano_encode(&buf, data);
+    } else {
+      nano_serialize(&buf, data, NANO_PROT(con));
+    }
+    nng_msg *msg = NULL;
+
+    saio = calloc(1, sizeof(nano_aio));
+    NANO_ENSURE_ALLOC(saio);
     saio->type = SENDAIO;
 
-    if ((xc = nng_msg_alloc(&msg, 0)))
-      goto exitlevel1;
+    if ((xc = nng_msg_alloc(&msg, 0)) ||
+        (xc = nng_msg_append(msg, buf.buf, buf.cur)) ||
+        (xc = nng_aio_alloc(&saio->aio, saio_complete, saio))) {
+      nng_msg_free(msg);
+      goto fail;
+    }
 
     if (pipeid) {
       nng_pipe p;
       p.id = (uint32_t) pipeid;
       nng_msg_set_pipe(msg, p);
-    }
-
-    if ((xc = nng_msg_append(msg, buf.buf, buf.cur)) ||
-        (xc = nng_aio_alloc(&saio->aio, saio_complete, saio))) {
-      nng_msg_free(msg);
-      goto exitlevel1;
     }
 
     nng_aio_set_msg(saio->aio, msg);
@@ -521,30 +558,31 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
 
     nano_stream *nst = (nano_stream *) NANO_PTR(con);
     nng_stream *sp = nst->stream;
-    nng_iov iov;
 
-    saio = R_Calloc(1, nano_aio);
+    saio = calloc(1, sizeof(nano_aio));
+    NANO_ENSURE_ALLOC(saio);
     saio->type = IOV_SENDAIO;
-    saio->data = R_Calloc(buf.cur, unsigned char);
+    saio->data = calloc(buf.cur, sizeof(unsigned char));
+    NANO_ENSURE_ALLOC(saio->data);
     memcpy(saio->data, buf.buf, buf.cur);
-    iov.iov_len = buf.cur - nst->textframes;
-    iov.iov_buf = saio->data;
+    nng_iov iov = {
+      .iov_buf = saio->data,
+      .iov_len = buf.cur - nst->textframes
+    };
 
-    if ((xc = nng_aio_alloc(&saio->aio, isaio_complete, saio)))
-      goto exitlevel2;
-
-    if ((xc = nng_aio_set_iov(saio->aio, 1u, &iov)))
-      goto exitlevel3;
+    if ((xc = nng_aio_alloc(&saio->aio, isaio_complete, saio)) ||
+        (xc = nng_aio_set_iov(saio->aio, 1u, &iov)))
+      goto fail;
 
     nng_aio_set_timeout(saio->aio, dur);
     nng_stream_send(sp, saio->aio);
     NANO_FREE(buf);
 
     PROTECT(aio = R_MakeExternalPtr(saio, nano_AioSymbol, R_NilValue));
-    R_RegisterCFinalizerEx(aio, iaio_finalizer, TRUE);
+    R_RegisterCFinalizerEx(aio, saio_finalizer, TRUE);
 
   } else {
-    NANO_ERROR("'con' is not a valid Socket, Context, or Stream");
+    Rf_error("`con` is not a valid Socket, Context, or Stream");
   }
 
   PROTECT(env = R_NewEnv(R_NilValue, 0, 0));
@@ -557,13 +595,12 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
   UNPROTECT(3);
   return env;
 
-  exitlevel3:
+  fail:
   nng_aio_free(saio->aio);
-  exitlevel2:
-  R_Free(saio->data);
-  exitlevel1:
-  R_Free(saio);
+  free(saio->data);
+  failmem:
   NANO_FREE(buf);
+  free(saio);
   return mk_error_data(-xc);
 
 }
@@ -580,21 +617,21 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEX
     interrupt = 1 - signal;
   }
   nano_cv *ncv = signal ? (nano_cv *) NANO_PTR(cvar) : NULL;
-  nano_aio *raio;
+  nano_aio *raio = NULL;
   SEXP aio, env, fun;
   int sock, xc;
 
   if ((sock = !NANO_PTR_CHECK(con, nano_SocketSymbol)) || !NANO_PTR_CHECK(con, nano_ContextSymbol)) {
 
     const uint8_t mod = (uint8_t) nano_matcharg(mode);
-    raio = R_Calloc(1, nano_aio);
+    raio = calloc(1, sizeof(nano_aio));
+    NANO_ENSURE_ALLOC(raio);
     raio->next = ncv;
     raio->type = signal ? RECVAIOS : RECVAIO;
     raio->mode = mod;
-    raio->cb = NULL;
 
-    if ((xc = nng_aio_alloc(&raio->aio, signal ? raio_complete_signal : interrupt ? raio_complete_interrupt : raio_complete, raio)))
-      goto exitlevel1;
+    if ((xc = nng_aio_alloc(&raio->aio, interrupt ? raio_complete_interrupt : raio_complete, raio)))
+      goto fail;
 
     nng_aio_set_timeout(raio->aio, dur);
     sock ? nng_recv_aio(*(nng_socket *) NANO_PTR(con), raio->aio) :
@@ -605,25 +642,25 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEX
 
   } else if (!NANO_PTR_CHECK(con, nano_StreamSymbol)) {
 
-    const uint8_t mod = (uint8_t) nano_matchargs(mode);
+    const uint8_t mod = (uint8_t) (nano_matcharg(mode) == 1 ? 2 : nano_matcharg(mode));
     const size_t xlen = (size_t) nano_integer(bytes);
     nng_stream **sp = (nng_stream **) NANO_PTR(con);
-    nng_iov iov;
 
-    raio = R_Calloc(1, nano_aio);
+    raio = calloc(1, sizeof(nano_aio));
+    NANO_ENSURE_ALLOC(raio);
     raio->next = ncv;
     raio->type = signal ? IOV_RECVAIOS : IOV_RECVAIO;
     raio->mode = mod;
-    raio->cb = NULL;
-    raio->data = R_Calloc(xlen, unsigned char);
-    iov.iov_len = xlen;
-    iov.iov_buf = raio->data;
+    raio->data = calloc(xlen, sizeof(unsigned char));
+    NANO_ENSURE_ALLOC(raio->data);
+    nng_iov iov = {
+      .iov_buf = raio->data,
+      .iov_len = xlen
+    };
 
-    if ((xc = nng_aio_alloc(&raio->aio, signal ? iraio_complete_signal : iraio_complete, raio)))
-      goto exitlevel2;
-
-    if ((xc = nng_aio_set_iov(raio->aio, 1u, &iov)))
-      goto exitlevel3;
+    if ((xc = nng_aio_alloc(&raio->aio, iraio_complete, raio)) ||
+        (xc = nng_aio_set_iov(raio->aio, 1u, &iov)))
+      goto fail;
 
     nng_aio_set_timeout(raio->aio, dur);
     nng_stream_recv(*sp, raio->aio);
@@ -632,7 +669,7 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEX
     R_RegisterCFinalizerEx(aio, iaio_finalizer, TRUE);
 
   } else {
-    NANO_ERROR("'con' is not a valid Socket, Context or Stream");
+    Rf_error("`con` is not a valid Socket, Context or Stream");
   }
 
   PROTECT(env = R_NewEnv(R_NilValue, 0, 0));
@@ -645,12 +682,18 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEX
   UNPROTECT(3);
   return env;
 
-  exitlevel3:
+  fail:
   nng_aio_free(raio->aio);
-  exitlevel2:
-  R_Free(raio->data);
-  exitlevel1:
-  R_Free(raio);
+  free(raio->data);
+  failmem:
+  free(raio);
   return mk_error_data(xc);
+
+}
+
+SEXP rnng_interrupt_switch(SEXP x) {
+
+  nano_interrupt = NANO_INTEGER(x);
+  return x;
 
 }

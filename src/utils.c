@@ -1,19 +1,3 @@
-// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
-//
-// This file is part of nanonext.
-//
-// nanonext is free software: you can redistribute it and/or modify it under the
-// terms of the GNU General Public License as published by the Free Software
-// Foundation, either version 3 of the License, or (at your option) any later
-// version.
-//
-// nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-// A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License along with
-// nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 // nanonext - C level - Utilities ----------------------------------------------
 
 #include "nanonext.h"
@@ -23,8 +7,8 @@
 SEXP rnng_strerror(SEXP error) {
 
   const int xc = nano_integer(error);
-  char nano_errbuf[NANONEXT_ERR_STRLEN];
-  snprintf(nano_errbuf, NANONEXT_ERR_STRLEN, "%d | %s", xc, nng_strerror(xc));
+  char nano_errbuf[NANONEXT_STR_SIZE];
+  snprintf(nano_errbuf, NANONEXT_STR_SIZE, "%d | %s", xc, nng_strerror(xc));
 
   return Rf_mkString(nano_errbuf);
 
@@ -207,27 +191,13 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_socket_set_bool(*sock, op, (bool) NANO_INTEGER(value));
       break;
     case VECSXP:
-      if (strncmp(op, "serial", 6))
-        Rf_error("type of 'value' not supported");
-      R_xlen_t xlen = Rf_xlength(value);
-      if (xlen > 0) {
-        if (Rf_xlength(value) != 4 ||
-            TYPEOF(NANO_VECTOR(value)[0]) != STRSXP ||
-            TYPEOF(NANO_VECTOR(value)[3]) != LGLSXP) {
-          xc = 3; break;
-        }
-        SEXPTYPE typ1 = TYPEOF(NANO_VECTOR(value)[1]);
-        SEXPTYPE typ2 = TYPEOF(NANO_VECTOR(value)[2]);
-        if (!(typ1 == CLOSXP || typ1 == SPECIALSXP || typ1 == BUILTINSXP) ||
-            !(typ2 == CLOSXP || typ2 == SPECIALSXP || typ2 == BUILTINSXP)) {
-            xc = 3; break;
-        }
-      }
-      NANO_SET_PROT(object, Rf_VectorToPairList(value));
+      if (strncmp(op, "serial", 6) || TYPEOF(value) != VECSXP)
+        Rf_error("type of `value` not supported");
+      NANO_SET_PROT(object, Rf_xlength(value) ? value : R_NilValue);
       xc = 0;
       break;
     default:
-      Rf_error("type of 'value' not supported");
+      Rf_error("type of `value` not supported");
     }
 
   } else if (!NANO_PTR_CHECK(object, nano_ContextSymbol)) {
@@ -255,7 +225,7 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_ctx_set_bool(*ctx, op, (bool) NANO_INTEGER(value));
       break;
     default:
-      Rf_error("type of 'value' not supported");
+      Rf_error("type of `value` not supported");
     }
 
   } else if (!NANO_PTR_CHECK(object, nano_StreamSymbol)) {
@@ -283,7 +253,7 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_stream_set_bool(*st, op, (bool) NANO_INTEGER(value));
       break;
     default:
-      Rf_error("type of 'value' not supported");
+      Rf_error("type of `value` not supported");
     }
 
   } else if (!NANO_PTR_CHECK(object, nano_ListenerSymbol)) {
@@ -311,7 +281,7 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_listener_set_bool(*list, op, (bool) NANO_INTEGER(value));
       break;
     default:
-      Rf_error("type of 'value' not supported");
+      Rf_error("type of `value` not supported");
     }
 
   } else if (!NANO_PTR_CHECK(object, nano_DialerSymbol)) {
@@ -339,11 +309,11 @@ SEXP rnng_set_opt(SEXP object, SEXP opt, SEXP value) {
       xc = nng_dialer_set_bool(*dial, op, (bool) NANO_INTEGER(value));
       break;
     default:
-      Rf_error("type of 'value' not supported");
+      Rf_error("type of `value` not supported");
     }
 
   } else {
-    Rf_error("'object' is not a valid Socket, Context, Stream, Listener or Dialer");
+    Rf_error("`object` is not a valid Socket, Context, Stream, Listener or Dialer");
   }
 
   if (xc)
@@ -372,7 +342,7 @@ SEXP rnng_subscribe(SEXP object, SEXP value, SEXP sub) {
     xc = nng_ctx_set(*ctx, op, buf.buf, buf.cur - (TYPEOF(value) == STRSXP));
 
   } else {
-    Rf_error("'object' is not a valid Socket or Context");
+    Rf_error("`object` is not a valid Socket or Context");
   }
 
   if (xc)
@@ -480,7 +450,7 @@ SEXP rnng_get_opt(SEXP object, SEXP opt) {
     }
 
   } else {
-    Rf_error("'object' is not a valid Socket, Context, Stream, Listener, or Dialer");
+    Rf_error("`object` is not a valid Socket, Context, Stream, Listener, or Dialer");
   }
 
   if (xc)
@@ -539,7 +509,7 @@ SEXP rnng_stats_get(SEXP object, SEXP stat) {
     sst = nng_stat_find_dialer(nst, *dial);
 
   } else {
-    Rf_error("'object' is not a valid Socket, Listener or Dialer");
+    Rf_error("`object` is not a valid Socket, Listener or Dialer");
   }
 
   sst = nng_stat_find(sst, statname);
@@ -557,28 +527,48 @@ SEXP rnng_stats_get(SEXP object, SEXP stat) {
 
 // serialization config --------------------------------------------------------
 
-SEXP rnng_serial_config(SEXP klass, SEXP sfunc, SEXP ufunc, SEXP vec) {
+SEXP rnng_serial_config(SEXP klass, SEXP sfunc, SEXP ufunc) {
 
   SEXP out;
-  PROTECT(out = Rf_allocVector(VECSXP, 4));
+  PROTECT(out = Rf_allocVector(VECSXP, 3));
 
   if (TYPEOF(klass) != STRSXP)
-    Rf_error("'class' must be a character string");
-
+    Rf_error("`class` must be a character vector");
   SET_VECTOR_ELT(out, 0, klass);
 
-  SEXPTYPE typ1 = TYPEOF(sfunc);
-  SEXPTYPE typ2 = TYPEOF(ufunc);
-  if (!(typ1 == CLOSXP || typ1 == SPECIALSXP || typ1 == BUILTINSXP) ||
-      !(typ2 == CLOSXP || typ2 == SPECIALSXP || typ2 == BUILTINSXP))
-    Rf_error("both 'sfunc' and 'ufunc' must be functions");
-  SET_VECTOR_ELT(out, 1, sfunc);
-  SET_VECTOR_ELT(out, 2, ufunc);
+  R_xlen_t xlen = XLENGTH(klass);
+  if (Rf_xlength(sfunc) != xlen || Rf_xlength(ufunc) != xlen)
+    Rf_error("`class`, `sfunc` and `ufunc` must all be the same length");
 
-  if (TYPEOF(vec) != LGLSXP)
-    Rf_error("'vec' must be a logical value");
+  switch (TYPEOF(sfunc)) {
+  case VECSXP:
+    SET_VECTOR_ELT(out, 1, sfunc);
+    break;
+  case CLOSXP:
+  case SPECIALSXP:
+  case BUILTINSXP: ;
+    SEXP slist = Rf_allocVector(VECSXP, 1);
+    SET_VECTOR_ELT(out, 1, slist);
+    SET_VECTOR_ELT(slist, 0, sfunc);
+    break;
+  default:
+    Rf_error("`sfunc` must be a function or list of functions");
+  }
 
-  SET_VECTOR_ELT(out, 3, Rf_ScalarLogical(NANO_INTEGER(vec) ? 1 : 0));
+  switch (TYPEOF(ufunc)) {
+  case VECSXP:
+    SET_VECTOR_ELT(out, 2, ufunc);
+    break;
+  case CLOSXP:
+  case SPECIALSXP:
+  case BUILTINSXP: ;
+    SEXP ulist = Rf_allocVector(VECSXP, 1);
+    SET_VECTOR_ELT(out, 2, ulist);
+    SET_VECTOR_ELT(ulist, 0, ufunc);
+    break;
+  default:
+    Rf_error("`ufunc` must be a function or list of functions");
+  }
 
   UNPROTECT(1);
   return out;
@@ -586,13 +576,6 @@ SEXP rnng_serial_config(SEXP klass, SEXP sfunc, SEXP ufunc, SEXP vec) {
 }
 
 // specials --------------------------------------------------------------------
-
-SEXP rnng_set_marker(SEXP x) {
-
-  special_bit = (uint8_t) NANO_INTEGER(x);
-  return x;
-
-}
 
 SEXP rnng_advance_rng_state(void) {
 
@@ -603,10 +586,11 @@ SEXP rnng_advance_rng_state(void) {
 
 }
 
-SEXP rnng_interrupt_switch(SEXP x) {
+SEXP rnng_fini_priors(void) {
 
-  nano_interrupt = NANO_INTEGER(x);
-  return x;
+  nano_thread_shutdown();
+  nano_list_do(SHUTDOWN, NULL);
+  return R_NilValue;
 
 }
 

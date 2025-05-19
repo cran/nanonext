@@ -1,19 +1,3 @@
-// Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-//
-// This file is part of nanonext.
-//
-// nanonext is free software: you can redistribute it and/or modify it under the
-// terms of the GNU General Public License as published by the Free Software
-// Foundation, either version 3 of the License, or (at your option) any later
-// version.
-//
-// nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-// A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License along with
-// nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 // nanonext - header file ------------------------------------------------------
 
 #ifndef NANONEXT_H
@@ -50,18 +34,37 @@ typedef struct nano_handle_s {
 
 #endif
 
-#ifdef NANONEXT_SIGNALS
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-#include <signal.h>
-#endif
-
 #ifdef NANONEXT_IO
 #include <time.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdio.h>
+#endif
+
+#ifdef NANONEXT_NET
+#ifdef _WIN32
+#if !defined(_WIN32_WINNT) || (defined(_WIN32_WINNT) && (_WIN32_WINNT < 0x0600))
+#define _WIN32_WINNT 0x0600
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/uio.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <net/if.h>
+#endif
+#endif
+
+#ifdef NANONEXT_SIGNALS
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+#include <signal.h>
 #endif
 
 #ifdef NANONEXT_TLS
@@ -81,7 +84,7 @@ typedef struct nano_handle_s {
 #include <errno.h>
 #endif
 
-#include <stdint.h>
+#include <inttypes.h>
 #ifndef R_NO_REMAP
 #define R_NO_REMAP
 #endif
@@ -92,8 +95,12 @@ typedef struct nano_handle_s {
 #include <Rinternals.h>
 #include <Rversion.h>
 #include <R_ext/Visibility.h>
-#if defined(NANONEXT_SIGNALS) && defined(_WIN32)
+#if defined(NANONEXT_SIGNALS)
+#ifdef _WIN32
 #include <Rembedded.h>
+#else
+extern int R_interrupts_pending;
+#endif
 #endif
 
 #define NANO_PTR(x) (void *) CAR(x)
@@ -108,29 +115,30 @@ typedef struct nano_handle_s {
 #define NANO_STRING(x) CHAR(*((const SEXP *) DATAPTR_RO(x)))
 #define NANO_STR_N(x, n) CHAR(((const SEXP *) DATAPTR_RO(x))[n])
 #define NANO_INTEGER(x) *(int *) DATAPTR_RO(x)
-#define NANO_ERROR(x) { Rf_error(x); return R_NilValue; }
 
 #define ERROR_OUT(xc) Rf_error("%d | %s", xc, nng_strerror(xc))
 #define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
 #define NANONEXT_INIT_BUFSIZE 4096
 #define NANONEXT_SERIAL_VER 3
 #define NANONEXT_SERIAL_THR 134217728
-#define NANONEXT_ERR_STRLEN 40
-#define NANONEXT_LD_STRLEN 21
+#define NANONEXT_CHUNK_SIZE INT_MAX // must be <= INT_MAX
+#define NANONEXT_STR_SIZE 40
 #define NANO_ALLOC(x, sz)                                      \
-  (x)->buf = R_Calloc(sz, unsigned char);                      \
+  (x)->buf = calloc(sz, sizeof(unsigned char));                \
+  if ((x)->buf == NULL) Rf_error("memory allocation failed");  \
   (x)->len = sz;                                               \
   (x)->cur = 0
 #define NANO_INIT(x, ptr, sz)                                  \
   (x)->buf = ptr;                                              \
   (x)->len = 0;                                                \
   (x)->cur = sz
-#define NANO_FREE(x) if (x.len) R_Free(x.buf)
+#define NANO_FREE(x) if (x.len) free(x.buf)
 #define NANO_CLASS2(x, cls1, cls2)                             \
   SEXP klass = Rf_allocVector(STRSXP, 2);                      \
   Rf_classgets(x, klass);                                      \
   SET_STRING_ELT(klass, 0, Rf_mkChar(cls1));                   \
   SET_STRING_ELT(klass, 1, Rf_mkChar(cls2))
+#define NANO_ENSURE_ALLOC(x) if (x == NULL) { xc = 2; goto failmem; }
 
 typedef union nano_opt_u {
   char *str;
@@ -178,8 +186,10 @@ typedef struct nano_aio_s {
 } nano_aio;
 
 typedef struct nano_saio_s {
+  nng_ctx *ctx;
   nng_aio *aio;
   void *cb;
+  int id;
 } nano_saio;
 
 typedef struct nano_cv_s {
@@ -214,9 +224,27 @@ typedef struct nano_buf_s {
   size_t cur;
 } nano_buf;
 
+typedef struct nano_serial_bundle_s {
+  R_outpstream_t outpstream;
+  R_inpstream_t inpstream;
+  SEXP klass;
+  SEXP hook_func;
+} nano_serial_bundle;
+
+typedef enum nano_list_op {
+  INIT,
+  FINALIZE,
+  COMPLETE,
+  FREE,
+  SHUTDOWN
+} nano_list_op;
+
+typedef struct nano_node_s {
+  void *data;
+  struct nano_node_s *next;
+} nano_node;
+
 extern void (*eln2)(void (*)(void *), void *, double, int);
-extern uint8_t special_bit;
-extern int nano_interrupt;
 
 extern SEXP nano_AioSymbol;
 extern SEXP nano_ContextSymbol;
@@ -272,12 +300,14 @@ void nano_serialize(nano_buf *, const SEXP, SEXP);
 SEXP nano_unserialize(unsigned char *, const size_t, SEXP);
 SEXP nano_decode(unsigned char *, const size_t, const uint8_t, SEXP);
 void nano_encode(nano_buf *, const SEXP);
-int nano_encodes(const SEXP);
+int nano_encode_mode(const SEXP);
 int nano_matcharg(const SEXP);
-int nano_matchargs(const SEXP);
 
 void pipe_cb_signal(nng_pipe, nng_pipe_ev, void *);
 void tls_finalizer(SEXP);
+
+void nano_list_do(nano_list_op, nano_aio *);
+void nano_thread_shutdown(void);
 
 SEXP rnng_advance_rng_state(void);
 SEXP rnng_aio_call(SEXP);
@@ -307,13 +337,19 @@ SEXP rnng_dialer_close(SEXP);
 SEXP rnng_dialer_start(SEXP, SEXP);
 SEXP rnng_eval_safe(SEXP);
 SEXP rnng_fini(void);
+SEXP rnng_fini_priors(void);
 SEXP rnng_get_opt(SEXP, SEXP);
+SEXP rnng_header_read(SEXP);
+SEXP rnng_header_set(SEXP);
 SEXP rnng_interrupt_switch(SEXP);
+SEXP rnng_ip_addr(void);
 SEXP rnng_is_error_value(SEXP);
 SEXP rnng_is_nul_byte(SEXP);
 SEXP rnng_listen(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_listener_close(SEXP);
 SEXP rnng_listener_start(SEXP);
+SEXP rnng_marker_read(SEXP);
+SEXP rnng_marker_set(SEXP);
 SEXP rnng_messenger(SEXP);
 SEXP rnng_messenger_thread_create(SEXP);
 SEXP rnng_monitor_create(SEXP, SEXP);
@@ -326,14 +362,14 @@ SEXP rnng_ncurl_transact(SEXP);
 SEXP rnng_pipe_notify(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_protocol_open(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_random(SEXP, SEXP);
+SEXP rnng_read_stdin(SEXP);
 SEXP rnng_reap(SEXP);
 SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_serial_config(SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_set_marker(SEXP);
+SEXP rnng_serial_config(SEXP, SEXP, SEXP);
 SEXP rnng_set_opt(SEXP, SEXP, SEXP);
 SEXP rnng_set_promise_context(SEXP, SEXP);
 SEXP rnng_signal_thread_create(SEXP, SEXP);
@@ -344,7 +380,6 @@ SEXP rnng_stream_close(SEXP);
 SEXP rnng_stream_open(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_strerror(SEXP);
 SEXP rnng_subscribe(SEXP, SEXP, SEXP);
-SEXP rnng_thread_shutdown(void);
 SEXP rnng_tls_config(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_traverse_precious(void);
 SEXP rnng_unresolved(SEXP);
@@ -353,5 +388,6 @@ SEXP rnng_url_parse(SEXP);
 SEXP rnng_version(void);
 SEXP rnng_wait_thread_create(SEXP);
 SEXP rnng_write_cert(SEXP, SEXP);
+SEXP rnng_write_stdout(SEXP);
 
 #endif

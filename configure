@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Library versions
-LIB_VER="110-2"
+LIB_VER="110-2a"
 TLS_VER="362"
 
 # Initialise
@@ -12,7 +12,9 @@ NNG_LIBS=""
 
 # Find compiler and export flags
 CC=`"${R_HOME}/bin/R" CMD config CC`
-export CC
+CFLAGS=`"${R_HOME}/bin/R" CMD config CFLAGS`
+LDFLAGS=`"${R_HOME}/bin/R" CMD config LDFLAGS`
+export CC CFLAGS LDFLAGS
 
 if [ -z "$MACOSX_DEPLOYMENT_TARGET" ]; then
 export MACOSX_DEPLOYMENT_TARGET=`echo $CC | sed -En 's/.*-version-min=([0-9][0-9.]*).*/\1/p'`
@@ -37,7 +39,7 @@ if [ -z "$NANONEXT_LIBS" ]; then
 if [ "$INCLUDE_DIR" ] || [ "$LIB_DIR" ]
 then
   PKG_CFLAGS="-I$INCLUDE_DIR $PKG_CFLAGS"
-  PKG_LIBS="-L$LIB_DIR $PKG_LIBS"
+  PKG_LIBS="-L$LIB_DIR -lmbedtls -lmbedx509 -lmbedcrypto $PKG_LIBS"
   echo "Found INCLUDE_DIR $INCLUDE_DIR"
   echo "Found LIB_DIR $LIB_DIR"
 elif [ -d "/usr/local/include/mbedtls" ]

@@ -1,19 +1,3 @@
-// Copyright (C) 2022-2024 Hibiki AI Limited <info@hibiki-ai.com>
-//
-// This file is part of nanonext.
-//
-// nanonext is free software: you can redistribute it and/or modify it under the
-// terms of the GNU General Public License as published by the Free Software
-// Foundation, either version 3 of the License, or (at your option) any later
-// version.
-//
-// nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-// WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-// A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License along with
-// nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 // nanonext - C level - Threaded Applications ----------------------------------
 
 #define NANONEXT_PROTOCOLS
@@ -22,11 +6,26 @@
 
 // threads callable and messenger ----------------------------------------------
 
-extern nng_thread *nano_wait_thr;
-extern nng_aio *nano_shared_aio;
-extern nng_mtx *nano_wait_mtx;
-extern nng_cv *nano_wait_cv;
-extern int nano_wait_condition;
+static nng_mtx *nano_wait_mtx = NULL;
+static nng_cv *nano_wait_cv = NULL;
+static nng_thread *nano_wait_thr = NULL;
+static nng_aio *nano_shared_aio = NULL;
+static int nano_wait_condition = 0;
+
+void nano_thread_shutdown(void) {
+  if (nano_wait_thr == NULL)
+    return;
+  if (nano_shared_aio != NULL)
+    nng_aio_stop(nano_shared_aio);
+  nng_mtx_lock(nano_wait_mtx);
+  nano_wait_condition = -1;
+  nng_cv_wake(nano_wait_cv);
+  nng_mtx_unlock(nano_wait_mtx);
+  nng_thread_destroy(nano_wait_thr);
+  nng_cv_free(nano_wait_cv);
+  nng_mtx_free(nano_wait_mtx);
+  nano_wait_thr = NULL;
+}
 
 // # nocov start
 // tested interactively
@@ -135,26 +134,27 @@ static void rnng_messenger_thread(void *args) {
 SEXP rnng_messenger(SEXP url) {
 
   const char *up = CHAR(STRING_ELT(url, 0));
-  nng_socket *sock = R_Calloc(1, nng_socket);
-  nng_listener *lp;
-  nng_dialer *dp;
+  nng_listener *lp = NULL;
+  nng_dialer *dp = NULL;
   int xc, dialer = 0;
   SEXP socket, con;
 
+  nng_socket *sock = malloc(sizeof(nng_socket));
+  NANO_ENSURE_ALLOC(sock);
+
   if ((xc = nng_pair0_open(sock)))
-    goto exitlevel1;
-  lp = R_Calloc(1, nng_listener);
+    goto fail;
+  lp = malloc(sizeof(nng_listener));
+  NANO_ENSURE_ALLOC(lp);
   if ((xc = nng_listen(*sock, up, lp, 0))) {
-    if (xc != 10 && xc != 15) {
-      R_Free(lp);
-      goto exitlevel2;
-    }
-    R_Free(lp);
-    dp = R_Calloc(1, nng_dialer);
-    if ((xc = nng_dial(*sock, up, dp, 0))) {
-      R_Free(dp);
-      goto exitlevel2;
-    }
+    if (xc != 10 && xc != 15)
+      goto fail;
+    free(lp);
+    lp = NULL;
+    dp = malloc(sizeof(nng_dialer));
+    NANO_ENSURE_ALLOC(dp);
+    if ((xc = nng_dial(*sock, up, dp, 0)))
+      goto fail;
     dialer = 1;
   }
 
@@ -172,10 +172,13 @@ SEXP rnng_messenger(SEXP url) {
   UNPROTECT(2);
   return socket;
 
-  exitlevel2:
-  nng_close(*sock);
-  exitlevel1:
-  R_Free(sock);
+  fail:
+  failmem:
+  free(dp);
+  free(lp);
+  if (sock != NULL)
+    nng_close(*sock);
+  free(sock);
   ERROR_OUT(xc);
 
 }
@@ -207,8 +210,8 @@ static void thread_aio_finalizer(SEXP xptr) {
   nng_thread_destroy(xp->thr);
   nng_cv_free(cv);
   nng_mtx_free(mtx);
-  R_Free(ncv);
-  R_Free(xp);
+  free(ncv);
+  free(xp);
 
 }
 
@@ -232,25 +235,29 @@ static void rnng_wait_thread_single(void *args) {
 void single_wait_thread_create(SEXP x) {
 
   nano_aio *aiop = (nano_aio *) NANO_PTR(x);
-  nano_thread_aio *taio = R_Calloc(1, nano_thread_aio);
-  nano_cv *ncv = R_Calloc(1, nano_cv);
+
+  int xc, signalled;
+  nano_thread_aio *taio = NULL;
+  nano_cv *ncv = NULL;
+
+  taio = malloc(sizeof(nano_thread_aio));
+  NANO_ENSURE_ALLOC(taio);
+  ncv = malloc(sizeof(nano_cv));
+  NANO_ENSURE_ALLOC(ncv);
   taio->aio = aiop->aio;
   taio->cv = ncv;
-  nng_mtx *mtx;
-  nng_cv *cv;
-  int xc, signalled;
+  nng_mtx *mtx = NULL;
+  nng_cv *cv = NULL;
 
-  if ((xc = nng_mtx_alloc(&mtx)))
-    goto exitlevel1;
-
-  if ((xc = nng_cv_alloc(&cv, mtx)))
-    goto exitlevel2;
+  if ((xc = nng_mtx_alloc(&mtx)) ||
+      (xc = nng_cv_alloc(&cv, mtx)))
+    goto fail;
 
   ncv->mtx = mtx;
   ncv->cv = cv;
 
   if ((xc = nng_thread_create(&taio->thr, rnng_wait_thread_single, taio)))
-    goto exitlevel3;
+    goto fail;
 
   SEXP xptr;
   PROTECT(xptr = R_MakeExternalPtr(taio, R_NilValue, R_NilValue));
@@ -277,11 +284,12 @@ void single_wait_thread_create(SEXP x) {
 
   return;
 
-  exitlevel3:
+  fail:
   nng_cv_free(cv);
-  exitlevel2:
   nng_mtx_free(mtx);
-  exitlevel1:
+  failmem:
+  free(ncv);
+  free(taio);
   ERROR_OUT(xc);
 
 }
@@ -302,7 +310,7 @@ static void thread_duo_finalizer(SEXP xptr) {
     nng_mtx_unlock(mtx);
   }
   nng_thread_destroy(xp->thr);
-  R_Free(xp);
+  free(xp);
 
 }
 
@@ -342,15 +350,11 @@ SEXP rnng_wait_thread_create(SEXP x) {
 
     int xc, signalled;
 
-    if (!nano_wait_thr) {
-      if ((xc = nng_mtx_alloc(&nano_wait_mtx)))
-        goto exitlevel1;
-
-      if ((xc = nng_cv_alloc(&nano_wait_cv, nano_wait_mtx)))
-        goto exitlevel2;
-
-      if ((xc = nng_thread_create(&nano_wait_thr, rnng_wait_thread, NULL)))
-        goto exitlevel3;
+    if (nano_wait_thr == NULL) {
+      if ((xc = nng_mtx_alloc(&nano_wait_mtx)) ||
+          (xc = nng_cv_alloc(&nano_wait_cv, nano_wait_mtx)) ||
+          (xc = nng_thread_create(&nano_wait_thr, rnng_wait_thread, NULL)))
+        goto fail;
     }
 
     int thread_required = 0;
@@ -411,11 +415,9 @@ SEXP rnng_wait_thread_create(SEXP x) {
 
     return x;
 
-    exitlevel3:
+    fail:
     nng_cv_free(nano_wait_cv);
-    exitlevel2:
     nng_mtx_free(nano_wait_mtx);
-    exitlevel1:
     ERROR_OUT(xc);
 
   } else if (typ == VECSXP) {
@@ -429,21 +431,6 @@ SEXP rnng_wait_thread_create(SEXP x) {
 
   return x;
 
-}
-
-SEXP rnng_thread_shutdown(void) {
-  if (nano_wait_thr != NULL) {
-    if (nano_shared_aio != NULL)
-      nng_aio_stop(nano_shared_aio);
-    nng_mtx_lock(nano_wait_mtx);
-    nano_wait_condition = -1;
-    nng_cv_wake(nano_wait_cv);
-    nng_mtx_unlock(nano_wait_mtx);
-    nng_thread_destroy(nano_wait_thr);
-    nng_cv_free(nano_wait_cv);
-    nng_mtx_free(nano_wait_mtx);
-  }
-  return R_NilValue;
 }
 
 static void rnng_signal_thread(void *args) {
@@ -496,10 +483,14 @@ static void rnng_signal_thread(void *args) {
 SEXP rnng_signal_thread_create(SEXP cv, SEXP cv2) {
 
   if (NANO_PTR_CHECK(cv, nano_CvSymbol))
-    Rf_error("'cv' is not a valid Condition Variable");
+    Rf_error("`cv` is not a valid Condition Variable");
 
   if (NANO_PTR_CHECK(cv2, nano_CvSymbol))
-    Rf_error("'cv2' is not a valid Condition Variable");
+    Rf_error("`cv2` is not a valid Condition Variable");
+
+  int xc;
+  nano_thread_duo *duo = malloc(sizeof(nano_thread_duo));
+  NANO_ENSURE_ALLOC(duo);
 
   SEXP existing = Rf_getAttrib(cv, R_MissingArg);
   if (existing != R_NilValue) {
@@ -509,7 +500,6 @@ SEXP rnng_signal_thread_create(SEXP cv, SEXP cv2) {
 
   nano_cv *ncv = (nano_cv *) NANO_PTR(cv);
   nano_cv *ncv2 = (nano_cv *) NANO_PTR(cv2);
-  nano_thread_duo *duo = R_Calloc(1, nano_thread_duo);
   duo->cv = ncv;
   duo->cv2 = ncv2;
 
@@ -518,17 +508,127 @@ SEXP rnng_signal_thread_create(SEXP cv, SEXP cv2) {
   ncv->condition = 0;
   nng_mtx_unlock(dmtx);
 
-  const int xc = nng_thread_create(&duo->thr, rnng_signal_thread, duo);
-  if (xc) {
-    R_Free(duo);
-    Rf_setAttrib(cv, R_MissingArg, R_NilValue);
-    ERROR_OUT(xc);
-  }
+  if ((xc = nng_thread_create(&duo->thr, rnng_signal_thread, duo)))
+    goto fail;
 
   SEXP xptr = R_MakeExternalPtr(duo, R_NilValue, R_NilValue);
   Rf_setAttrib(cv, R_MissingArg, xptr);
   R_RegisterCFinalizerEx(xptr, thread_duo_finalizer, TRUE);
 
   return cv2;
+
+  fail:
+  free(duo);
+  Rf_setAttrib(cv, R_MissingArg, R_NilValue);
+  failmem:
+  ERROR_OUT(xc);
+
+}
+
+char *nano_readline(void) {
+
+  size_t sz = NANONEXT_INIT_BUFSIZE;
+  size_t cur = 0;
+  char *buf = malloc(sz);
+  if (buf == NULL) {
+    return NULL;
+  }
+
+  int c;
+  while ((c = fgetc(stdin)) != EOF) {
+    if (cur + 1 >= sz) {
+      sz += sz;
+      char *nbuf = realloc(buf, sz);
+      if (nbuf == NULL)
+        break;
+      buf = nbuf;
+    }
+
+    buf[cur++] = (char) c;
+    if (c == '\n')
+      break;
+  }
+
+  if (cur == 0 && c == EOF) {
+    free(buf);
+    return NULL;
+  }
+
+  buf[cur] = '\0';
+  return buf;
+
+}
+
+void nano_read_thread(void *arg) {
+
+  int xc = 0;
+  nng_socket sock = {0};
+  nng_dialer dp = {0};
+  if ((xc = nng_push0_open(&sock)) ||
+      (xc = nng_dialer_create(&dp, sock, "inproc://nanonext-reserved-reader")) ||
+      (xc = nng_dialer_start(dp, 0)))
+    goto cleanup;
+
+  char *buf = NULL;
+  while (1) {
+    buf = nano_readline();
+    if (buf == NULL)
+      break;
+    xc = nng_send(sock, buf, strlen(buf) + 1, 0);
+    free(buf);
+    if (xc)
+      break;
+  }
+
+  cleanup:
+  nng_close(sock);
+
+}
+
+SEXP rnng_read_stdin(SEXP interactive) {
+
+  if (NANO_INTEGER(interactive))
+    Rf_error("can only be used in non-interactive sessions");
+
+  int xc;
+  nng_socket *sock = NULL;
+  nng_listener *lp = NULL;
+  sock = malloc(sizeof(nng_socket));
+  NANO_ENSURE_ALLOC(sock);
+  lp = calloc(1, sizeof(nng_listener));
+  NANO_ENSURE_ALLOC(lp);
+
+  if ((xc = nng_pull0_open(sock)) ||
+      (xc = nng_listener_create(lp, *sock, "inproc://nanonext-reserved-reader")) ||
+      (xc = nng_listener_start(*lp, 0)))
+    goto fail;
+
+  nng_thread *thr;
+
+  if ((xc = nng_thread_create(&thr, nano_read_thread, NULL)))
+    ERROR_OUT(xc);
+
+  SEXP socket, con, thread;
+  PROTECT(thread = R_MakeExternalPtr(thr, R_NilValue, R_NilValue));
+  R_RegisterCFinalizerEx(thread, thread_finalizer, TRUE);
+  PROTECT(con = R_MakeExternalPtr(lp, R_NilValue, thread));
+  R_RegisterCFinalizerEx(con, listener_finalizer, TRUE);
+  PROTECT(socket = R_MakeExternalPtr(sock, nano_SocketSymbol, con));
+  R_RegisterCFinalizerEx(socket, socket_finalizer, TRUE);
+
+  NANO_CLASS2(socket, "nanoSocket", "nano");
+  Rf_setAttrib(socket, nano_IdSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
+  Rf_setAttrib(socket, nano_ProtocolSymbol, Rf_mkString("pull"));
+  Rf_setAttrib(socket, nano_StateSymbol, Rf_mkString("opened"));
+
+  UNPROTECT(3);
+  return socket;
+
+  fail:
+  nng_close(*sock);
+  failmem:
+  free(lp);
+  free(sock);
+  ERROR_OUT(xc);
 
 }

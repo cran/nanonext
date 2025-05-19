@@ -1,19 +1,3 @@
-# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-#
-# This file is part of nanonext.
-#
-# nanonext is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 # nanonext - Core - Sockets ----------------------------------------------------
 
 #' Open Socket
@@ -103,13 +87,14 @@
 #'
 #' @export
 #'
-socket <- function(protocol = c("bus", "pair", "poly", "push", "pull", "pub",
-                                "sub", "req", "rep", "surveyor", "respondent"),
-                   dial = NULL,
-                   listen = NULL,
-                   tls = NULL,
-                   autostart = TRUE,
-                   raw = FALSE)
+socket <- function(
+  protocol = c("bus", "pair", "poly", "push", "pull", "pub", "sub", "req", "rep", "surveyor", "respondent"),
+  dial = NULL,
+  listen = NULL,
+  tls = NULL,
+  autostart = TRUE,
+  raw = FALSE
+)
   .Call(rnng_protocol_open, protocol, dial, listen, tls, autostart, raw)
 
 #' Close Connection

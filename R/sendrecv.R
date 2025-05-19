@@ -1,19 +1,3 @@
-# Copyright (C) 2022-2025 Hibiki AI Limited <info@hibiki-ai.com>
-#
-# This file is part of nanonext.
-#
-# nanonext is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation, either version 3 of the License, or (at your option) any later
-# version.
-#
-# nanonext is distributed in the hope that it will be useful, but WITHOUT ANY
-# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along with
-# nanonext. If not, see <https://www.gnu.org/licenses/>.
-
 # nanonext - Core Functions - send/recv ----------------------------------------
 
 #' Send
@@ -100,7 +84,7 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL, pipe = 0L)
 #'   `"string"` (9L). The default `"serial"` means a serialised R object; for
 #'   the other modes, received bytes are converted into the respective mode.
 #'   `"string"` is a faster option for length one character vectors. For
-#'   Streams, `"serial"` is not an option and the default is `"character"`.
+#'   Streams, `"serial"` will default to `"character"`.
 #' @param n \[default 65536L\] applicable to Streams only, the maximum number of
 #'   bytes to receive. Can be an over-estimate, but note that a buffer of this
 #'   size is reserved.
@@ -166,9 +150,10 @@ send <- function(con, data, mode = c("serial", "raw"), block = NULL, pipe = 0L)
 #'
 #' @export
 #'
-recv <- function(con,
-                 mode = c("serial", "character", "complex", "double",
-                          "integer", "logical", "numeric", "raw", "string"),
-                 block = NULL,
-                 n = 65536L)
+recv <- function(
+  con,
+  mode = c("serial", "character", "complex", "double", "integer", "logical", "numeric", "raw", "string"),
+  block = NULL,
+  n = 65536L
+)
   .Call(rnng_recv, con, mode, block, n)
