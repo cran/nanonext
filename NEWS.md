@@ -1,3 +1,14 @@
+# nanonext 1.6.1
+
+#### Updates
+
+* `ncurl()` and variants now accept request data supplied as a raw vector (thanks @thomasp85, #158).
+* `cv_reset()` now correctly resets the flag in the case a flag event has already been registered with `pipe_notify()`.
+* The previous `listen()` and `dial()` argument `error`, removed in v1.6.0, is now defunct.
+* The previous `serial_config()` argument `vec`, unutilised since v1.6.0, is removed.
+* Fixes package installation with 'libmbedtls' in a non-standard filesystem location, even if known to the compiler (thanks @tdhock, #150).
+* Bundled 'libnng' updated to 1.11.0 release.
+
 # nanonext 1.6.0
 
 #### New Features
@@ -12,7 +23,7 @@
 #### Updates
 
 * `listen()` and `dial()` argument `error` is replaced with `fail` to specify the failure mode - 'warn', 'error', or 'none' to just return an 'errorValue'.
- + Any existing usage of `error = TRUE` will work only until the next release.
+  + Any existing usage of `error = TRUE` will work only until the next release.
 * Partial matching is no longer enabled for the `mode` argument to send/receive functions.
 * `send_aio()` without keeping a reference to the return value no longer potentially drops sends (thanks @wch, #129).
 * `pipe_notify()` no longer requires any particular sequencing of closing the socket and garbage collection of the socket / 'conditionVariable' (#143).

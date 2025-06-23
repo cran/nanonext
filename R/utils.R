@@ -268,8 +268,6 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #'   object inheriting from `class` and returns a raw vector.
 #' @param ufunc a function (or list of functions) that accepts a raw vector and
 #'   returns a reference object.
-#' @param vec do not specify (retained for compatibility only and will be
-#'   removed).
 #'
 #' @return A list comprising the configuration. This should be set on a Socket
 #'   using [opt<-()] with option name `"serial"`.
@@ -295,7 +293,7 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #'
 #' @export
 #'
-serial_config <- function(class, sfunc, ufunc, vec = FALSE)
+serial_config <- function(class, sfunc, ufunc)
   .Call(rnng_serial_config, class, sfunc, ufunc)
 
 #' Write to Stdout
@@ -370,23 +368,11 @@ ip_addr <- function() .Call(rnng_ip_addr)
 #'
 #' Internal package functions.
 #'
-#' @param value integer value.
-#'
-#' @return For `.header()`: the integer `value` supplied.
-#'
-#' @keywords internal
-#' @export
-#'
-.header <- function(value = 0L) .Call(rnng_header_set, value)
-
-#' Read Serialization Header
-#'
 #' @param x raw vector.
 #'
 #' @return For `.read_header()`: integer value.
 #'
 #' @keywords internal
-#' @rdname dot-header
 #' @export
 #'
 .read_header <- function(x) .Call(rnng_header_read, x)
@@ -398,7 +384,7 @@ ip_addr <- function() .Call(rnng_ip_addr)
 #' @return For `.mark()`: the logical `bool` supplied.
 #'
 #' @keywords internal
-#' @rdname dot-header
+#' @rdname dot-read_header
 #' @export
 #'
 .mark <- function(bool = TRUE) .Call(rnng_marker_set, bool)
@@ -410,7 +396,7 @@ ip_addr <- function() .Call(rnng_ip_addr)
 #' @return For `.read_marker()`: logical value `TRUE` or `FALSE`.
 #'
 #' @keywords internal
-#' @rdname dot-header
+#' @rdname dot-read_header
 #' @export
 #'
 .read_marker <- function(x) .Call(rnng_marker_read, x)
