@@ -1,3 +1,22 @@
+# nanonext 1.7.0
+
+#### Behavioural Changes
+
+* The promises method for `ncurlAio` has been updated for ease of use (#176):
+  + Returns a list of 'status', 'headers' and 'data'.
+  + Rejects only if an NNG error is returned (all HTTP status codes are resolved).
+* Improved behaviour when using `serial_config()` configurations applied to a socket.
+  If the serialization hook function errors or otherwise fails to return a raw vector, this will error out rather than be silently ignored (#173).
+
+#### New Features
+
+* A 'recvAio' returned by `request()` now has an attribute `id`, which is the integer ID of the context passed to it.
+
+#### Updates
+
+* `opt()` for a boolean NNG option now correctly returns a logical value instead of an integer (#186).
+* `as.promise()` method for `recvAio` and `ncurlAio` objects made robust for high-throughput cases (#171).
+
 # nanonext 1.6.2
 
 #### Updates

@@ -123,6 +123,7 @@ extern int R_interrupts_pending;
 #define NANONEXT_SERIAL_THR 134217728
 #define NANONEXT_CHUNK_SIZE INT_MAX // must be <= INT_MAX
 #define NANONEXT_STR_SIZE 40
+#define NANONEXT_WAIT_DUR 1000
 #define NANO_ALLOC(x, sz)                                      \
   (x)->buf = calloc(sz, sizeof(unsigned char));                \
   if ((x)->buf == NULL) Rf_error("memory allocation failed");  \
@@ -228,7 +229,7 @@ typedef struct nano_serial_bundle_s {
   R_outpstream_t outpstream;
   R_inpstream_t inpstream;
   SEXP klass;
-  SEXP hook_func;
+  unsigned char *buf;
 } nano_serial_bundle;
 
 typedef enum nano_list_op {
@@ -365,7 +366,6 @@ SEXP rnng_fini(void);
 SEXP rnng_fini_priors(void);
 SEXP rnng_get_opt(SEXP, SEXP);
 SEXP rnng_header_read(SEXP);
-SEXP rnng_interrupt_switch(SEXP);
 SEXP rnng_ip_addr(void);
 SEXP rnng_is_error_value(SEXP);
 SEXP rnng_is_nul_byte(SEXP);
@@ -391,6 +391,7 @@ SEXP rnng_reap(SEXP);
 SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_request_stop(SEXP);
 SEXP rnng_send(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_send_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_serial_config(SEXP, SEXP, SEXP);

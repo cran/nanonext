@@ -5,8 +5,6 @@
 
 // internals -------------------------------------------------------------------
 
-static int nano_interrupt = 0;
-
 static SEXP mk_error_aio(const int xc, SEXP env) {
 
   SEXP err = PROTECT(Rf_ScalarInteger(xc));
@@ -149,7 +147,7 @@ static void raio_complete_interrupt(void *arg) {
   if (raio->cb != NULL)
     later2(raio_invoke_cb, raio->cb);
 
-  if (nano_interrupt) {
+  if (res <= 0) {
 #ifdef _WIN32
     UserBreak = 1;
 #else
@@ -471,6 +469,61 @@ SEXP rnng_aio_stop(SEXP x) {
 
 }
 
+SEXP rnng_request_stop(SEXP x) {
+
+  SEXP out;
+  switch (TYPEOF(x)) {
+  case ENVSXP: ;
+    SEXP coreaio;
+    nng_msg *msgp = NULL;
+    int res = 0;
+    PROTECT(coreaio = Rf_findVarInFrame(x, nano_AioSymbol));
+    if (NANO_PTR_CHECK(coreaio, nano_AioSymbol)) goto fail;
+    nano_aio *aiop = (nano_aio *) NANO_PTR(coreaio);
+    if (aiop->type != REQAIOS && aiop->type != REQAIO) goto fail;
+    nng_aio_stop(aiop->aio);
+    nano_saio *saio = (nano_saio *) aiop->cb;
+    if (saio->id == 0) goto fail;
+
+    const SEXP context = Rf_getAttrib(coreaio, nano_ContextSymbol);
+    if (NANO_PTR_CHECK(context, nano_ContextSymbol)) goto fail;
+    nng_ctx *ctx = (nng_ctx *) NANO_PTR(context);
+    const nng_duration dur = NANONEXT_WAIT_DUR;
+    if (nng_ctx_set_ms(*ctx, "send-timeout", dur) ||
+        nng_ctx_set_ms(*ctx, "recv-timeout", dur) ||
+        nng_msg_alloc(&msgp, 0) ||
+        nng_msg_append_u32(msgp, 0) ||
+        nng_msg_append(msgp, &saio->id, sizeof(int)) ||
+        nng_ctx_sendmsg(*ctx, msgp, 0)) {
+      goto fail;
+    }
+    msgp = NULL;
+    if (nng_ctx_recvmsg(*ctx, &msgp, 0))
+      goto fail;
+    memcpy(&res, nng_msg_body(msgp), sizeof(int));
+
+    fail:
+    nng_msg_free(msgp);
+    UNPROTECT(1);
+    out = Rf_ScalarLogical(res != 0);
+    break;
+  case VECSXP: ;
+    const R_xlen_t xlen = Rf_xlength(x);
+    PROTECT(out = Rf_allocVector(LGLSXP, xlen));
+    for (R_xlen_t i = xlen - 1; i >= 0; i--) {
+      SEXP item = rnng_request_stop(NANO_VECTOR(x)[i]);
+      SET_LOGICAL_ELT(out, i, NANO_INTEGER(item));
+    }
+    UNPROTECT(1);
+    break;
+  default:
+    out = Rf_ScalarLogical(0);
+  }
+
+  return out;
+
+}
+
 static int rnng_unresolved_impl(SEXP x) {
 
   int xc;
@@ -740,12 +793,5 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEX
   failmem:
   free(raio);
   return mk_error_data(xc);
-
-}
-
-SEXP rnng_interrupt_switch(SEXP x) {
-
-  nano_interrupt = NANO_INTEGER(x);
-  return x;
 
 }

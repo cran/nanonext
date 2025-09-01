@@ -55,11 +55,15 @@ void raio_invoke_cb(void *arg) {
 
 void haio_invoke_cb(void *arg) {
 
-  SEXP call, status, node = (SEXP) arg, x = TAG(node);
-  status = nano_aio_http_status(x);
-  PROTECT(call = Rf_lcons(nano_ResolveSymbol, Rf_cons(status, R_NilValue)));
+  SEXP call, out, node = (SEXP) arg, x = TAG(node);
+  const char *names[] = {"status", "headers", "data", ""};
+  PROTECT(out = Rf_mkNamed(VECSXP, names));
+  SET_VECTOR_ELT(out, 0, nano_aio_http_status(x));
+  SET_VECTOR_ELT(out, 1, Rf_findVarInFrame(x, nano_ProtocolSymbol));
+  SET_VECTOR_ELT(out, 2, Rf_findVarInFrame(x, nano_ValueSymbol));
+  PROTECT(call = Rf_lcons(nano_ResolveSymbol, Rf_cons(out, R_NilValue)));
   Rf_eval(call, NANO_ENCLOS(x));
-  UNPROTECT(1);
+  UNPROTECT(2);
   nano_ReleaseObject(node);
 
 }
@@ -84,12 +88,11 @@ static void request_complete(void *arg) {
     res = - (int) p.id;
   } else if (res == 5 && saio->id) {
     nng_msg *msg = NULL;
-    if (nng_msg_alloc(&msg, 0) == 0) {
-      if (nng_msg_append_u32(msg, 0) ||
-          nng_msg_append(msg, &saio->id, sizeof(int)) ||
-          nng_ctx_sendmsg(*saio->ctx, msg, 0)) {
-        nng_msg_free(msg);
-      }
+    if (nng_msg_alloc(&msg, 0) ||
+        nng_msg_append_u32(msg, 0) ||
+        nng_msg_append(msg, &saio->id, sizeof(int)) ||
+        nng_ctx_sendmsg(*saio->ctx, msg, NNG_FLAG_NONBLOCK)) {
+      nng_msg_free(msg);
     }
   }
 
@@ -459,7 +462,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) nano_integer(timeout);
   const uint8_t mod = (uint8_t) nano_matcharg(recvmode);
   const int raw = nano_encode_mode(sendmode);
-  const int id = msgid != R_NilValue ? nng_ctx_id(*ctx) : 0;
+  const int id = nng_ctx_id(*ctx);
   const int signal = cvar != R_NilValue && !NANO_PTR_CHECK(cvar, nano_CvSymbol);
   const int drop = cvar != R_NilValue && !signal;
   int xc;
@@ -485,7 +488,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   NANO_ENSURE_ALLOC(raio);
 
   saio->ctx = ctx;
-  saio->id = id;
+  saio->id = msgid != R_NilValue ? id : 0;
 
   if ((xc = nng_msg_alloc(&msg, 0)) ||
       (xc = nng_msg_append(msg, buf.buf, buf.cur)) ||
@@ -512,10 +515,11 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   PROTECT(aio = R_MakeExternalPtr(raio, nano_AioSymbol, NANO_PROT(con)));
   R_RegisterCFinalizerEx(aio, request_finalizer, TRUE);
   Rf_setAttrib(aio, nano_ContextSymbol, con);
-  Rf_setAttrib(aio, nano_IdSymbol, Rf_ScalarInteger(id));
+  Rf_setAttrib(aio, nano_IdSymbol, Rf_ScalarInteger(saio->id));
 
   PROTECT(env = R_NewEnv(R_NilValue, 0, 0));
   Rf_classgets(env, nano_reqAio);
+  Rf_setAttrib(env, nano_IdSymbol, Rf_ScalarInteger(id));
   Rf_defineVar(nano_AioSymbol, aio, env);
 
   PROTECT(fun = R_mkClosure(R_NilValue, nano_aioFuncMsg, clo));
@@ -637,10 +641,10 @@ SEXP rnng_monitor_create(SEXP socket, SEXP cv) {
   nng_socket *sock = (nng_socket *) NANO_PTR(socket);
 
   if ((xc = nng_pipe_notify(*sock, NNG_PIPE_EV_ADD_POST, pipe_cb_monitor, monitor)))
-    goto fail;
+    goto failmem;
 
   if ((xc = nng_pipe_notify(*sock, NNG_PIPE_EV_REM_POST, pipe_cb_monitor, monitor)))
-    goto fail;
+    goto failmem;
 
   PROTECT(xptr = R_MakeExternalPtr(monitor, nano_MonitorSymbol, R_NilValue));
   R_RegisterCFinalizerEx(xptr, monitor_finalizer, TRUE);
@@ -650,7 +654,6 @@ SEXP rnng_monitor_create(SEXP socket, SEXP cv) {
 
   return xptr;
 
-  fail:
   failmem:
   if (monitor != NULL)
     free(monitor->ids);

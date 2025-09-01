@@ -264,6 +264,23 @@ collect_aio_ <- function(x) .Call(rnng_aio_collect_safe, x)
 #'
 stop_aio <- function(x) invisible(.Call(rnng_aio_stop, x))
 
+#' Stop Request Operation
+#'
+#' Stop an asynchronous Aio operation, or a list of Aio operations, created by
+#' [request()]. This is an augmented version of [stop_aio()] that additionally
+#' requests cancellation by sending an integer zero followed by the context ID
+#' over the context, and waiting for the response.
+#'
+#' @param x an Aio or list of Aios (objects of class 'recvAio' returned by
+#'   [request()]).
+#'
+#' @return Invisibly, a logical vector.
+#'
+#' @keywords internal
+#' @export
+#'
+stop_request <- function(x) invisible(.Call(rnng_request_stop, x))
+
 #' Query if an Aio is Unresolved
 #'
 #' Query whether an Aio, Aio value or list of Aios remains unresolved. Unlike
@@ -353,30 +370,22 @@ as.promise.recvAio <- function(x) {
   promise <- .subset2(x, "promise")
 
   if (is.null(promise)) {
-    promise <- if (unresolved(x)) {
-      promises::promise(
-        function(resolve, reject) .keep(x, environment())
-      )$then(
-        onFulfilled = function(value, .visible) {
-          is_error_value(value) && stop(nng_error(value))
-          value
-        }
-      )
-    } else {
-      value <- .subset2(x, "value")
-      promises::promise(
-        function(resolve, reject)
-          resolve({
-            is_error_value(value) && stop(nng_error(value))
-            value
-          })
-      )
-    }
-
+    promise <- promises::promise(
+      function(resolve, reject) {
+        if (unresolved(x)) .keep(x, environment()) else resolve(.subset2(x, "value"))
+      }
+    )$then(
+      onFulfilled = handle_fulfilled
+    )
     `[[<-`(x, "promise", promise)
   }
 
   promise
+}
+
+handle_fulfilled <- function(value, .visible) {
+  is_error_value(value) && stop(nng_error(value))
+  value
 }
 
 #' @exportS3Method promises::is.promising
