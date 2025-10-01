@@ -86,7 +86,12 @@ static void request_complete(void *arg) {
     raio->data = msg;
     nng_pipe p = nng_msg_get_pipe(msg);
     res = - (int) p.id;
-  } else if (res == 5 && saio->id) {
+    if (saio->id == 0) {
+      unsigned char *buf = (unsigned char *) nng_msg_body(msg);
+      if (buf[0] == 0x7 && buf[3] == 0x1)
+        nng_pipe_close(p);
+    }
+  } else if (res == 5 && saio->id > 0) {
     nng_msg *msg = NULL;
     if (nng_msg_alloc(&msg, 0) ||
         nng_msg_append_u32(msg, 0) ||
@@ -115,6 +120,7 @@ static void request_complete(void *arg) {
 
 }
 
+// Can be removed after mirai >= 2.5.1 is released
 static void request_complete_dropcon(void *arg) {
 
   nano_aio *raio = (nano_aio *) arg;
@@ -149,6 +155,8 @@ void pipe_cb_signal(nng_pipe p, nng_pipe_ev ev, void *arg) {
   nng_mtx_unlock(mtx);
   if (sig > 1) {
 #ifdef _WIN32
+    if (sig == SIGINT)
+      UserBreak = 1;
     raise(sig);
 #else
     if (sig == SIGINT)
@@ -464,7 +472,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   const int raw = nano_encode_mode(sendmode);
   const int id = nng_ctx_id(*ctx);
   const int signal = cvar != R_NilValue && !NANO_PTR_CHECK(cvar, nano_CvSymbol);
-  const int drop = cvar != R_NilValue && !signal;
+  const int drop = cvar == R_MissingArg;
   int xc;
 
   nano_cv *ncv = signal ? (nano_cv *) NANO_PTR(cvar) : NULL;
@@ -488,7 +496,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   NANO_ENSURE_ALLOC(raio);
 
   saio->ctx = ctx;
-  saio->id = msgid != R_NilValue ? id : 0;
+  saio->id = msgid != R_NilValue ? id : mod != 1 ? -id : 0;
 
   if ((xc = nng_msg_alloc(&msg, 0)) ||
       (xc = nng_msg_append(msg, buf.buf, buf.cur)) ||
@@ -515,7 +523,6 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   PROTECT(aio = R_MakeExternalPtr(raio, nano_AioSymbol, NANO_PROT(con)));
   R_RegisterCFinalizerEx(aio, request_finalizer, TRUE);
   Rf_setAttrib(aio, nano_ContextSymbol, con);
-  Rf_setAttrib(aio, nano_IdSymbol, Rf_ScalarInteger(saio->id));
 
   PROTECT(env = R_NewEnv(R_NilValue, 0, 0));
   Rf_classgets(env, nano_reqAio);

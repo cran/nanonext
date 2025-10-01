@@ -456,6 +456,13 @@ SEXP rnng_aio_stop(SEXP x) {
     if (NANO_PTR_CHECK(coreaio, nano_AioSymbol)) break;
     nano_aio *aiop = (nano_aio *) NANO_PTR(coreaio);
     nng_aio_stop(aiop->aio);
+    // See #194, this is to reset the R interrupts state after an interrupt
+    // requested by `stop_request()` has already triggered
+#ifdef _WIN32
+    UserBreak = 0;
+#else
+    R_interrupts_pending = 0;
+#endif
     break;
   case VECSXP: ;
     const R_xlen_t xlen = Rf_xlength(x);
@@ -713,14 +720,8 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
 SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEXP clo) {
 
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) nano_integer(timeout);
-  int signal, interrupt;
-  if (cvar == R_NilValue) {
-    signal = 0;
-    interrupt = 0;
-  } else {
-    signal = !NANO_PTR_CHECK(cvar, nano_CvSymbol);
-    interrupt = 1 - signal;
-  }
+  const int signal = cvar != R_NilValue && !NANO_PTR_CHECK(cvar, nano_CvSymbol);
+  const int interrupt = cvar == R_MissingArg;
   nano_cv *ncv = signal ? (nano_cv *) NANO_PTR(cvar) : NULL;
   nano_aio *raio = NULL;
   SEXP aio, env, fun;

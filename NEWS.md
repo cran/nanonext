@@ -1,3 +1,10 @@
+# nanonext 1.7.1
+
+#### Updates
+
+* `stop_aio()` now resets the R interrupt flags (#194).
+* The `cv` arguments at `recv_aio()` and `request()` have been simplified to accept just a 'conditionVariable' or NULL.
+
 # nanonext 1.7.0
 
 #### Behavioural Changes
