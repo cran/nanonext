@@ -14,7 +14,7 @@ static SEXP nano_eval_prot (void *call) {
 
 static void nano_cleanup(void *data, Rboolean jump) {
   if (jump)
-    free(data);
+    free(((nano_buf *) data)->buf);
 }
 
 static void nano_eval_safe (void *call) {
@@ -111,10 +111,10 @@ static SEXP nano_serialize_hook(SEXP x, SEXP hook_func) {
 
   SEXP out, call;
   PROTECT(call = Rf_lcons(NANO_VECTOR(hook_func)[i], Rf_cons(x, R_NilValue)));
-  out = R_UnwindProtect(nano_eval_prot, call, nano_cleanup, nano_bundle.buf, NULL);
+  out = R_UnwindProtect(nano_eval_prot, call, nano_cleanup, stream->data, NULL);
   UNPROTECT(1);
   if (TYPEOF(out) != RAWSXP) {
-    free(nano_bundle.buf);
+    free(((nano_buf *) stream->data)->buf);
     Rf_error("Serialization function for `%s` did not return a raw vector", NANO_STR_N(klass, i));
   }
 
@@ -259,12 +259,40 @@ SEXP nano_raw_char(const unsigned char *buf, const size_t sz) {
 
 }
 
+SEXP nano_url_with_port(nng_url *up, int port) {
+
+  char port_s[8];
+  const int port_len = snprintf(port_s, sizeof(port_s), "%d", port);
+  const int ipv6 = strchr(up->u_hostname, ':') != NULL;
+
+  size_t len = strlen(up->u_scheme) + 3 + strlen(up->u_hostname) + (ipv6 ? 2 : 0) +
+               1 + (size_t) port_len;
+  if (up->u_path != NULL) len += strlen(up->u_path);
+  if (up->u_query != NULL && up->u_query[0] != '\0') len += 1 + strlen(up->u_query);
+  if (up->u_fragment != NULL && up->u_fragment[0] != '\0') len += 1 + strlen(up->u_fragment);
+
+  char *s = R_alloc(len + 1, 1);
+  char *p = s;
+  size_t r = len + 1;
+  int n;
+  n = snprintf(p, r, "%s://", up->u_scheme); p += n; r -= (size_t) n;
+  n = snprintf(p, r, ipv6 ? "[%s]" : "%s", up->u_hostname); p += n; r -= (size_t) n;
+  n = snprintf(p, r, ":%s", port_s); p += n; r -= (size_t) n;
+  if (up->u_path != NULL) { n = snprintf(p, r, "%s", up->u_path); p += n; r -= (size_t) n; }
+  if (up->u_query != NULL && up->u_query[0] != '\0') { n = snprintf(p, r, "?%s", up->u_query); p += n; r -= (size_t) n; }
+  if (up->u_fragment != NULL && up->u_fragment[0] != '\0') snprintf(p, r, "#%s", up->u_fragment);
+
+  return Rf_mkString(s);
+
+}
+
 void nano_serialize(nano_buf *buf, SEXP object, SEXP hook, int header) {
 
   NANO_ALLOC(buf, NANONEXT_INIT_BUFSIZE);
   struct R_outpstream_st output_stream;
 
   if (header || special_marker) {
+    memset(buf->buf, 0, 8);
     buf->buf[0] = 0x7;
     buf->buf[3] = (uint8_t) special_marker;
     if (header)
@@ -275,7 +303,6 @@ void nano_serialize(nano_buf *buf, SEXP object, SEXP hook, int header) {
   if (hook != R_NilValue) {
     nano_bundle.klass = NANO_VECTOR(hook)[0];
     nano_bundle.outpstream = &output_stream;
-    nano_bundle.buf = buf->buf;
   }
 
   R_InitOutPStream(
@@ -432,7 +459,7 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const uint8_t mod, SEXP ho
 void nano_encode(nano_buf *enc, const SEXP object) {
 
   switch (TYPEOF(object)) {
-  case STRSXP: ;
+  case STRSXP: {
     const char *s;
     R_xlen_t xlen = XLENGTH(object);
     if (xlen == 1) {
@@ -452,6 +479,7 @@ void nano_encode(nano_buf *enc, const SEXP object) {
       enc->cur += slen;
     }
     break;
+  }
   case REALSXP:
     NANO_INIT(enc, (unsigned char *) DATAPTR_RO(object), XLENGTH(object) * sizeof(double));
     break;

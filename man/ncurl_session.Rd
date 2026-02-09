@@ -41,7 +41,8 @@ format.}
 
 \item{response}{(optional) a character vector specifying the response headers
 to return e.g. \code{c("date", "server")}. These are case-insensitive and
-will return NULL if not present. A non-character vector will be ignored.}
+will return NULL if not present. Specify \code{TRUE} to return all response
+headers. A non-character vector will be ignored (other than \code{TRUE}).}
 
 \item{timeout}{(optional) integer value in milliseconds after which the
 connection and subsequent transact attempts time out.}
@@ -58,16 +59,15 @@ an 'errorValue'.
 
 For \code{transact}: a named list of 3 elements:
 \itemize{
-\item \verb{$status} - integer HTTP repsonse status code (200 - OK).
-Use \code{\link[=status_code]{status_code()}} for a translation of the meaning.
-\item \verb{$headers} - named list of response headers (if specified in the
-session), or NULL otherwise. If the status code is within the 300 range,
-i.e. a redirect, the response header 'Location' is automatically appended
-to return the redirect address.
-\item \verb{$data} - the response body as a character string (if
-\code{convert = TRUE} was specified for the session), which may be further
-parsed as html, json, xml etc. as required, or else a raw byte vector,
-which may be saved as a file using \code{\link[=writeBin]{writeBin()}}.
+\item \verb{$status} - integer HTTP repsonse status code (200 - OK). Use
+\code{\link[=status_code]{status_code()}} for a translation of the meaning.
+\item \verb{$headers} - named list of response headers (all headers if
+\code{response = TRUE} was specified for the session, those specified in
+\code{response}, or NULL otherwise).
+\item \verb{$data} - the response body as a character string (if \code{convert = TRUE} was
+specified for the session), which may be further parsed as html, json, xml
+etc. as required, or else a raw byte vector, which may be saved as a file
+using \code{\link[=writeBin]{writeBin()}}.
 }
 }
 \description{
@@ -76,6 +76,14 @@ along with all related parameters, and may be used to return data multiple
 times by repeatedly calling \code{transact()}, which transacts once over the
 connection.
 }
+\section{Public Internet HTTPS}{
+
+
+When making HTTPS requests over the public internet, you should supply a TLS
+configuration to validate server certificates. See \code{\link[=tls_config]{tls_config()}} for
+details.
+}
+
 \examples{
 s <- ncurl_session(
   "https://postman-echo.com/get",

@@ -172,7 +172,7 @@ SEXP rnng_dial(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP fail) {
   Rf_setAttrib(dialer, nano_StateSymbol, Rf_mkString(start ? "started" : "not started"));
   Rf_setAttrib(dialer, nano_SocketSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
 
-  attr = Rf_getAttrib(socket, nano_DialerSymbol);
+  PROTECT(attr = Rf_getAttrib(socket, nano_DialerSymbol));
   R_xlen_t xlen = Rf_xlength(attr);
   PROTECT(newattr = Rf_allocVector(VECSXP, xlen + 1));
   for (R_xlen_t i = 0; i < xlen; i++) {
@@ -181,7 +181,7 @@ SEXP rnng_dial(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP fail) {
   SET_VECTOR_ELT(newattr, xlen, dialer);
   Rf_setAttrib(socket, nano_DialerSymbol, newattr);
 
-  UNPROTECT(2);
+  UNPROTECT(3);
   return nano_success;
 
   fail:
@@ -246,11 +246,22 @@ SEXP rnng_listen(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP fail) {
 
   NANO_CLASS2(listener, "nanoListener", "nano");
   Rf_setAttrib(listener, nano_IdSymbol, Rf_ScalarInteger(nng_listener_id(*lp)));
+  if (start) {
+    nng_url *up;
+    if (nng_url_parse(&up, ur) == 0) {
+      if (up->u_port != NULL && up->u_port[0] == '0' && up->u_port[1] == '\0') {
+        int port;
+        if (nng_listener_get_int(*lp, NNG_OPT_TCP_BOUND_PORT, &port) == 0)
+          url = nano_url_with_port(up, port);
+      }
+      nng_url_free(up);
+    }
+  }
   Rf_setAttrib(listener, nano_UrlSymbol, url);
   Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString(start ? "started" : "not started"));
   Rf_setAttrib(listener, nano_SocketSymbol, Rf_ScalarInteger(nng_socket_id(*sock)));
 
-  attr = Rf_getAttrib(socket, nano_ListenerSymbol);
+  PROTECT(attr = Rf_getAttrib(socket, nano_ListenerSymbol));
   R_xlen_t xlen = Rf_xlength(attr);
   PROTECT(newattr = Rf_allocVector(VECSXP, xlen + 1));
   for (R_xlen_t i = 0; i < xlen; i++) {
@@ -259,7 +270,7 @@ SEXP rnng_listen(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP fail) {
   SET_VECTOR_ELT(newattr, xlen, listener);
   Rf_setAttrib(socket, nano_ListenerSymbol, newattr);
 
-  UNPROTECT(2);
+  UNPROTECT(3);
   return nano_success;
 
   fail:
@@ -298,6 +309,16 @@ SEXP rnng_listener_start(SEXP listener) {
   if (xc)
     ERROR_RET(xc);
 
+  SEXP url = Rf_getAttrib(listener, nano_UrlSymbol);
+  nng_url *up;
+  if (nng_url_parse(&up, CHAR(STRING_ELT(url, 0))) == 0) {
+    if (up->u_port != NULL && up->u_port[0] == '0' && up->u_port[1] == '\0') {
+      int port;
+      if (nng_listener_get_int(*list, NNG_OPT_TCP_BOUND_PORT, &port) == 0)
+        Rf_setAttrib(listener, nano_UrlSymbol, nano_url_with_port(up, port));
+    }
+    nng_url_free(up);
+  }
   Rf_setAttrib(listener, nano_StateSymbol, Rf_mkString("started"));
   return nano_success;
 
@@ -406,24 +427,36 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block, SEXP pipe) {
     nano_stream *nst = (nano_stream *) NANO_PTR(con);
     nng_stream *sp = nst->stream;
     nng_aio *aiop = NULL;
-    nng_iov iov = {
-      .iov_buf = buf.buf,
-      .iov_len = buf.cur - nst->textframes
-    };
 
     if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
       goto fail;
 
-    if ((xc = nng_aio_set_iov(aiop, 1u, &iov))) {
-      nng_aio_free(aiop);
-      goto fail;
+    if (nst->msgmode) {
+      nng_msg *msgp;
+      const size_t xlen = buf.cur - nst->textframes;
+      if ((xc = nng_msg_alloc(&msgp, xlen))) {
+        nng_aio_free(aiop);
+        goto fail;
+      }
+      memcpy(nng_msg_body(msgp), buf.buf, xlen);
+      nng_aio_set_msg(aiop, msgp);
+    } else {
+      nng_iov iov = {
+        .iov_buf = buf.buf,
+        .iov_len = buf.cur - nst->textframes
+      };
+      if ((xc = nng_aio_set_iov(aiop, 1u, &iov))) {
+        nng_aio_free(aiop);
+        goto fail;
+      }
     }
 
     nng_aio_set_timeout(aiop, flags ? flags : (NANO_INTEGER(block) != 0) * NNG_DURATION_DEFAULT);
     nng_stream_send(sp, aiop);
     NANO_FREE(buf);
     nng_aio_wait(aiop);
-    xc = nng_aio_result(aiop);
+    if ((xc = nng_aio_result(aiop)) && nst->msgmode)
+      nng_msg_free(nng_aio_get_msg(aiop));
     nng_aio_free(aiop);
 
   } else {
@@ -523,36 +556,52 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block, SEXP bytes) {
   } else if (!NANO_PTR_CHECK(con, nano_StreamSymbol)) {
 
     const int mod = nano_matcharg(mode) == 1 ? 2 : nano_matcharg(mode);
-    const size_t xlen = (size_t) nano_integer(bytes);
-    nng_stream **sp = (nng_stream **) NANO_PTR(con);
+    nano_stream *nst = (nano_stream *) NANO_PTR(con);
+    nng_stream *sp = nst->stream;
     nng_aio *aiop = NULL;
 
-    buf = calloc(xlen, sizeof(unsigned char));
-    NANO_ENSURE_ALLOC(buf);
-    nng_iov iov = {
-      .iov_buf = buf,
-      .iov_len = xlen
-    };
-
-    if ((xc = nng_aio_alloc(&aiop, NULL, NULL)) ||
-        (xc = nng_aio_set_iov(aiop, 1u, &iov))) {
-      nng_aio_free(aiop);
+    if ((xc = nng_aio_alloc(&aiop, NULL, NULL)))
       goto fail;
-    }
 
-    nng_aio_set_timeout(aiop, flags ? flags : (NANO_INTEGER(block) != 0) * NNG_DURATION_DEFAULT);
-    nng_stream_recv(*sp, aiop);
-
-    nng_aio_wait(aiop);
-    if ((xc = nng_aio_result(aiop))) {
+    if (nst->msgmode) {
+      nng_msg *msgp;
+      nng_aio_set_timeout(aiop, flags ? flags : (NANO_INTEGER(block) != 0) * NNG_DURATION_DEFAULT);
+      nng_stream_recv(sp, aiop);
+      nng_aio_wait(aiop);
+      if ((xc = nng_aio_result(aiop))) {
+        nng_aio_free(aiop);
+        goto fail;
+      }
+      msgp = nng_aio_get_msg(aiop);
       nng_aio_free(aiop);
-      goto fail;
+      buf = nng_msg_body(msgp);
+      sz = nng_msg_len(msgp);
+      res = nano_decode(buf, sz, mod, NANO_PROT(con));
+      nng_msg_free(msgp);
+    } else {
+      const size_t xlen = (size_t) nano_integer(bytes);
+      buf = malloc(xlen);
+      NANO_ENSURE_ALLOC(buf);
+      nng_iov iov = {
+        .iov_buf = buf,
+        .iov_len = xlen
+      };
+      if ((xc = nng_aio_set_iov(aiop, 1u, &iov))) {
+        nng_aio_free(aiop);
+        goto fail;
+      }
+      nng_aio_set_timeout(aiop, flags ? flags : (NANO_INTEGER(block) != 0) * NNG_DURATION_DEFAULT);
+      nng_stream_recv(sp, aiop);
+      nng_aio_wait(aiop);
+      if ((xc = nng_aio_result(aiop))) {
+        nng_aio_free(aiop);
+        goto fail;
+      }
+      sz = nng_aio_count(aiop);
+      nng_aio_free(aiop);
+      res = nano_decode(buf, sz, mod, NANO_PROT(con));
+      free(buf);
     }
-
-    sz = nng_aio_count(aiop);
-    nng_aio_free(aiop);
-    res = nano_decode(buf, sz, mod, NANO_PROT(con));
-    free(buf);
 
   } else {
     Rf_error("`con` is not a valid Socket, Context or Stream");

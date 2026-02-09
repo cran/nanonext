@@ -62,7 +62,7 @@ static void nano_printf(const int err, const char *fmt, ...) {
   int bytes = vsnprintf(buf, NANONEXT_INIT_BUFSIZE, fmt, arg_ptr);
   va_end(arg_ptr);
 
-  if (write(err ? STDERR_FILENO : STDOUT_FILENO, buf, (size_t) bytes)) {};
+  if (write(err ? STDERR_FILENO : STDOUT_FILENO, buf, (size_t) bytes)) {}
 
 }
 
@@ -599,7 +599,7 @@ SEXP rnng_read_stdin(SEXP interactive) {
   nng_listener *lp = NULL;
   sock = malloc(sizeof(nng_socket));
   NANO_ENSURE_ALLOC(sock);
-  lp = calloc(1, sizeof(nng_listener));
+  lp = malloc(sizeof(nng_listener));
   NANO_ENSURE_ALLOC(lp);
 
   if ((xc = nng_pull0_open(sock)) ||

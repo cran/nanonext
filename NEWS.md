@@ -1,3 +1,27 @@
+# nanonext 1.8.0
+
+#### New Features
+
+* Adds `http_server()` for creating HTTP and WebSocket servers with TLS/SSL support.
+* Adds `handler()` for dynamic HTTP request handling with custom callbacks.
+* Adds `handler_ws()` for WebSocket connections with `on_message`, `on_open`, and `on_close` callbacks.
+* Adds `handler_stream()` for HTTP streaming using chunked transfer encoding, supporting Server-Sent Events (SSE), NDJSON, and custom streaming formats.
+* Adds `format_sse()` helper for formatting Server-Sent Events messages.
+* Adds static content handlers: `handler_file()` and `handler_directory()` for serving files, `handler_inline()` for in-memory content, and `handler_redirect()` for HTTP redirects. 
+* `ncurl()` and variants now accept `response = TRUE` to return all response headers.
+* Listeners now automatically resolve port `0` to the actual port assigned by the OS. The listener's `url` attribute is updated when the listener starts.
+* Adds `race_aio()` to wait for and return the index of the first resolved Aio in a list of Aios.
+
+#### Updates
+
+* Closing an already closed stream now returns 'errorValue' 7 | Object closed rather than error.
+* `random()` now only accepts 'n' between 1 and 1024. Supplying 0 will error (#238).
+* Fixes a potential crash when `random()` or `write_cert()` is called in a fresh session before any other TLS-related functions have been called, and nanonext has been compiled against a system Mbed TLS with PSA crypto enabled. (#242).
+* Fixes a potential crash when a serialization hook errors (#225).
+* Performance improvements for serialization, streaming, and async sends.
+* Bundled 'libmbedtls' updated to latest 3.6.5 LTS branch release (#234).
+* Building from source no longer requires `xz`.
+
 # nanonext 1.7.2
 
 #### Updates

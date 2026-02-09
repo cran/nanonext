@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.8">
-<title>nanonext - NNG Lightweight Messaging Library</title>
+<meta name="generator" content="litedown 0.9">
+<title>nanonext - Quick Reference</title>
 <style type="text/css">
 body {
   font-family: sans-serif;
@@ -108,518 +108,469 @@ section.footnotes {
 }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xiee/utils@1.13.61/css/prism-xcode.min.css">
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
 </head>
 <body>
 <div class="frontmatter">
-<div class="title"><h1>nanonext - NNG Lightweight Messaging Library</h1></div>
+<div class="title"><h1>nanonext - Quick Reference</h1></div>
 </div>
 <div class="body">
-<h3 id="sec:table-of-contents">Table of Contents</h3>
-<ol>
-<li><a href="#cross-language-exchange">Cross-language Exchange</a></li>
-<li><a href="#async-and-concurrency">Async and Concurrency</a></li>
-<li><a href="#synchronisation-primitives">Synchronisation Primitives</a></li>
-<li><a href="#tls-secure-connections">TLS Secure Connections</a></li>
-<li><a href="#request-reply-protocol">Request / Reply Protocol</a></li>
-<li><a href="#publisher-subscriber-protocol">Publisher / Subscriber Protocol</a></li>
-<li><a href="#surveyor-respondent-protocol">Surveyor / Respondent Protocol</a></li>
-<li><a href="#ncurl-async-http-client">ncurl: (Async) HTTP Client</a></li>
-<li><a href="#stream-websocket-client">stream: Websocket Client</a></li>
-<li><a href="#options-serialization-and-statistics">Options, Serialization and Statistics</a></li>
-</ol>
-<h3 id="sec:cross-language-exchange">Cross-language Exchange</h3>
-<p><code>nanonext</code> provides a fast and reliable data interface between different programming languages where NNG has an implementation, including C, C++, Java, Python, Go, Rust etc.</p>
-<p>The following example demonstrates the exchange of numerical data between R and Python (NumPy), two of the most commonly-used languages for data science and machine learning.</p>
-<p>Using a messaging interface provides a clean and robust approach, light on resources with limited and identifiable points of failure.</p>
-<p>This approach can also serve as an interface / pipe between different processes written in the same or different languages, running on the same computer or distributed across networks, and is an enabler of modular software design as espoused by the Unix philosophy.</p>
-<p>One solution it provides is that of processing real-time data where computation times exceed the data frequency - by dividing the computation into stages, this may be set up as a pipeline or ‘cascade’ of processes, each connected using NNG sockets.</p>
-<p>Create socket in Python using the NNG binding ‘pynng’:</p>
-<pre><code class="language-python">import numpy as np
-import pynng
-socket = pynng.Pair0(listen=&quot;ipc:///tmp/nanonext.socket&quot;)
-</code></pre>
-<p>Create nano object in R using <code>nanonext</code>, then send a vector of ‘doubles’, specifying mode as ‘raw’:</p>
+<h2 id="sec:core-concepts">Core Concepts</h2>
+<p><strong>nanonext</strong> provides bindings to NNG (Nanomsg Next Gen), a high-performance messaging library for building distributed systems.</p>
+<p>This is a cheatsheet. Refer to the other vignettes for detailed introductions:</p>
+<ul>
+<li><a href="v01-messaging.html">Messaging and Async I/O</a> - cross-language exchange, async operations, synchronisation</li>
+<li><a href="v02-protocols.html">Scalability Protocols</a> - req/rep, pub/sub, surveyor/respondent</li>
+<li><a href="v03-configuration.html">Configuration and Security</a> - TLS, options, serialization, statistics</li>
+<li><a href="v04-web.html">Web Toolkit</a> - HTTP client/server, WebSocket, streaming</li>
+</ul>
+<h2 id="sec:key-takeaways">Key Takeaways</h2>
+<ul>
+<li><strong>Sockets</strong> connect via URLs using scalability protocols (req/rep, pub/sub, etc.)</li>
+<li><strong>Transports</strong>: <code>inproc://</code> (in-process), <code>ipc://</code> (inter-process), <code>tcp://</code>, <code>ws://</code>, <code>wss://</code>, <code>tls+tcp://</code></li>
+<li><strong>Async I/O</strong>: <code>send_aio()</code> / <code>recv_aio()</code> return immediately; access results via <code>$data</code> or <code>$result</code></li>
+<li><strong>Modes</strong>: <code>&quot;serial&quot;</code> (R objects), <code>&quot;raw&quot;</code> (bytes), <code>&quot;double&quot;</code>, <code>&quot;integer&quot;</code>, <code>&quot;character&quot;</code>, etc.</li>
+<li><strong>Condition variables</strong>: <code>cv()</code> for zero-latency event synchronisation</li>
+</ul>
+<h2 id="sec:1-sockets-and-connections">1. Sockets and Connections</h2>
+<h3 id="sec:create-sockets">Create Sockets</h3>
 <pre><code class="language-r">library(nanonext)
-n &lt;- nano(&quot;pair&quot;, dial = &quot;ipc:///tmp/nanonext.socket&quot;)
-n$send(c(1.1, 2.2, 3.3, 4.4, 5.5), mode = &quot;raw&quot;)
-#&gt; [1] 0
-</code></pre>
-<p>Receive in Python as a NumPy array of ‘floats’, and send back to R:</p>
-<pre><code class="language-python">raw = socket.recv()
-array = np.frombuffer(raw)
-print(array)
-#&gt; [1.1 2.2 3.3 4.4 5.5]
 
-msg = array.tobytes()
-socket.send(msg)
+# Functional interface
+s &lt;- socket(&quot;pair&quot;)
+listen(s, &quot;tcp://127.0.0.1:5555&quot;)
+dial(s, &quot;tcp://127.0.0.1:5555&quot;)
 
-socket.close()
-</code></pre>
-<p>Receive in R, specifying the receive mode as ‘double’:</p>
-<pre><code class="language-r">n$recv(mode = &quot;double&quot;)
-#&gt; [1] 1.1 2.2 3.3 4.4 5.5
+# Object-oriented interface
+n &lt;- nano(&quot;pair&quot;, listen = &quot;tcp://127.0.0.1:5555&quot;)
+n$dial(&quot;tcp://127.0.0.1:5556&quot;)
 
+# Close when done
+close(s)
 n$close()
 </code></pre>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:async-and-concurrency">Async and Concurrency</h3>
-<p><code>nanonext</code> implements true async send and receive, leveraging NNG as a massively-scaleable concurrency framework.</p>
-<pre><code class="language-r">s1 &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nano&quot;)
-s2 &lt;- socket(&quot;pair&quot;, dial = &quot;inproc://nano&quot;)
+<h3 id="sec:protocols">Protocols</h3>
+<table>
+<thead>
+<tr>
+<th>Protocol</th>
+<th>Description</th>
+<th>Socket Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pair</strong></td>
+<td>1-to-1 bidirectional</td>
+<td><code>&quot;pair&quot;</code></td>
+</tr>
+<tr>
+<td><strong>Poly</strong></td>
+<td>Polyamorous pair</td>
+<td><code>&quot;poly&quot;</code></td>
+</tr>
+<tr>
+<td><strong>Pipeline</strong></td>
+<td>One-way data flow</td>
+<td><code>&quot;push&quot;</code>, <code>&quot;pull&quot;</code></td>
+</tr>
+<tr>
+<td><strong>Req/Rep</strong></td>
+<td>RPC pattern</td>
+<td><code>&quot;req&quot;</code>, <code>&quot;rep&quot;</code></td>
+</tr>
+<tr>
+<td><strong>Pub/Sub</strong></td>
+<td>Broadcast/subscribe</td>
+<td><code>&quot;pub&quot;</code>, <code>&quot;sub&quot;</code></td>
+</tr>
+<tr>
+<td><strong>Survey</strong></td>
+<td>Query all peers</td>
+<td><code>&quot;surveyor&quot;</code>, <code>&quot;respondent&quot;</code></td>
+</tr>
+<tr>
+<td><strong>Bus</strong></td>
+<td>Many-to-many mesh</td>
+<td><code>&quot;bus&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="sec:transports">Transports</h3>
+<table>
+<thead>
+<tr>
+<th>URL Scheme</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inproc://name</code></td>
+<td>In-process (fastest, same process)</td>
+</tr>
+<tr>
+<td><code>ipc:///path</code></td>
+<td>Inter-process (Unix socket / named pipe)</td>
+</tr>
+<tr>
+<td><code>tcp://host:port</code></td>
+<td>TCP/IP network</td>
+</tr>
+<tr>
+<td><code>ws://host:port/path</code></td>
+<td>WebSocket</td>
+</tr>
+<tr>
+<td><code>wss://host:port/path</code></td>
+<td>WebSocket over TLS</td>
+</tr>
+<tr>
+<td><code>tls+tcp://host:port</code></td>
+<td>TLS encrypted TCP</td>
+</tr>
+</tbody>
+</table>
+<h2 id="sec:2-send-and-receive">2. Send and Receive</h2>
+<h3 id="sec:synchronous">Synchronous</h3>
+<pre><code class="language-r"># Send R object (serialized)
+send(s, data.frame(a = 1, b = 2))
 
-</code></pre>
-<p><code>send_aio()</code> and <code>recv_aio()</code> functions return immediately with an ‘Aio’ object, but perform their operations async.</p>
-<p>An ‘Aio’ object returns an unresolved value whilst its asynchronous operation is ongoing, automatically resolving to a final value once complete.</p>
-<pre><code class="language-r"># an async receive is requested, but no messages are waiting (yet to be sent)
-msg &lt;- recv_aio(s2)
-msg
-#&gt; &lt; recvAio | $data &gt;
-msg$data
-#&gt; 'unresolved' logi NA
-</code></pre>
-<p>For a ‘sendAio’ object, the result is stored at <code>$result</code>.</p>
-<pre><code class="language-r">res &lt;- send_aio(s1, data.frame(a = 1, b = 2))
-res
-#&gt; &lt; sendAio | $result &gt;
-res$result
-#&gt; [1] 0
-</code></pre>
-<p><em>Note: a return value of 0 denotes a successful send, meaning that the message has been accepted by the socket for sending; the message itself may still be buffered within the system.</em></p>
-<p>For a ‘recvAio’ object, the message is stored at <code>$data</code>.</p>
-<pre><code class="language-r"># now that a message has been sent, the 'recvAio' resolves automatically
-msg$data
-#&gt;   a b
-#&gt; 1 1 2
-</code></pre>
-<p>Auxiliary function <code>unresolved()</code> may be used in control flow statements to perform actions which depend on resolution of the Aio, both before and after. This means there is no need to actually wait (block) for an Aio to resolve, as the example below demonstrates.</p>
-<pre><code class="language-r">msg &lt;- recv_aio(s2)
+# Receive R object
+recv(s)
 
-# unresolved() queries for resolution itself so no need to use it again within the while loop
+# Send raw bytes (for cross-language exchange)
+send(s, c(1.1, 2.2, 3.3), mode = &quot;raw&quot;)
+
+# Receive as specific type
+recv(s, mode = &quot;double&quot;)
+recv(s, mode = &quot;character&quot;)
+recv(s, mode = &quot;raw&quot;)
+</code></pre>
+<h3 id="sec:receive-modes">Receive Modes</h3>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&quot;serial&quot;</code> / <code>1</code></td>
+<td>R serialization (default)</td>
+</tr>
+<tr>
+<td><code>&quot;character&quot;</code> / <code>2</code></td>
+<td>Coerce to character</td>
+</tr>
+<tr>
+<td><code>&quot;complex&quot;</code> / <code>3</code></td>
+<td>Coerce to complex</td>
+</tr>
+<tr>
+<td><code>&quot;double&quot;</code> / <code>4</code></td>
+<td>Coerce to double</td>
+</tr>
+<tr>
+<td><code>&quot;integer&quot;</code> / <code>5</code></td>
+<td>Coerce to integer</td>
+</tr>
+<tr>
+<td><code>&quot;logical&quot;</code> / <code>6</code></td>
+<td>Coerce to logical</td>
+</tr>
+<tr>
+<td><code>&quot;numeric&quot;</code> / <code>7</code></td>
+<td>Coerce to numeric</td>
+</tr>
+<tr>
+<td><code>&quot;raw&quot;</code> / <code>8</code></td>
+<td>Raw bytes</td>
+</tr>
+<tr>
+<td><code>&quot;string&quot;</code> / <code>9</code></td>
+<td>Fast option for length-1 character</td>
+</tr>
+</tbody>
+</table>
+<h2 id="sec:3-async-i-o">3. Async I/O</h2>
+<h3 id="sec:basic-async">Basic Async</h3>
+<pre><code class="language-r"># Async send - returns immediately
+res &lt;- send_aio(s, data)
+res$result          # 0 = success, error code otherwise
+
+# Async receive - returns immediately
+msg &lt;- recv_aio(s)
+msg$data            # Value when resolved, 'unresolved' NA otherwise
+
+# Check if resolved
+unresolved(msg)     # TRUE while pending
+
+# Wait for resolution
+call_aio(msg)       # Blocks, returns Aio object
+collect_aio(msg)    # Blocks, returns value directly
+msg[]               # Blocks (user-interruptible), returns value
+</code></pre>
+<h3 id="sec:non-blocking-patterns">Non-blocking Patterns</h3>
+<pre><code class="language-r"># Poll while doing other work
 while (unresolved(msg)) {
-  # do stuff before checking resolution again
-  send_aio(s1, &quot;resolved&quot;)
-  cat(&quot;unresolved&quot;)
+  # do other tasks
 }
-#&gt; unresolved
+result &lt;- msg$data
 
-# perform actions which depend on the Aio value outside the while loop
+# Multiple async operations
+msg1 &lt;- recv_aio(s1)
+msg2 &lt;- recv_aio(s2)
+# Both run concurrently
+</code></pre>
+<h2 id="sec:4-condition-variables">4. Condition Variables</h2>
+<h3 id="sec:basics">Basics</h3>
+<pre><code class="language-r"># Create condition variable
+cv &lt;- cv()
+
+# Check/signal
+cv_value(cv)        # Get counter value
+cv_signal(cv)       # Increment counter
+cv_reset(cv)        # Reset to zero
+
+# Wait (blocks until counter &gt; 0, then decrements)
+wait(cv)
+
+# Wait with timeout (ms), returns FALSE on timeout
+until(cv, 1000)
+</code></pre>
+<h3 id="sec:pipe-notifications">Pipe Notifications</h3>
+<pre><code class="language-r"># Signal on connection/disconnection
+pipe_notify(socket, cv = cv, add = TRUE, remove = TRUE)
+
+# Distinguish message vs disconnect with flag
+pipe_notify(socket, cv = cv, remove = TRUE, flag = TRUE)
+r &lt;- recv_aio(socket, cv = cv)
+wait(cv) || stop(&quot;disconnected&quot;)  # FALSE = pipe event
+</code></pre>
+<h3 id="sec:async-with-cv">Async with CV</h3>
+<pre><code class="language-r">cv &lt;- cv()
+msg &lt;- recv_aio(s, cv = cv)
+wait(cv)            # Wake on receive completion
 msg$data
-#&gt; [1] &quot;resolved&quot;
 </code></pre>
-<p>The values may also be called explicitly using <code>call_aio()</code>. This will wait for completion of the Aio (blocking).</p>
-<pre><code class="language-r"># will wait for completion then return the resolved Aio
-call_aio(msg)
+<h2 id="sec:5-request-reply-rpc">5. Request/Reply (RPC)</h2>
+<h3 id="sec:server">Server</h3>
+<pre><code class="language-r">rep &lt;- socket(&quot;rep&quot;, listen = &quot;tcp://127.0.0.1:5555&quot;)
+ctx &lt;- context(rep)
 
-# to access the resolved value (waiting if required):
-call_aio(msg)$data
-#&gt; [1] &quot;resolved&quot;
+# reply() blocks, waiting for request
+reply(ctx, execute = my_function, send_mode = &quot;raw&quot;)
 
-# or directly:
-collect_aio(msg)
-#&gt; [1] &quot;resolved&quot;
-
-# or user-interruptible:
-msg[]
-#&gt; [1] &quot;resolved&quot;
-
-close(s1)
-close(s2)
-
+close(rep)
 </code></pre>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:synchronisation-primitives">Synchronisation Primitives</h3>
-<p><code>nanonext</code> implements cross-platform synchronisation primitives provided by the NNG library.</p>
-<p>As the R interpreter runs on a single thread, synchronisation primitives such as mutexes and condition variables are not natively implemented in the R language. However, as NNG is inherently threaded and messaging can be asynchronous, it is possible to synchronise between NNG events and the main R execution thread.</p>
-<p>The events that can be signalled include asynchronous receive completions, and pipe events - when connections are established or dropped.</p>
-<p>Condition variables can be used simply to record such events, or more powerfully, to wait upon them. The condition variables implemented in <code>nanonext</code> include a both a condition (value) and flag (boolean). Each signal increments the value, and each successful return of <code>wait()</code> or <code>until()</code> decrements the value. A non-zero condition allows waiting threads to continue.</p>
-<p>In any situation where polling for an event presents a solution, waiting upon a condition to be signalled can be more efficient, both in terms of consuming no resources while waiting, and also being synchronised with the event (having no latency).</p>
-<p>The following shows how condition variables and signalling work in practice.</p>
-<p>Example 1: set up a socket, and wait for the other side to connect:</p>
-<pre><code class="language-r">sock &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nanopipe&quot;)
+<h3 id="sec:client">Client</h3>
+<pre><code class="language-r">req &lt;- socket(&quot;req&quot;, dial = &quot;tcp://127.0.0.1:5555&quot;)
+ctx &lt;- context(req)
 
-cv &lt;- cv() # create new condition variable
-cv_value(cv)
-#&gt; [1] 0
+# request() returns immediately
+aio &lt;- request(ctx, data = args, recv_mode = &quot;double&quot;)
 
-pipe_notify(sock, cv = cv, add = TRUE, remove = TRUE)
+# Do other work while server processes...
 
-# wait(cv) # uncomment in normal usage - but would block
+# Get result when needed
+result &lt;- aio[]
 
-# for illustration:
-sock2 &lt;- socket(&quot;pair&quot;, dial = &quot;inproc://nanopipe&quot;)
-
-cv_value(cv) # incremented when pipe to 'sock2' was created
-#&gt; [1] 1
-
-wait(cv) # wait() now does not block
-
-cv_value(cv) # wait() decrements the CV value - calling wait() again will block
-#&gt; [1] 0
-
-close(sock2)
-
-cv_value(cv) # incremented when pipe to 'sock2' was destroyed
-#&gt; [1] 1
-
-close(sock)
-
+close(req)
 </code></pre>
-<p>Example 2: wait until a message is received or connection is dropped:</p>
-<pre><code class="language-r">sock &lt;- socket(&quot;pair&quot;, listen = &quot;inproc://nanosignal&quot;)
-sock2 &lt;- socket(&quot;pair&quot;, dial = &quot;inproc://nanosignal&quot;)
+<h2 id="sec:6-pub-sub">6. Pub/Sub</h2>
+<pre><code class="language-r">pub &lt;- socket(&quot;pub&quot;, listen = &quot;inproc://pubsub&quot;)
+sub &lt;- socket(&quot;sub&quot;, dial = &quot;inproc://pubsub&quot;)
 
-cv &lt;- cv() # create new condition variable
-cv_value(cv)
-#&gt; [1] 0
+# Subscribe to topic (prefix matching)
+subscribe(sub, topic = &quot;news&quot;)
+subscribe(sub, topic = NULL)      # All topics
 
-pipe_notify(sock, cv = cv, add = FALSE, remove = TRUE, flag = TRUE)
+# Unsubscribe
+unsubscribe(sub, topic = &quot;news&quot;)
 
-send(sock2, &quot;this message will wake waiting thread&quot;) # in real usage happens concurrently with wait()
-#&gt; [1] 0
+# Publish (topic is message prefix)
+send(pub, c(&quot;news&quot;, &quot;headline&quot;), mode = &quot;raw&quot;)
 
-r &lt;- recv_aio(sock, cv = cv) # same cv passed to recv_aio()
-
-# wakes as soon as the asynchronous receive completes
-wait(cv) || stop(&quot;peer disconnected&quot;)
-#&gt; [1] TRUE
-
-r$data
-#&gt; [1] &quot;this message will wake waiting thread&quot;
-
-close(sock)
-close(sock2)
-
-</code></pre>
-<p>The above example shows the working of the flag within the condition variable. As the pipe notification was specified to raise a flag, this can be used to distinguish between a pipe event signal and a message receive signal.</p>
-<p>In the case a flag is raised, <code>wait()</code> returns FALSE rather than TRUE. So the above code will stop with the custom error message upon disconnect or else continue. This affords a way of handling disconnects that would not be possible if simply using <code>call_aio()</code>, which is also a blocking wait (on a single message).</p>
-<p>As can be seen, this type of mechanism presents a powerful way of waiting simulatenously on multiple events, and also distinguishing between them. <code>pipe_notify()</code> can also be set to signal two condition variables upon each event, providing even more flexibility in creating complex concurrent applications.</p>
-<p>For further details, please refer to the function documentation for <code>cv()</code>.</p>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:tls-secure-connections">TLS Secure Connections</h3>
-<p>Secure connections are enabled through the combination of NNG and Mbed TLS libraries.</p>
-<p>Authentication of endpoints and encryption of the TCP transport layer is achieved transparently by:</p>
-<p>i) Specifying a secure <code>tls+tcp://</code> or <code>wss://</code> URL, and
-ii) Passing a TLS configuration object to the ‘tls’ argument of <code>listen()</code> or <code>dial()</code>.</p>
-<p>A TLS configuration, or ‘tlsConfig’, object is created by the <code>tls_config()</code> function. Specify the argument ‘client’ to create a client configuration, and ‘server’ to create a server configuration.</p>
-<p>A client configuration requires a PEM-encoded CA certificate (chain) used to verify the server identity. A server configuration requires the certificate and associated private key. These may be supplied as files or directly as character vectors. Valid X.509 certificates generated via a Certificate Signing Request to a Certificate Authority are supported in this way.</p>
-<p>Additionally, the convenience function <code>write_cert()</code> can automatically generate a 4096 bit RSA key pair and self-signed X.509 certificate in the format required by <code>tls_config()</code>. The ‘cn’ argument must be provided and match exactly the hostname / IP address of the URL that is being used, e.g. in the example below ‘127.0.0.1’ must be used throughout, or alternatively ‘localhost’, but not a mixture of the two.</p>
-<pre><code class="language-r">cert &lt;- write_cert(cn = &quot;127.0.0.1&quot;)
-str(cert)
-#&gt; List of 2
-#&gt;  $ server: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;-----BEGIN RSA PRIVATE KEY-----\nMIIJKAIBAAKCAgEAnM4fRU63IE3EnjHYD28HaxEMwfsPj1hbFPLY88kUwS6yikJd\n31fRGOQnpMjw&quot;| __truncated__
-#&gt;  $ client: chr [1:2] &quot;-----BEGIN CERTIFICATE-----\nMIIFOTCCAyGgAwIBAgIBATANBgkqhkiG9w0BAQsFADA0MRIwEAYDVQQDDAkxMjcu\nMC4wLjExETAPBgNV&quot;| __truncated__ &quot;&quot;
-
-ser &lt;- tls_config(server = cert$server)
-ser
-#&gt; &lt; TLS server config | auth mode: optional &gt;
-
-cli &lt;- tls_config(client = cert$client)
-cli
-#&gt; &lt; TLS client config | auth mode: required &gt;
-
-s &lt;- socket(listen = &quot;tls+tcp://127.0.0.1:5558&quot;, tls = ser)
-s1 &lt;- socket(dial = &quot;tls+tcp://127.0.0.1:5558&quot;, tls = cli)
-
-# secure TLS connection established
-
-close(s1)
-close(s)
-
-</code></pre>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:request-reply-protocol">Request Reply Protocol</h3>
-<p><code>nanonext</code> implements remote procedure calls (RPC) using NNG’s req/rep protocol to provide a basis for distributed computing.</p>
-<p>Can be used to perform computationally-expensive calculations or I/O-bound operations such as writing large amounts of data to disk in a separate ‘server’ process running concurrently.</p>
-<p>[S] Server process: <code>reply()</code> will wait for a message and apply a function, in this case <code>rnorm()</code>, before sending back the result. This is started in a background ‘mirai’ process.</p>
-<pre><code class="language-r">m &lt;- mirai::mirai({
-  library(nanonext)
-  rep &lt;- socket(&quot;rep&quot;, listen = &quot;tcp://127.0.0.1:6556&quot;)
-  reply(context(rep), execute = rnorm, send_mode = &quot;raw&quot;)
-  Sys.sleep(2) # linger period to flush system socket send
-})
-
-</code></pre>
-<p>[C] Client process: <code>request()</code> performs an async send and receive request and returns immediately with a <code>recvAio</code> object.</p>
-<pre><code class="language-r">library(nanonext)
-req &lt;- socket(&quot;req&quot;, dial = &quot;tcp://127.0.0.1:6556&quot;)
-aio &lt;- request(context(req), data = 1e8, recv_mode = &quot;double&quot;)
-
-</code></pre>
-<p>At this point, the client can run additional code concurrent with the server processing the request.</p>
-<pre><code class="language-r"># do more...
-</code></pre>
-<p>When the result of the server calculation is required, the <code>recvAio</code> may be called using <code>call_aio()</code>.</p>
-<p>The return value from the server request is then retrieved and stored in the Aio as <code>$data</code>.</p>
-<pre><code class="language-r">call_aio(aio)$data |&gt; str()
-#&gt;  num [1:100000000] -1.03 0.19 -0.219 0.473 -0.775 ...
-</code></pre>
-<p>As <code>call_aio()</code> is blocking and will wait for completion, an alternative is to query <code>aio$data</code> directly. This will return an ‘unresolved’ logical NA value if the calculation is yet to complete.</p>
-<p>In this example the calculation is returned, but other operations may reside entirely on the server side, for example writing data to disk.</p>
-<p>In such a case, calling or querying the value confirms that the operation has completed, and provides the return value of the function, which may typically be NULL or an exit code.</p>
-<p>The <a href="https://doi.org/10.5281/zenodo.7912722"><code>mirai</code></a> package (<a href="https://mirai.r-lib.org/">https://mirai.r-lib.org/</a>) uses <code>nanonext</code> as the back-end to provide asynchronous execution of arbitrary R code using the RPC model.</p>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:publisher-subscriber-protocol">Publisher Subscriber Protocol</h3>
-<p><code>nanonext</code> fully implements NNG’s pub/sub protocol as per the below example. A subscriber can subscribe to one or multiple topics broadcast by a publisher.</p>
-<pre><code class="language-r">pub &lt;- socket(&quot;pub&quot;, listen = &quot;inproc://nanobroadcast&quot;)
-sub &lt;- socket(&quot;sub&quot;, dial = &quot;inproc://nanobroadcast&quot;)
-
-sub |&gt; subscribe(topic = &quot;examples&quot;)
-
-pub |&gt; send(c(&quot;examples&quot;, &quot;this is an example&quot;), mode = &quot;raw&quot;)
-#&gt; [1] 0
-sub |&gt; recv(mode = &quot;character&quot;)
-#&gt; [1] &quot;examples&quot;           &quot;this is an example&quot;
-
-pub |&gt; send(&quot;examples at the start of a single text message&quot;, mode = &quot;raw&quot;)
-#&gt; [1] 0
-sub |&gt; recv(mode = &quot;character&quot;)
-#&gt; [1] &quot;examples at the start of a single text message&quot;
-
-pub |&gt; send(c(&quot;other&quot;, &quot;this other topic will not be received&quot;), mode = &quot;raw&quot;)
-#&gt; [1] 0
-sub |&gt; recv(mode = &quot;character&quot;)
-#&gt; 'errorValue' int 8 | Try again
-
-# specify NULL to subscribe to ALL topics
-sub |&gt; subscribe(topic = NULL)
-pub |&gt; send(c(&quot;newTopic&quot;, &quot;this is a new topic&quot;), mode = &quot;raw&quot;)
-#&gt; [1] 0
-sub |&gt; recv(&quot;character&quot;)
-#&gt; [1] &quot;newTopic&quot;            &quot;this is a new topic&quot;
-
-sub |&gt; unsubscribe(topic = NULL)
-pub |&gt; send(c(&quot;newTopic&quot;, &quot;this topic will now not be received&quot;), mode = &quot;raw&quot;)
-#&gt; [1] 0
-sub |&gt; recv(&quot;character&quot;)
-#&gt; 'errorValue' int 8 | Try again
-
-# however the topics explicitly subscribed to are still received
-pub |&gt; send(c(&quot;examples will still be received&quot;), mode = &quot;raw&quot;)
-#&gt; [1] 0
-sub |&gt; recv(mode = &quot;character&quot;)
-#&gt; [1] &quot;examples will still be received&quot;
-</code></pre>
-<p>The subscribed topic can be of any atomic type (not just character), allowing integer, double, logical, complex and raw vectors to be sent and received.</p>
-<pre><code class="language-r">sub |&gt; subscribe(topic = 1)
-pub |&gt; send(c(1, 10, 10, 20), mode = &quot;raw&quot;)
-#&gt; [1] 0
-sub |&gt; recv(mode = &quot;double&quot;)
-#&gt; [1]  1 10 10 20
-pub |&gt; send(c(2, 10, 10, 20), mode = &quot;raw&quot;)
-#&gt; [1] 0
-sub |&gt; recv(mode = &quot;double&quot;)
-#&gt; 'errorValue' int 8 | Try again
+# Receive (includes topic)
+recv(sub, mode = &quot;character&quot;)
 
 close(pub)
 close(sub)
-
 </code></pre>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:surveyor-respondent-protocol">Surveyor Respondent Protocol</h3>
-<p>This type of pattern is useful for applications such as service discovery.</p>
-<p>A surveyor sends a survey, which is broadcast to all peer respondents. Respondents are then able to reply, but are not obliged to. The survey itself is a timed event, and responses received after the timeout are discarded.</p>
-<pre><code class="language-r">sur &lt;- socket(&quot;surveyor&quot;, listen = &quot;inproc://nanoservice&quot;)
-res1 &lt;- socket(&quot;respondent&quot;, dial = &quot;inproc://nanoservice&quot;)
-res2 &lt;- socket(&quot;respondent&quot;, dial = &quot;inproc://nanoservice&quot;)
+<h2 id="sec:7-surveyor-respondent">7. Surveyor/Respondent</h2>
+<pre><code class="language-r">sur &lt;- socket(&quot;surveyor&quot;, listen = &quot;inproc://survey&quot;)
+res1 &lt;- socket(&quot;respondent&quot;, dial = &quot;inproc://survey&quot;)
+res2 &lt;- socket(&quot;respondent&quot;, dial = &quot;inproc://survey&quot;)
 
-# sur sets a survey timeout, applying to this and subsequent surveys
-sur |&gt; survey_time(value = 500)
+# Set survey timeout (ms)
+survey_time(sur, 500)
 
-# sur sends a message and then requests 2 async receives
-sur |&gt; send(&quot;service check&quot;)
-#&gt; [1] 0
-aio1 &lt;- sur |&gt; recv_aio()
-aio2 &lt;- sur |&gt; recv_aio()
+# Broadcast survey
+send(sur, &quot;ping&quot;)
 
-# res1 receives the message and replies using an aio send function
-res1 |&gt; recv()
-#&gt; [1] &quot;service check&quot;
-res1 |&gt; send_aio(&quot;res1&quot;)
+# Collect responses (async)
+aio1 &lt;- recv_aio(sur)
+aio2 &lt;- recv_aio(sur)
 
-# res2 receives the message but fails to reply
-res2 |&gt; recv()
-#&gt; [1] &quot;service check&quot;
+# Respondents reply
+recv(res1)
+send(res1, &quot;pong1&quot;)
 
-# checking the aio - only the first will have resolved
-aio1$data
-#&gt; [1] &quot;res1&quot;
-aio2$data
-#&gt; 'unresolved' logi NA
-
-# after the survey expires, the second resolves into a timeout error
+# Late/missing responses timeout (errorValue 5)
 msleep(500)
-aio2$data
-#&gt; 'errorValue' int 5 | Timed out
+aio2$data           # errorValue if no response
 
 close(sur)
 close(res1)
 close(res2)
-
 </code></pre>
-<p>Above, <code>msleep()</code> is an uninterruptible sleep function (utilising the NNG library), taking a time in milliseconds.</p>
-<p>It can be seen that the final value resolves into a timeout, which is an integer 5 classed as ‘errorValue’. All integer error codes are classed as ‘errorValue’ to be easily distinguishable from integer message values.</p>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:ncurl-async-http-client">ncurl: Async HTTP Client</h3>
-<p><code>ncurl()</code> is a minimalist http(s) client.</p>
-<p><code>ncurl_aio()</code> is the async edition, performing requests asynchronously, returning immediately with an ‘ncurlAio’.</p>
-<p>For normal use, it takes just the URL. It can follow redirects.</p>
-<pre><code class="language-r">ncurl(&quot;https://postman-echo.com/get&quot;)
-#&gt; $status
-#&gt; [1] 200
-#&gt; 
-#&gt; $headers
-#&gt; NULL
-#&gt; 
-#&gt; $data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t1757325117.423\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-68bea73d-359dc37d61c0beec06554f90\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/get\&quot;\n}&quot;
+<h2 id="sec:8-tls-secure-connections">8. TLS Secure Connections</h2>
+<h3 id="sec:self-signed-certificates">Self-signed Certificates</h3>
+<pre><code class="language-r"># Generate certificate (cn must match URL host exactly)
+cert &lt;- write_cert(cn = &quot;127.0.0.1&quot;)
+
+# Create TLS configs
+server_tls &lt;- tls_config(server = cert$server)
+client_tls &lt;- tls_config(client = cert$client)
+
+# Use with tls+tcp:// or wss://
+s1 &lt;- socket(listen = &quot;tls+tcp://127.0.0.1:5555&quot;, tls = server_tls)
+s2 &lt;- socket(dial = &quot;tls+tcp://127.0.0.1:5555&quot;, tls = client_tls)
 </code></pre>
-<p>For advanced use, supports additional HTTP methods such as POST or PUT.</p>
-<pre><code class="language-r">res &lt;- ncurl_aio(&quot;https://postman-echo.com/post&quot;,
-                 method = &quot;POST&quot;,
-                 headers = c(`Content-Type` = &quot;application/json&quot;, Authorization = &quot;Bearer APIKEY&quot;),
-                 data = '{&quot;key&quot;: &quot;value&quot;}',
-                 response = &quot;date&quot;)
-res
-#&gt; &lt; ncurlAio | $status $headers $data &gt;
+<h3 id="sec:ca-certificates">CA Certificates</h3>
+<pre><code class="language-r"># Client with CA cert file
+client_tls &lt;- tls_config(client = &quot;/path/to/ca-cert.pem&quot;)
 
-call_aio(res)$headers
-#&gt; $date
-#&gt; [1] &quot;Mon, 08 Sep 2025 09:51:57 GMT&quot;
-
-res$data
-#&gt; [1] &quot;{\n  \&quot;args\&quot;: {},\n  \&quot;data\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;files\&quot;: {},\n  \&quot;form\&quot;: {},\n  \&quot;headers\&quot;: {\n    \&quot;host\&quot;: \&quot;postman-echo.com\&quot;,\n    \&quot;x-request-start\&quot;: \&quot;t1757325117.974\&quot;,\n    \&quot;connection\&quot;: \&quot;close\&quot;,\n    \&quot;content-length\&quot;: \&quot;16\&quot;,\n    \&quot;x-forwarded-proto\&quot;: \&quot;https\&quot;,\n    \&quot;x-forwarded-port\&quot;: \&quot;443\&quot;,\n    \&quot;x-amzn-trace-id\&quot;: \&quot;Root=1-68bea73d-295741f97817358c06050d6b\&quot;,\n    \&quot;content-type\&quot;: \&quot;application/json\&quot;,\n    \&quot;authorization\&quot;: \&quot;Bearer APIKEY\&quot;\n  },\n  \&quot;json\&quot;: {\n    \&quot;key\&quot;: \&quot;value\&quot;\n  },\n  \&quot;url\&quot;: \&quot;https://postman-echo.com/post\&quot;\n}&quot;
+# Server with cert + key
+server_tls &lt;- tls_config(server = c(&quot;/path/to/cert.pem&quot;, &quot;/path/to/key.pem&quot;))
 </code></pre>
-<p>In this respect, it may be used as a performant and lightweight method for making REST API requests.</p>
-<h5 id="sec:ncurl-promises">ncurl Promises</h5>
-<p><code>ncurl_aio()</code> may also be used anywhere that accepts a ‘promise’ from the promises package, including with Shiny ExtendedTask.</p>
-<p>The promise is resolved with a list of ‘status’, ‘headers’ and ‘data’, or rejected with a translation of the error if an NNG error was returned e.g. for ‘15 | Address invalid’.</p>
-<pre><code class="language-r">library(promises)
+<h2 id="sec:9-options-and-statistics">9. Options and Statistics</h2>
+<h3 id="sec:get-set-options">Get/Set Options</h3>
+<pre><code class="language-r"># Delayed start for configuration
+s &lt;- socket(listen = &quot;tcp://127.0.0.1:5555&quot;, autostart = FALSE)
 
-p &lt;- ncurl_aio(&quot;https://postman-echo.com/get&quot;) |&gt; then(\(x) cat(x$data))
-is.promise(p)
-#&gt; [1] TRUE
-</code></pre>
-<h5 id="sec:ncurl-session">ncurl Session</h5>
-<p><code>ncurl_session()</code> creates a re-usable open connection and presents a much faster and more efficient solution for repeated polling of an API endpoint. <code>transact()</code> is then used to request data multiple times as required. This method allows a polling frequency that exceeds a server’s new connection limits, where this is permitted.</p>
-<p>By specifying <code>convert = FALSE</code>, the received binary data is made available as a raw vector. This may be fed into ‘json’ parsers which can operate directly on such data etc.</p>
-<pre><code class="language-r">sess &lt;- ncurl_session(&quot;https://postman-echo.com/get&quot;,
-                      convert = FALSE,
-                      headers = c(`Content-Type` = &quot;application/json&quot;, Authorization = &quot;Bearer APIKEY&quot;),
-                      response = c(&quot;Date&quot;, &quot;Content-Type&quot;))
-sess
-#&gt; &lt; ncurlSession &gt; - transact() to return data
-
-transact(sess)
-#&gt; $status
-#&gt; [1] 200
-#&gt; 
-#&gt; $headers
-#&gt; $headers$Date
-#&gt; [1] &quot;Mon, 08 Sep 2025 09:51:58 GMT&quot;
-#&gt; 
-#&gt; $headers$`Content-Type`
-#&gt; [1] &quot;application/json; charset=utf-8&quot;
-#&gt; 
-#&gt; 
-#&gt; $data
-#&gt;   [1] 7b 0a 20 20 22 61 72 67 73 22 3a 20 7b 7d 2c 0a 20 20 22 68 65 61 64 65 72 73 22 3a 20 7b 0a 20 20 20
-#&gt;  [35] 20 22 68 6f 73 74 22 3a 20 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 0a 20 20 20 20 22
-#&gt;  [69] 78 2d 72 65 71 75 65 73 74 2d 73 74 61 72 74 22 3a 20 22 74 31 37 35 37 33 32 35 31 31 38 2e 34 33 36
-#&gt; [103] 22 2c 0a 20 20 20 20 22 63 6f 6e 6e 65 63 74 69 6f 6e 22 3a 20 22 63 6c 6f 73 65 22 2c 0a 20 20 20 20
-#&gt; [137] 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72 6f 74 6f 22 3a 20 22 68 74 74 70 73 22 2c 0a 20 20 20 20
-#&gt; [171] 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 6f 72 74 22 3a 20 22 34 34 33 22 2c 0a 20 20 20 20 22 78 2d
-#&gt; [205] 61 6d 7a 6e 2d 74 72 61 63 65 2d 69 64 22 3a 20 22 52 6f 6f 74 3d 31 2d 36 38 62 65 61 37 33 65 2d 32
-#&gt; [239] 32 61 63 65 66 61 38 32 63 64 33 63 38 62 64 37 66 30 65 30 65 36 39 22 2c 0a 20 20 20 20 22 63 6f 6e
-#&gt; [273] 74 65 6e 74 2d 74 79 70 65 22 3a 20 22 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c 0a 20 20
-#&gt; [307] 20 20 22 61 75 74 68 6f 72 69 7a 61 74 69 6f 6e 22 3a 20 22 42 65 61 72 65 72 20 41 50 49 4b 45 59 22
-#&gt; [341] 0a 20 20 7d 2c 0a 20 20 22 75 72 6c 22 3a 20 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63
-#&gt; [375] 68 6f 2e 63 6f 6d 2f 67 65 74 22 0a 7d
-</code></pre>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:stream-websocket-client">stream: Websocket Client</h3>
-<p><code>stream()</code> exposes NNG’s low-level byte stream interface for communicating with raw sockets. This may be used for connecting to arbitrary non-NNG endpoints.</p>
-<p>The stream interface can be used to communicate with (secure) websocket servers. The argument <code>textframes = TRUE</code> can be specified where the websocket server uses text rather than binary frames.</p>
-<pre><code class="language-r"># connecting to an echo service
-s &lt;- stream(dial = &quot;wss://echo.websocket.org/&quot;, textframes = TRUE)
-s
-#&gt; &lt; nanoStream &gt;
-#&gt;  - mode: dialer text frames
-#&gt;  - state: opened
-#&gt;  - url: wss://echo.websocket.org/
-</code></pre>
-<p><code>send()</code> and <code>recv()</code>, as well as their asynchronous counterparts <code>send_aio()</code> and <code>recv_aio()</code> can be used on Streams in the same way as Sockets. This affords a great deal of flexibility in ingesting and processing streaming data.</p>
-<pre><code class="language-r">s |&gt; recv()
-#&gt; [1] &quot;Request served by 4d896d95b55478&quot;
-
-s |&gt; send(&quot;initial message&quot;)
-#&gt; [1] 0
-
-s |&gt; recv()
-#&gt; [1] &quot;initial message&quot;
-
-s |&gt; recv_aio() -&gt; r
-
-s |&gt; send(&quot;async message&quot;)
-#&gt; [1] 0
-
-s |&gt; send(&quot;final message&quot;)
-#&gt; [1] 0
-
-s |&gt; recv()
-#&gt; [1] &quot;final message&quot;
-
-r$data
-#&gt; [1] &quot;async message&quot;
-
-close(s)
-
-</code></pre>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
-<h3 id="sec:options-serialization-and-statistics">Options, Serialization and Statistics</h3>
-<p>Use <code>opt()</code> and <code>'opt&lt;-'()</code> to get and set options on a Socket, Context, Stream, Listener or Dialer.</p>
-<p>See the function documentation page for a list of common options.</p>
-<p>Once a dialer or listener has started, it is not generally possible to change its configuration. In this case, the dialer or listener should be created specifying ‘autostart = FALSE’.</p>
-<pre><code class="language-r">s &lt;- socket(listen = &quot;inproc://options&quot;, autostart = FALSE)
-
-# no maximum message size
+# Get option
 opt(s$listener[[1]], &quot;recv-size-max&quot;)
-#&gt; [1] 0
 
-# enfore maximum message size to protect against denial-of-service type attacks
+# Set option
 opt(s$listener[[1]], &quot;recv-size-max&quot;) &lt;- 8192L
 
-opt(s$listener[[1]], &quot;recv-size-max&quot;)
-#&gt; [1] 8192
-
+# Start after configuration
 start(s$listener[[1]])
-
 </code></pre>
-<p>There is the special write-only option ‘serial’ for Sockets, which sets a serialization configuration returned by <code>serial_config()</code>. This registers custom functions to handle serialization and unserialization of reference objects, plugging into the ‘refhook’ system of native R serialization. This allows the transparent send and receive of such objects using mode ‘serial’ without the need for a separate ‘marshalling’ step. Once set, configurations apply to the Socket and all Contexts created from the Socket.</p>
-<pre><code class="language-r">serial &lt;- serial_config(&quot;obj_class&quot;, function(x) serialize(x, NULL), unserialize)
-opt(s, &quot;serial&quot;) &lt;- serial
+<h3 id="sec:common-options">Common Options</h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&quot;recv-size-max&quot;</code></td>
+<td>Max message size (0 = unlimited)</td>
+</tr>
+<tr>
+<td><code>&quot;send-timeout&quot;</code></td>
+<td>Send timeout (ms)</td>
+</tr>
+<tr>
+<td><code>&quot;recv-timeout&quot;</code></td>
+<td>Receive timeout (ms)</td>
+</tr>
+<tr>
+<td><code>&quot;reconnect-time-min&quot;</code></td>
+<td>Min reconnect interval (ms)</td>
+</tr>
+<tr>
+<td><code>&quot;reconnect-time-max&quot;</code></td>
+<td>Max reconnect interval (ms)</td>
+</tr>
+<tr>
+<td><code>&quot;req:resend-time&quot;</code></td>
+<td>Request retry interval</td>
+</tr>
+<tr>
+<td><code>&quot;sub:prefnew&quot;</code></td>
+<td>Prefer newer messages</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sec:custom-serialization">Custom Serialization</h3>
+<pre><code class="language-r"># Register custom serializer for a class
+serial &lt;- serial_config(
+  &quot;class_name&quot;,
+  function(x) serialize(x, NULL),  # serialize
+  unserialize                      # unserialize
+)
+opt(socket, &quot;serial&quot;) &lt;- serial
+</code></pre>
+<h3 id="sec:statistics">Statistics</h3>
+<pre><code class="language-r">stat(socket, &quot;pipes&quot;)      # Active connections
+stat(listener, &quot;accept&quot;)   # Connection attempts
+stat(dialer, &quot;reject&quot;)     # Rejected connections
+</code></pre>
+<h2 id="sec:10-contexts">10. Contexts</h2>
+<p>Contexts enable concurrent operations on a single socket (for req/rep, surveyor/respondent).</p>
+<pre><code class="language-r">s &lt;- socket(&quot;req&quot;, dial = &quot;tcp://127.0.0.1:5555&quot;)
 
+# Create independent contexts
+ctx1 &lt;- context(s)
+ctx2 &lt;- context(s)
+
+# Concurrent requests
+aio1 &lt;- request(ctx1, data1)
+aio2 &lt;- request(ctx2, data2)
+
+# Close contexts (or they close with socket)
+close(ctx1)
+close(ctx2)
 close(s)
 </code></pre>
-<p>Similarly <code>stat()</code> has been implemented as the interface to NNG’s statistics framework.</p>
-<p>This can be used on a Socket, Listener or Dialer to query useful statistics such as the total number of connection attempts, the current number of connections etc.</p>
-<p>See the function documentation page for available statistics.</p>
-<pre><code class="language-r">s &lt;- socket(listen = &quot;inproc://stat&quot;)
-
-# no active connections (pipes)
-stat(s, &quot;pipes&quot;)
-#&gt; [1] 0
-
-s1 &lt;- socket(dial = &quot;inproc://stat&quot;)
-
-# one now that the dialer has conneceted
-stat(s, &quot;pipes&quot;)
-#&gt; [1] 1
-
-close(s)
+<h2 id="sec:11-cross-language-exchange">11. Cross-language Exchange</h2>
+<h3 id="sec:r-to-python-numpy">R to Python (NumPy)</h3>
+<pre><code class="language-r"># R: send raw doubles
+n &lt;- nano(&quot;pair&quot;, dial = &quot;ipc:///tmp/nanonext&quot;)
+n$send(c(1.1, 2.2, 3.3), mode = &quot;raw&quot;)
+result &lt;- n$recv(mode = &quot;double&quot;)
 </code></pre>
-<p><a href="#table-of-contents">« Back to ToC</a></p>
+<pre><code class="language-python"># Python: receive as NumPy array
+import numpy as np
+import pynng
+socket = pynng.Pair0(listen=&quot;ipc:///tmp/nanonext&quot;)
+array = np.frombuffer(socket.recv())
+socket.send(array.tobytes())
+</code></pre>
+<h2 id="sec:12-error-handling">12. Error Handling</h2>
+<pre><code class="language-r"># Errors return as 'errorValue' class
+result &lt;- recv(s, block = FALSE)
+
+# Check for errors
+is_error_value(result)
+
+# Error codes
+# 5  = Timed out
+# 6  = Connection refused
+# 8  = Try again (non-blocking, no message)
+
+# Get error message
+nng_error(5)        # &quot;Timed out&quot;
+</code></pre>
+<h2 id="sec:13-utilities">13. Utilities</h2>
+<pre><code class="language-r"># Sleep (uninterruptible, ms)
+msleep(100)
+
+# Random bytes
+random(8)                          # 8 random bytes as hex string
+random(8, convert = FALSE)         # As raw vector
+
+# Parse URL
+parse_url(&quot;tcp://127.0.0.1:5555&quot;)
+</code></pre>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
 </body>
 </html>

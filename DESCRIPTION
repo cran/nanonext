@@ -1,7 +1,7 @@
 Type: Package
 Package: nanonext
-Title: NNG (Nanomsg Next Gen) Lightweight Messaging Library
-Version: 1.7.2
+Title: Lightweight Toolkit for Messaging, Concurrency and the Web
+Version: 1.8.0
 Authors@R: c(
     person("Charlie", "Gao", , "charlie.gao@posit.co", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-0750-061X")),
@@ -11,15 +11,16 @@ Authors@R: c(
     person("R Consortium", role = "fnd")
   )
 Description: R binding for NNG (Nanomsg Next Gen), a successor to ZeroMQ.
-    NNG is a socket library for reliable, high-performance messaging over
-    in-process, IPC, TCP, WebSocket and secure TLS transports. Implements
-    'Scalability Protocols', a standard for common communications patterns
-    including publish/subscribe, request/reply and service discovery. As
-    its own threaded concurrency framework, provides a toolkit for
-    asynchronous programming and distributed computing. Intuitive 'aio'
-    objects resolve automatically when asynchronous operations complete,
-    and synchronisation primitives allow R to wait upon events signalled
-    by concurrent threads.
+    A toolkit for messaging, concurrency and the web. High-performance
+    socket messaging over in-process, IPC, TCP, WebSocket and secure TLS
+    transports implements 'Scalability Protocols', a standard for common
+    communications patterns including publish/subscribe, request/reply and
+    survey. A threaded concurrency framework with intuitive 'aio' objects
+    that resolve automatically upon completion of asynchronous operations,
+    and synchronisation primitives that allow R to wait on events
+    signalled by concurrent threads. A unified HTTP server hosting REST
+    endpoints, WebSocket connections and streaming on a single port, with
+    a built-in HTTP client.
 License: MIT + file LICENSE
 URL: https://nanonext.r-lib.org, https://github.com/r-lib/nanonext
 BugReports: https://github.com/r-lib/nanonext/issues
@@ -34,14 +35,13 @@ Config/usethis/last-upkeep: 2025-04-23
 Encoding: UTF-8
 RoxygenNote: 7.3.3
 SystemRequirements: 'libnng' >= 1.9 and 'libmbedtls' >= 2.5, or 'cmake'
-        and 'xz' to compile NNG and/or Mbed TLS included in package
-        sources
+        to compile NNG and/or Mbed TLS included in package sources
 NeedsCompilation: yes
-Packaged: 2025-11-03 08:10:36 UTC; cg334
+Packaged: 2026-02-09 00:03:28 UTC; cg334
 Author: Charlie Gao [aut, cre] (ORCID: <https://orcid.org/0000-0002-0750-061X>),
   Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>),
   Hibiki AI Limited [cph],
   R Consortium [fnd]
 Maintainer: Charlie Gao <charlie.gao@posit.co>
 Repository: CRAN
-Date/Publication: 2025-11-03 09:30:02 UTC
+Date/Publication: 2026-02-09 06:10:02 UTC

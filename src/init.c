@@ -25,6 +25,8 @@ SEXP nano_StreamSymbol;
 SEXP nano_TlsSymbol;
 SEXP nano_UrlSymbol;
 SEXP nano_ValueSymbol;
+SEXP nano_HttpServerSymbol;
+SEXP nano_ConnSymbol;
 
 SEXP nano_aioFuncMsg;
 SEXP nano_aioFuncRes;
@@ -59,6 +61,8 @@ static void RegisterSymbols(void) {
   nano_TlsSymbol = Rf_install("tls");
   nano_UrlSymbol = Rf_install("url");
   nano_ValueSymbol = Rf_install("value");
+  nano_HttpServerSymbol = Rf_install("httpServer");
+  nano_ConnSymbol = Rf_install("conn");
 }
 
 static void PreserveObjects(void) {
@@ -124,11 +128,16 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_dial", (DL_FUNC) &rnng_dial, 5},
   {"rnng_dialer_close", (DL_FUNC) &rnng_dialer_close, 1},
   {"rnng_dialer_start", (DL_FUNC) &rnng_dialer_start, 2},
+  {"rnng_dispatcher_run", (DL_FUNC) &rnng_dispatcher_run, 7},
   {"rnng_eval_safe", (DL_FUNC) &rnng_eval_safe, 1},
   {"rnng_fini", (DL_FUNC) &rnng_fini, 0},
   {"rnng_fini_priors", (DL_FUNC) &rnng_fini_priors, 0},
   {"rnng_get_opt", (DL_FUNC) &rnng_get_opt, 2},
   {"rnng_header_read", (DL_FUNC) &rnng_header_read, 1},
+  {"rnng_http_server_close", (DL_FUNC) &rnng_http_server_close, 1},
+  {"rnng_http_server_create", (DL_FUNC) &rnng_http_server_create, 3},
+  {"rnng_http_server_start", (DL_FUNC) &rnng_http_server_start, 1},
+  {"rnng_http_server_stop", (DL_FUNC) &rnng_http_server_stop, 1},
   {"rnng_ip_addr", (DL_FUNC) &rnng_ip_addr, 0},
   {"rnng_is_error_value", (DL_FUNC) &rnng_is_error_value, 1},
   {"rnng_is_nul_byte", (DL_FUNC) &rnng_is_nul_byte, 1},
@@ -147,6 +156,7 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_ncurl_transact", (DL_FUNC) &rnng_ncurl_transact, 1},
   {"rnng_pipe_notify", (DL_FUNC) &rnng_pipe_notify, 5},
   {"rnng_protocol_open", (DL_FUNC) &rnng_protocol_open, 6},
+  {"rnng_race_aio", (DL_FUNC) &rnng_race_aio, 2},
   {"rnng_random", (DL_FUNC) &rnng_random, 2},
   {"rnng_read_stdin", (DL_FUNC) &rnng_read_stdin, 1},
   {"rnng_reap", (DL_FUNC) &rnng_reap, 1},
@@ -176,6 +186,12 @@ static const R_CallMethodDef callMethods[] = {
   {"rnng_wait_thread_create", (DL_FUNC) &rnng_wait_thread_create, 1},
   {"rnng_write_cert", (DL_FUNC) &rnng_write_cert, 2},
   {"rnng_write_stdout", (DL_FUNC) &rnng_write_stdout, 1},
+  {"rnng_ws_close", (DL_FUNC) &rnng_ws_close, 1},
+  {"rnng_ws_send", (DL_FUNC) &rnng_ws_send, 2},
+  {"rnng_conn_close", (DL_FUNC) &rnng_conn_close, 1},
+  {"rnng_stream_conn_send", (DL_FUNC) &rnng_stream_conn_send, 2},
+  {"rnng_stream_conn_set_header", (DL_FUNC) &rnng_stream_conn_set_header, 3},
+  {"rnng_stream_conn_set_status", (DL_FUNC) &rnng_stream_conn_set_status, 2},
   {NULL, NULL, 0}
 };
 
