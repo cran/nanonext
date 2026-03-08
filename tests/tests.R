@@ -1010,6 +1010,7 @@ if (later && NOT_CRAN) {
 if (later && NOT_CRAN) {
   msgs <- list()
   ws_conn <- NULL
+  ws_req <- NULL
   test_class("nanoServer", srv <- http_server(
     url = "http://127.0.0.1:0",
     handlers = list(
@@ -1020,14 +1021,15 @@ if (later && NOT_CRAN) {
           msgs <<- c(msgs, list(data))
           ws$send(data)
         },
-        on_open = function(ws) {
+        on_open = function(ws, req) {
           ws_conn <<- ws
+          ws_req <<- req
           msgs <<- c(msgs, list("open"))
         },
         on_close = function(ws) { msgs <<- c(msgs, list("close")) },
         textframes = TRUE
       ),
-      handler_ws("/ws-reject", function(ws, data) ws$send(data), on_open = function(ws) ws$close())
+      handler_ws("/ws-reject", function(ws, data) ws$send(data), on_open = function(ws, req) ws$close())
     )
   ))
   test_zero(srv$start())
@@ -1047,6 +1049,10 @@ if (later && NOT_CRAN) {
     test_type("closure", ws_conn$send)
     test_type("closure", ws_conn$close)
     test_null(ws_conn$nonexistent)
+    test_type("list", ws_req)
+    test_equal(ws_req$uri, "/ws")
+    test_type("character", ws_req$headers)
+    test_false(is.null(names(ws_req$headers)))
     test_zero(send(ws, "hello", block = 500))
     while (length(msgs) < 2L) later::run_now(1)
     reply <- recv(ws, block = 500, mode = "character")
@@ -1054,7 +1060,7 @@ if (later && NOT_CRAN) {
     test_error(ws_conn$send(123L), "`data` must be raw or character")
     test_error(ws_conn$send(list(a = 1)), "`data` must be raw or character")
     test_zero(close(ws))
-    for (i in 1:5) later::run_now(0.1)
+    while (length(msgs) < 3L) later::run_now(1)
     test_equal(msgs[[1]], "open")
     test_equal(msgs[[2]], "hello")
     test_equal(ws_conn$close(), 7L)
@@ -1065,6 +1071,18 @@ if (later && NOT_CRAN) {
   if (is_nano(ws_reject)) {
     later::run_now(1)
     close(ws_reject)
+  }
+  ws_req <- NULL
+  ws_h <- tryCatch(stream(dial = paste0(ws_url, "/ws"), textframes = TRUE,
+                          headers = c(Authorization = "Bearer testtoken", "X-Custom" = "value1")),
+                   error = identity)
+  if (is_nano(ws_h)) {
+    while (is.null(ws_req)) later::run_now(1)
+    test_equal(ws_req$headers[["Authorization"]], "Bearer testtoken")
+    test_equal(ws_req$headers[["X-Custom"]], "value1")
+    n_msgs <- length(msgs)
+    close(ws_h)
+    while (length(msgs) == n_msgs) later::run_now(1)
   }
   test_zero(srv$close())
   test_error(http_server(url = "http://127.0.0.1:0", handlers = list(
@@ -1101,7 +1119,7 @@ if (later && NOT_CRAN) {
           wss_msgs <<- c(wss_msgs, list(data))
           ws$send(paste0("wss:", data))
         },
-        on_open = function(ws) { wss_msgs <<- c(wss_msgs, list("wss_open")) },
+        on_open = function(ws, req) { wss_msgs <<- c(wss_msgs, list("wss_open")) },
         on_close = function(ws) { wss_msgs <<- c(wss_msgs, list("wss_close")) },
         textframes = TRUE
       )
@@ -1146,7 +1164,7 @@ if (later && NOT_CRAN) {
       handler_ws("/upper", function(ws, data) {
         upper_msgs <<- c(upper_msgs, list(data))
         ws$send(toupper(data))
-      }, on_open = function(ws) {
+      }, on_open = function(ws, req) {
         conn_ids <<- c(conn_ids, ws$id)
       }, on_close = function(ws) {
         ws_shutdown_closed <<- ws_shutdown_closed + 1L
