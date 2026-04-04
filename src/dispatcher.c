@@ -34,6 +34,7 @@ typedef struct nano_dispatcher_s {
   int outq_count;
   int connections;
   int count;
+  int executing;
   nng_aio *host_aio;
   nng_aio *daemon_aio;
   nng_ctx host_ctx;
@@ -56,7 +57,6 @@ static void dispatch_shutdown(nano_dispatcher *d);
 static void dispatch_handle_connect(nano_dispatcher *d, int pipe);
 static void dispatch_handle_disconnect(nano_dispatcher *d, int pipe);
 static void dispatch_dispatch_tasks(nano_dispatcher *d);
-static int dispatch_count_executing(nano_dispatcher *d);
 static int dispatch_cancel_inq(nano_dispatcher *d, int id);
 static nano_dispatch_daemon *dispatch_find_idle_daemon(nano_dispatcher *d);
 
@@ -336,9 +336,10 @@ static void dispatch_handle_connect(nano_dispatcher *d, int pipe) {
 
   d->connections++;
 
-  SEXP init_data = PROTECT(Rf_allocVector(VECSXP, 2));
-  SEXP call = PROTECT(Rf_lang2(d->next_stream_fun, d->envir));
-  SEXP stream = Rf_eval(call, R_GlobalEnv);
+  SEXP init_data, call, stream;
+  PROTECT(init_data = Rf_allocVector(VECSXP, 2));
+  PROTECT(call = Rf_lang2(d->next_stream_fun, d->envir));
+  stream = Rf_eval(call, R_GlobalEnv);
   SET_VECTOR_ELT(init_data, 0, stream);
   SET_VECTOR_ELT(init_data, 1, d->serial);
 
@@ -358,6 +359,7 @@ static void dispatch_handle_disconnect(nano_dispatcher *d, int pipe) {
   if (dd == NULL) return;
 
   if (dd->msgid != 0) {
+    d->executing--;
     dispatch_send_reply(dd->ctx, d->conn_reset_buf, d->conn_reset_len);
     nng_ctx_close(dd->ctx);
   }
@@ -379,9 +381,8 @@ static void dispatch_handle_host_recv(nano_dispatcher *d) {
 
     if (id == 0) {
       // Status query - send raw integer array
-      int executing = dispatch_count_executing(d);
-      int completed = d->count - d->inq_count - executing;
-      int result[5] = {d->outq_count, d->connections, d->inq_count, executing, completed};
+      int completed = d->count - d->inq_count - d->executing;
+      int result[5] = {d->outq_count, d->connections, d->inq_count, d->executing, completed};
       dispatch_send_reply(d->host_ctx, (unsigned char *) result, sizeof(result));
     } else {
       // Cancel query - send raw integer (0 = FALSE, 1 = TRUE)
@@ -410,6 +411,7 @@ static void dispatch_handle_host_recv(nano_dispatcher *d) {
       msg = NULL;
       dd->ctx = d->host_ctx;
       dd->msgid = msgid;
+      d->executing++;
       if (is_sync) {
         dd->sync_gen = d->sync_generation;
         d->syncing = 1;
@@ -445,6 +447,7 @@ static void dispatch_handle_daemon_recv(nano_dispatcher *d) {
 
   nano_dispatch_daemon *dd = dispatch_find_daemon(d, pipe_id);
   if (dd != NULL && dd->msgid != 0) {
+    d->executing--;
     int is_marker = dispatch_read_marker(nng_msg_body(msg), nng_msg_len(msg));
 
     if (dispatch_send_msg_reply(dd->ctx, msg) == 0)
@@ -466,17 +469,6 @@ static void dispatch_handle_daemon_recv(nano_dispatcher *d) {
 }
 
 // helper functions ------------------------------------------------------------
-
-static int dispatch_count_executing(nano_dispatcher *d) {
-
-  int count = 0;
-  for (int i = 0; i < d->outq_size; i++)
-    for (nano_dispatch_daemon *dd = d->outq_table[i]; dd; dd = dd->next)
-      if (dd->msgid != 0)
-        count++;
-  return count;
-
-}
 
 static int dispatch_cancel_inq(nano_dispatcher *d, int id) {
 
@@ -529,6 +521,7 @@ static void dispatch_dispatch_tasks(nano_dispatcher *d) {
     t->msg = NULL;
     dd->ctx = t->ctx;
     dd->msgid = t->msgid;
+    d->executing++;
 
     if (is_sync) {
       dd->sync_gen = d->sync_generation;

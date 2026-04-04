@@ -259,6 +259,21 @@ SEXP nano_raw_char(const unsigned char *buf, const size_t sz) {
 
 }
 
+SEXP nano_findVarInFrame(const SEXP env, const SEXP sym, int *found) {
+
+  SEXP frame = CAR(env);  // FRAME
+  while (frame != R_NilValue) {
+    if (TAG(frame) == sym) {
+      if (found != NULL) *found = 1;
+      return CAR(frame); // BINDING_VALUE
+    }
+    frame = CDR(frame);
+  }
+  if (found != NULL) *found = 0;
+  return R_NilValue;
+
+}
+
 SEXP nano_url_with_port(nng_url *up, int port) {
 
   char port_s[8];
@@ -575,25 +590,3 @@ SEXP rnng_marker_set(SEXP x) {
 
 }
 
-SEXP rnng_marker_read(SEXP x) {
-
-  int res = 0;
-  if (TYPEOF(x) == RAWSXP && XLENGTH(x) > 12) {
-    unsigned char *buf = (unsigned char *) DATAPTR_RO(x);
-    res = buf[0] == 0x7 && buf[3] == 0x1;
-  }
-  return Rf_ScalarLogical(res);
-
-}
-
-SEXP rnng_header_read(SEXP x) {
-
-  int res = 0;
-  if (TYPEOF(x) == RAWSXP && XLENGTH(x) > 12) {
-    unsigned char *buf = (unsigned char *) DATAPTR_RO(x);
-    if (buf[0] == 0x7)
-      memcpy(&res, buf + 4, sizeof(int));
-  }
-  return Rf_ScalarInteger(res);
-
-}

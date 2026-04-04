@@ -59,8 +59,8 @@ void haio_invoke_cb(void *arg) {
   const char *names[] = {"status", "headers", "data", ""};
   PROTECT(out = Rf_mkNamed(VECSXP, names));
   SET_VECTOR_ELT(out, 0, nano_aio_http_status(x));
-  SET_VECTOR_ELT(out, 1, Rf_findVarInFrame(x, nano_ProtocolSymbol));
-  SET_VECTOR_ELT(out, 2, Rf_findVarInFrame(x, nano_ValueSymbol));
+  SET_VECTOR_ELT(out, 1, nano_findVarInFrame(x, nano_ProtocolSymbol, NULL));
+  SET_VECTOR_ELT(out, 2, nano_findVarInFrame(x, nano_ValueSymbol, NULL));
   PROTECT(call = Rf_lcons(nano_ResolveSymbol, Rf_cons(out, R_NilValue)));
   Rf_eval(call, NANO_ENCLOS(x));
   UNPROTECT(2);
@@ -491,12 +491,13 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   saio->ctx = ctx;
   saio->id = msgid != R_NilValue ? id : mod != 1 ? -id : 0;
 
-  if ((xc = nng_msg_alloc(&msg, 0)) ||
-      (xc = nng_msg_append(msg, buf.buf, buf.cur)) ||
+  if ((xc = nng_msg_alloc(&msg, buf.cur)) ||
       (xc = nng_aio_alloc(&saio->aio, sendaio_complete, saio))) {
     nng_msg_free(msg);
     goto fail;
   }
+
+  memcpy(nng_msg_body(msg), buf.buf, buf.cur);
 
   nng_aio_set_msg(saio->aio, msg);
   nng_ctx_send(*ctx, saio->aio);
@@ -543,7 +544,7 @@ SEXP rnng_set_promise_context(SEXP x, SEXP ctx) {
   if (TYPEOF(x) != ENVSXP)
     return R_NilValue;
 
-  SEXP aio = Rf_findVarInFrame(x, nano_AioSymbol);
+  const SEXP aio = nano_findVarInFrame(x, nano_AioSymbol, NULL);
   if (NANO_PTR_CHECK(aio, nano_AioSymbol))
     return R_NilValue;
 

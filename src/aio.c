@@ -7,7 +7,8 @@
 
 static SEXP mk_error_aio(const int xc, SEXP env) {
 
-  SEXP err = PROTECT(Rf_ScalarInteger(xc));
+  SEXP err;
+  PROTECT(err = Rf_ScalarInteger(xc));
   Rf_classgets(err, nano_error);
   Rf_defineVar(nano_ValueSymbol, err, env);
   Rf_defineVar(nano_AioSymbol, nano_success, env);
@@ -250,11 +251,12 @@ static inline SEXP create_aio_msg(SEXP env, SEXP aio, nano_aio *raio, int res) {
 
 SEXP nano_aio_result(SEXP env) {
 
-  const SEXP exist = Rf_findVarInFrame(env, nano_ValueSymbol);
-  if (exist != R_UnboundValue)
+  int found;
+  SEXP exist = nano_findVarInFrame(env, nano_ValueSymbol, &found);
+  if (found)
     return exist;
 
-  const SEXP aio = Rf_findVarInFrame(env, nano_AioSymbol);
+  const SEXP aio = nano_findVarInFrame(env, nano_AioSymbol, NULL);
   nano_aio *saio = (nano_aio *) NANO_PTR(aio);
 
   return create_aio_result(env, saio);
@@ -263,11 +265,12 @@ SEXP nano_aio_result(SEXP env) {
 
 SEXP nano_aio_get_msg(SEXP env) {
 
-  const SEXP exist = Rf_findVarInFrame(env, nano_ValueSymbol);
-  if (exist != R_UnboundValue)
+  int found;
+  SEXP exist = nano_findVarInFrame(env, nano_ValueSymbol, &found);
+  if (found)
     return exist;
 
-  const SEXP aio = Rf_findVarInFrame(env, nano_AioSymbol);
+  const SEXP aio = nano_findVarInFrame(env, nano_AioSymbol, NULL);
   nano_aio *raio = (nano_aio *) NANO_PTR(aio);
 
   int res;
@@ -295,11 +298,12 @@ SEXP nano_aio_get_msg(SEXP env) {
 
 SEXP rnng_aio_result(SEXP env) {
 
-  const SEXP exist = Rf_findVarInFrame(env, nano_ValueSymbol);
-  if (exist != R_UnboundValue)
+  int found;
+  SEXP exist = nano_findVarInFrame(env, nano_ValueSymbol, &found);
+  if (found)
     return exist;
 
-  const SEXP aio = Rf_findVarInFrame(env, nano_AioSymbol);
+  const SEXP aio = nano_findVarInFrame(env, nano_AioSymbol, NULL);
   nano_aio *saio = (nano_aio *) NANO_PTR(aio);
 
   if (nng_aio_busy(saio->aio))
@@ -311,11 +315,12 @@ SEXP rnng_aio_result(SEXP env) {
 
 SEXP rnng_aio_get_msg(SEXP env) {
 
-  const SEXP exist = Rf_findVarInFrame(env, nano_ValueSymbol);
-  if (exist != R_UnboundValue)
+  int found;
+  SEXP exist = nano_findVarInFrame(env, nano_ValueSymbol, &found);
+  if (found)
     return exist;
 
-  const SEXP aio = Rf_findVarInFrame(env, nano_AioSymbol);
+  const SEXP aio = nano_findVarInFrame(env, nano_AioSymbol, NULL);
   nano_aio *raio = (nano_aio *) NANO_PTR(aio);
 
   int res;
@@ -360,7 +365,7 @@ SEXP rnng_aio_call(SEXP x) {
 
   switch (TYPEOF(x)) {
   case ENVSXP: {
-    const SEXP coreaio = Rf_findVarInFrame(x, nano_AioSymbol);
+    const SEXP coreaio = nano_findVarInFrame(x, nano_AioSymbol, NULL);
     if (NANO_PTR_CHECK(coreaio, nano_AioSymbol))
       return x;
 
@@ -401,23 +406,24 @@ SEXP rnng_aio_call(SEXP x) {
 static SEXP rnng_aio_collect_impl(SEXP x, SEXP (*const func)(SEXP)) {
 
   SEXP out;
+  int found;
 
   switch (TYPEOF(x)) {
   case ENVSXP: {
-    out = Rf_findVarInFrame(func(x), nano_ValueSymbol);
-    if (out == R_UnboundValue) goto fail;
+    out = nano_findVarInFrame(func(x), nano_ValueSymbol, &found);
+    if (!found) goto fail;
     break;
   }
   case VECSXP: {
-    SEXP env, names;
+    SEXP env, val, names;
     const R_xlen_t xlen = Rf_xlength(x);
     PROTECT(out = Rf_allocVector(VECSXP, xlen));
     for (R_xlen_t i = 0; i < xlen; i++) {
       env = func(NANO_VECTOR(x)[i]);
       if (TYPEOF(env) != ENVSXP) goto fail;
-      env = Rf_findVarInFrame(env, nano_ValueSymbol);
-      if (env == R_UnboundValue) goto fail;
-      SET_VECTOR_ELT(out, i, env);
+      val = nano_findVarInFrame(env, nano_ValueSymbol, &found);
+      if (!found) goto fail;
+      SET_VECTOR_ELT(out, i, val);
     }
     names = Rf_getAttrib(x, R_NamesSymbol);
     if (names != R_NilValue)
@@ -452,7 +458,7 @@ SEXP rnng_aio_stop(SEXP x) {
 
   switch (TYPEOF(x)) {
   case ENVSXP: {
-    const SEXP coreaio = Rf_findVarInFrame(x, nano_AioSymbol);
+    const SEXP coreaio = nano_findVarInFrame(x, nano_AioSymbol, NULL);
     if (NANO_PTR_CHECK(coreaio, nano_AioSymbol)) break;
     nano_aio *aiop = (nano_aio *) NANO_PTR(coreaio);
     nng_aio_stop(aiop->aio);
@@ -483,10 +489,10 @@ SEXP rnng_request_stop(SEXP x) {
   SEXP out;
   switch (TYPEOF(x)) {
   case ENVSXP: {
-    SEXP coreaio;
     nng_msg *msgp = NULL;
     int res = 0;
-    PROTECT(coreaio = Rf_findVarInFrame(x, nano_AioSymbol));
+    SEXP coreaio;
+    PROTECT(coreaio = nano_findVarInFrame(x, nano_AioSymbol, NULL));
     if (NANO_PTR_CHECK(coreaio, nano_AioSymbol)) goto fail;
     nano_aio *aiop = (nano_aio *) NANO_PTR(coreaio);
     if (aiop->type != REQAIOS && aiop->type != REQAIO) goto fail;
@@ -540,7 +546,7 @@ static int rnng_unresolved_impl(SEXP x) {
   int xc;
   switch (TYPEOF(x)) {
   case ENVSXP: {
-    const SEXP coreaio = Rf_findVarInFrame(x, nano_AioSymbol);
+    const SEXP coreaio = nano_findVarInFrame(x, nano_AioSymbol, NULL);
     if (NANO_PTR_CHECK(coreaio, nano_AioSymbol)) {
       xc = 0; break;
     }
@@ -594,7 +600,7 @@ SEXP rnng_unresolved(SEXP x) {
 static int rnng_unresolved2_impl(SEXP x) {
 
   if (TYPEOF(x) == ENVSXP) {
-    const SEXP coreaio = Rf_findVarInFrame(x, nano_AioSymbol);
+    const SEXP coreaio = nano_findVarInFrame(x, nano_AioSymbol, NULL);
     if (NANO_PTR_CHECK(coreaio, nano_AioSymbol))
       return 0;
     nano_aio *aiop = (nano_aio *) NANO_PTR(coreaio);
@@ -725,12 +731,13 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
     NANO_ENSURE_ALLOC(saio);
     saio->type = SENDAIO;
 
-    if ((xc = nng_msg_alloc(&msg, 0)) ||
-        (xc = nng_msg_append(msg, buf.buf, buf.cur)) ||
+    if ((xc = nng_msg_alloc(&msg, buf.cur)) ||
         (xc = nng_aio_alloc(&saio->aio, saio_complete, saio))) {
       nng_msg_free(msg);
       goto fail;
     }
+
+    memcpy(nng_msg_body(msg), buf.buf, buf.cur);
 
     if (pipeid) {
       nng_pipe p;
@@ -820,7 +827,7 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEX
 
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) nano_integer(timeout);
   const int signal = cvar != R_NilValue && !NANO_PTR_CHECK(cvar, nano_CvSymbol);
-  const int interrupt = cvar == R_MissingArg;
+  const int interrupt = TYPEOF(cvar) == SYMSXP;
   nano_cv *ncv = signal ? (nano_cv *) NANO_PTR(cvar) : NULL;
   nano_aio *raio = NULL;
   SEXP aio, env, fun;
@@ -861,7 +868,13 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEX
       if ((xc = nng_aio_alloc(&raio->aio, raio_complete, raio)))
         goto fail;
     } else {
-      const size_t xlen = (size_t) nano_integer(bytes);
+      size_t xlen;
+      if (bytes != R_NilValue) {
+        xlen = (size_t) nano_integer(bytes);
+        Rf_warning("argument 'n' is deprecated; set 'buffer' in stream() instead");
+      } else {
+        xlen = nst->bufsize;
+      }
       raio->type = signal ? IOV_RECVAIOS : IOV_RECVAIO;
       raio->data = malloc(xlen);
       NANO_ENSURE_ALLOC(raio->data);
