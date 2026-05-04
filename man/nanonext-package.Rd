@@ -96,10 +96,20 @@ Useful links:
 \author{
 \strong{Maintainer}: Charlie Gao \email{charlie.gao@posit.co} (\href{https://orcid.org/0000-0002-0750-061X}{ORCID})
 
+Authors:
+\itemize{
+  \item Charlie Gao \email{charlie.gao@posit.co} (\href{https://orcid.org/0000-0002-0750-061X}{ORCID})
+}
+
 Other contributors:
 \itemize{
   \item Posit Software, PBC (\href{https://ror.org/03wc8by49}{ROR}) [copyright holder, funder]
   \item Hibiki AI Limited [copyright holder]
+  \item Staysail Systems, Inc. (NNG library) [copyright holder]
+  \item Capitar IT Group BV (NNG library) [copyright holder]
+  \item The Mbed TLS Contributors (Mbed TLS library) [copyright holder]
+  \item Pierre L'Ecuyer (RngStreams library) [copyright holder]
+  \item sakura authors (Serialization hooks) [copyright holder]
   \item R Consortium (\href{https://ror.org/01z833950}{ROR}) [funder]
 }
 

@@ -313,6 +313,7 @@ test_equal(reap(ctxn), 7L)
 test_zero(pipe_notify(rep, cv, add = TRUE, flag = TRUE))
 test_zero(pipe_notify(rep, cv, remove = TRUE, flag = tools::SIGCONT))
 test_zero(pipe_notify(req$socket, cv = cv, add = TRUE))
+test_zero(pipe_notify(rep, cv = NULL, add = TRUE, remove = TRUE))
 test_error(request(err, "test", cv = cv), "valid")
 test_error(recv_aio(err, cv = cv, timeout = 500))
 test_error(wait(err), "valid")
@@ -512,9 +513,6 @@ test_equal(nng_error(8), "8 | Try again")
 test_true(is_nul_byte(as.raw(0L)))
 test_false(is_nul_byte(NULL))
 test_false(is_error_value(1L))
-test_error(messenger("invalidURL"), "argument")
-test_type("raw", md5 <- nanonext:::md5_object("secret base"))
-test_equal(length(md5), 32L)
 test_type("double", mclock())
 test_null(msleep(1L))
 test_null(msleep(1))
@@ -710,7 +708,7 @@ if (NOT_CRAN) {
     poly_sock <- socket("poly", listen = "%s")
     mon <- monitor(poly_sock, cv)
     pipe_notify(rep_sock, cv, remove = TRUE, flag = tools::SIGTERM)
-    .dispatcher(rep_sock, poly_sock, mon, raw(10), NULL, new.env(), function(e) NULL)
+    .dispatcher(rep_sock, poly_sock, mon, raw(10), NULL, new.env(), function(e) integer(7))
     close(poly_sock)
   ', url_rep, url_poly)
   script <- tempfile(fileext = ".R")
@@ -926,6 +924,12 @@ if (later && NOT_CRAN) {
         received_headers <<- req$headers
         list(status = 200L, body = paste(names(req$headers), collapse = ","))
       }),
+      handler("/echo-body", function(req) {
+        list(status = 200L, body = req$body)
+      }, method = "POST"),
+      handler("/patch", function(req) {
+        list(status = 200L, body = paste0("patched:", rawToChar(req$body)))
+      }, method = "PATCH"),
       handler("/error", function(req) stop(simpleError(""))),
       handler("/api", function(req) list(status = 200L, body = paste("path:", req$uri)), prefix = TRUE),
       handler("/any", function(req) list(status = 200L, body = req$method), method = "*"),
@@ -995,12 +999,36 @@ if (later && NOT_CRAN) {
   aio <- ncurl_aio(paste0(base_url, "/no-body"), timeout = 2000)
   while (unresolved(aio)) later::run_now(1)
   test_equal(aio$status, 204L)
+  aio <- ncurl_aio(paste0(base_url, "/echo-body"), method = "POST",
+                   headers = c("Content-Type" = "text/plain"),
+                   data = "post data", timeout = 2000)
+  while (unresolved(aio)) later::run_now(1)
+  test_equal(aio$status, 200L)
+  aio <- ncurl_aio(paste0(base_url, "/patch"), method = "PATCH",
+                   headers = c("Content-Type" = "text/plain"),
+                   data = "hello", timeout = 2000)
+  while (unresolved(aio)) later::run_now(1)
+  test_equal(aio$status, 200L)
   aio <- ncurl_aio(paste0(base_url, "/nonexistent"), timeout = 2000)
   while (unresolved(aio)) later::run_now(1)
   test_equal(aio$status, 404L)
   aio <- ncurl_aio(paste0(base_url, "/put"), timeout = 2000)
   while (unresolved(aio)) later::run_now(1)
   test_equal(aio$status, 405L)
+  test_zero(srv$close())
+}
+
+if (later && NOT_CRAN) {
+  test_class("nanoServer", srv <- http_server(
+    url = "http://127.0.0.1:0",
+    handlers = handler("/single", function(req) list(status = 200L, body = "single handler"))
+  ))
+  test_zero(srv$start())
+  Sys.sleep(0.1)
+  aio <- ncurl_aio(paste0(srv$url, "/single"), timeout = 2000)
+  while (unresolved(aio)) later::run_now(1)
+  test_equal(aio$status, 200L)
+  test_equal(aio$data, "single handler")
   test_zero(srv$close())
 }
 
@@ -1054,6 +1082,9 @@ if (later && NOT_CRAN) {
     while (length(msgs) < 2L) later::run_now(1)
     reply <- recv(ws, block = 500, mode = "character")
     test_equal(reply, "hello")
+    test_zero(ws_conn$send(charToRaw("raw-from-server")))
+    raw_reply <- recv(ws, block = 500, mode = "raw")
+    test_type("raw", raw_reply)
     test_error(ws_conn$send(123L), "`data` must be raw or character")
     test_error(ws_conn$send(list(a = 1)), "`data` must be raw or character")
     test_zero(close(ws))
@@ -1312,6 +1343,15 @@ if (later && NOT_CRAN) {
           conn$send(paste0("method:", req$method))
           conn$close()
         }
+      ),
+      handler_stream(
+        "/prefix-stream",
+        on_request = function(conn, req) {
+          conn$set_header("Content-Type", "text/plain")
+          conn$send(paste0("prefix:", req$uri))
+          conn$close()
+        },
+        prefix = TRUE
       )
     )
   ))
@@ -1339,6 +1379,7 @@ if (later && NOT_CRAN) {
     test_error(stream_conn$set_header("X-Test", "value"), "after headers have been sent")
 
     test_zero(stream_conn$send(format_sse(data = "update")))
+    test_zero(stream_conn$send(charToRaw("raw-chunk")))
 
     test_error(stream_conn$send(123L), "`data` must be raw or character")
     test_error(stream_conn$send(list()), "`data` must be raw or character")
@@ -1364,7 +1405,114 @@ if (later && NOT_CRAN) {
   test_true("GET" %in% received_methods)
   test_true("POST" %in% received_methods)
 
+  prefix_aio <- ncurl_aio(paste0(base_url, "/prefix-stream/sub/path"), timeout = 2000)
+  while (unresolved(prefix_aio)) later::run_now(1)
+  test_equal(call_aio(prefix_aio)$status, 200L)
+
   test_zero(stream_srv$close())
+}
+
+test_null(.dispatcher_stop("invalid"))
+test_null(.dispatcher_wait("invalid", 1L))
+test_equal(length(.dispatcher_info("invalid")), 5L)
+test_null(.dispatcher_gate("invalid"))
+test_null(.dispatcher_try_gate("invalid"))
+test_identical(.dispatcher_capacity("invalid"), c(used = NA_real_, peak = NA_real_, capacity = NA_real_))
+
+if (NOT_CRAN) {
+  if (.Platform$OS.type == "windows") {
+    disp_poly_url <- sprintf("ipc://nanonext-dpoly-%d", Sys.getpid())
+  } else {
+    disp_poly_url <- sprintf("ipc://%s", tempfile())
+  }
+  disp_inproc_url <- sprintf("inproc://disp-test-%d", Sys.getpid())
+  RNGkind("L'Ecuyer-CMRG")
+  .advance()
+  stream <- .Random.seed
+  cvar <- cv()
+  client <- socket("req", listen = disp_inproc_url)
+  disp <- .dispatcher_start(disp_poly_url, disp_inproc_url, NULL, NULL, stream, NULL, cvar)
+  test_type("externalptr", disp)
+  daemon <- socket("poly", dial = disp_poly_url)
+  .dispatcher_wait(disp, 1L)
+  init_data <- recv(daemon, mode = "raw", block = 2000)
+  test_type("raw", init_data)
+  info <- .dispatcher_info(disp)
+  test_equal(length(info), 5L)
+  test_true(info[1L] >= 1L)
+  test_true(info[2L] >= 1L)
+  cap <- .dispatcher_capacity(disp)
+  test_type("double", cap)
+  test_identical(names(cap), c("used", "peak", "capacity"))
+  test_true(is.na(cap[["capacity"]]))
+  test_true(cap[["used"]] >= 0)
+  test_true(cap[["peak"]] >= cap[["used"]])
+  send(client, raw(8), mode = "raw", block = 2000)
+  status <- recv(client, mode = "integer", block = 2000)
+  test_equal(length(status), 5L)
+  task_msg <- raw(13)
+  task_msg[1] <- as.raw(0x07)
+  task_msg[5] <- as.raw(1L)
+  send(client, task_msg, mode = "raw", block = 2000)
+  task_recv <- recv(daemon, mode = "raw", block = 2000)
+  test_type("raw", task_recv)
+  send(daemon, raw(13), mode = "raw", block = 2000)
+  result <- recv(client, mode = "raw", block = 2000)
+  test_type("raw", result)
+  info2 <- .dispatcher_info(disp)
+  test_true(info2[5L] >= 1L)
+  ctx <- context(client)
+  aio <- request(ctx, data = "task", id = disp)
+  task_recv2 <- recv(daemon, mode = "raw", block = 2000)
+  test_type("raw", task_recv2)
+  test_true(stop_request(aio))
+  cancel_sig <- recv(daemon, mode = "raw", block = 2000)
+  test_equal(length(cancel_sig), 0L)
+  close(ctx)
+  ctx2 <- context(client)
+  aio2 <- request(ctx2, data = "queued_task", id = disp)
+  while (.dispatcher_info(disp)[3L] == 0L) msleep(1)
+  send(daemon, raw(13), mode = "raw", block = 2000)
+  test_true(stop_request(aio2))
+  close(ctx2)
+  test_null(.dispatcher_stop(disp))
+  test_equal(length(.dispatcher_info(disp)), 5L)
+  test_null(.dispatcher_stop(disp))
+  close(daemon)
+  close(client)
+  cvar2 <- cv()
+  client2 <- socket("req", listen = disp_inproc_url)
+  disp2 <- .dispatcher_start(disp_poly_url, disp_inproc_url, NULL, NULL, stream, 2L, cvar2)
+  test_type("externalptr", disp2)
+  test_true(.dispatcher_gate(disp2))
+  test_true(.dispatcher_try_gate(disp2))
+  test_equal(.dispatcher_capacity(disp2)[["capacity"]], 2)
+  test_null(.dispatcher_stop(disp2))
+  close(client2)
+  cvar2u <- cv()
+  client2u <- socket("req", listen = disp_inproc_url)
+  disp2u <- .dispatcher_start(disp_poly_url, disp_inproc_url, NULL, NULL, stream, NULL, cvar2u)
+  test_true(.dispatcher_try_gate(disp2u))
+  test_null(.dispatcher_stop(disp2u))
+  close(client2u)
+  disp_tls_cert <- write_cert(cn = "127.0.0.1")
+  disp_tls <- tls_config(server = disp_tls_cert$server)
+  disp_inproc_url3 <- sprintf("inproc://disp-test3-%d", Sys.getpid())
+  cvar3 <- cv()
+  client3 <- socket("req", listen = disp_inproc_url3)
+  disp3 <- .dispatcher_start("tls+tcp://127.0.0.1:0", disp_inproc_url3, disp_tls, NULL, stream, NULL, cvar3)
+  test_type("externalptr", disp3)
+  disp3_url <- attr(disp3, "url")
+  test_type("character", disp3_url)
+  disp_tls_client <- tls_config(client = disp_tls_cert$client)
+  daemon3 <- socket("poly", dial = disp3_url, tls = disp_tls_client)
+  .dispatcher_wait(disp3, 1L)
+  init_data3 <- recv(daemon3, mode = "raw", block = 2000)
+  test_type("raw", init_data3)
+  test_true(.dispatcher_info(disp3)[1L] >= 1L)
+  test_null(.dispatcher_stop(disp3))
+  close(daemon3)
+  close(client3)
 }
 
 if (!interactive() && NOT_CRAN) {

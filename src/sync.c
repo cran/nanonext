@@ -92,12 +92,18 @@ static void request_complete(void *arg) {
         nng_pipe_close(p);
     }
   } else if (res == 5 && saio->id > 0) {
-    nng_msg *msg = NULL;
-    if (nng_msg_alloc(&msg, 0) ||
-        nng_msg_append_u32(msg, 0) ||
-        nng_msg_append(msg, &saio->id, sizeof(int)) ||
-        nng_ctx_sendmsg(*saio->ctx, msg, NNG_FLAG_NONBLOCK)) {
-      nng_msg_free(msg);
+    if (saio->disp != NULL) {
+      if (saio->type) {
+        nng_msg *msg = NULL;
+        if (nng_msg_alloc(&msg, 0) ||
+            nng_msg_append_u32(msg, 0) ||
+            nng_msg_append(msg, &saio->id, sizeof(int)) ||
+            nng_ctx_sendmsg(*(nng_ctx *) saio->disp, msg, NNG_FLAG_NONBLOCK)) {
+          nng_msg_free(msg);
+        }
+      } else {
+        dispatch_cancel_direct(saio->disp, saio->id);
+      }
     }
   }
 
@@ -162,7 +168,7 @@ void pipe_cb_signal(nng_pipe p, nng_pipe_ev ev, void *arg) {
 
 }
 
-static void pipe_cb_monitor(nng_pipe p, nng_pipe_ev ev, void *arg) {
+void pipe_cb_monitor(nng_pipe p, nng_pipe_ev ev, void *arg) {
 
   nano_monitor *monitor = (nano_monitor *) arg;
 
@@ -488,16 +494,23 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   raio = calloc(1, sizeof(nano_aio));
   NANO_ENSURE_ALLOC(raio);
 
-  saio->ctx = ctx;
+  if (TYPEOF(msgid) == EXTPTRSXP) {
+    saio->disp = NANO_PTR(msgid);
+  } else if (msgid != R_NilValue) {
+    saio->disp = ctx;
+    saio->type = 1;
+  } else {
+    saio->disp = NULL;
+  }
   saio->id = msgid != R_NilValue ? id : mod != 1 ? -id : 0;
 
-  if ((xc = nng_msg_alloc(&msg, buf.cur)) ||
+  if ((xc = nng_msg_alloc(&msg, 0)) ||
       (xc = nng_aio_alloc(&saio->aio, sendaio_complete, saio))) {
     nng_msg_free(msg);
     goto fail;
   }
 
-  memcpy(nng_msg_body(msg), buf.buf, buf.cur);
+  nano_msg_set_body(msg, &buf);
 
   nng_aio_set_msg(saio->aio, msg);
   nng_ctx_send(*ctx, saio->aio);

@@ -7,12 +7,15 @@
 
 static SEXP nano_hash_char(unsigned char *buf, const size_t sz) {
 
+  static const char hex[] = "0123456789abcdef";
   SEXP out;
   char cbuf[sz + sz + 1];
-  char *cptr = cbuf;
 
-  for (size_t i = 0; i < sz; i++)
-    cptr += snprintf(cptr, 3, "%.2x", buf[i]);
+  for (size_t i = 0; i < sz; i++) {
+    cbuf[2 * i]     = hex[buf[i] >> 4];
+    cbuf[2 * i + 1] = hex[buf[i] & 0x0f];
+  }
+  cbuf[sz + sz] = '\0';
 
   PROTECT(out = Rf_allocVector(STRSXP, 1));
   SET_STRING_ELT(out, 0, Rf_mkCharLenCE(cbuf, (int) (sz + sz), CE_NATIVE));
@@ -267,7 +270,7 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
       goto fail;
 
     if (usefile > 1) {
-      crl = NANO_STR_N(client, 1);
+      crl = CHAR(STRING_ELT(client, 1));
       if ((xc = nng_tls_config_ca_chain(cfg, file, strncmp(crl, "", 1) ? crl : NULL)))
         goto fail;
     } else {
@@ -285,7 +288,7 @@ SEXP rnng_tls_config(SEXP client, SEXP server, SEXP pass, SEXP auth) {
       goto fail;
 
     if (usefile > 1) {
-      key = NANO_STR_N(server, 1);
+      key = CHAR(STRING_ELT(server, 1));
       if ((xc = nng_tls_config_own_cert(cfg, file, key, pss)))
         goto fail;
     } else {

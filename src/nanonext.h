@@ -6,6 +6,7 @@
 #include <nng/nng.h>
 #include <nng/supplemental/util/platform.h>
 #include <nng/supplemental/tls/tls.h>
+#include "nng_structs.h"
 
 #ifdef NANONEXT_PROTOCOLS
 #include <nng/protocol/bus0/bus.h>
@@ -23,7 +24,6 @@
 
 #ifdef NANONEXT_HTTP
 #include <nng/supplemental/http/http.h>
-#include "nng_structs.h"
 #ifdef _WIN32
 #include <winsock2.h>
 #else
@@ -41,9 +41,6 @@ typedef struct nano_handle_s {
 #endif
 
 #ifdef NANONEXT_IO
-#include <time.h>
-#include <unistd.h>
-#include <stdarg.h>
 #include <stdio.h>
 #endif
 
@@ -120,10 +117,10 @@ extern int R_interrupts_pending;
 #define NANO_SET_PROT(x, v) SETCDR(x, v)
 #define NANO_SET_ENCLOS(x, v) SETCDR(x, v)
 #define NANO_DATAPTR(x) (void *) DATAPTR_RO(x)
-#define NANO_VECTOR(x) ((const SEXP *) DATAPTR_RO(x))
-#define NANO_STRING(x) CHAR(*((const SEXP *) DATAPTR_RO(x)))
-#define NANO_STR_N(x, n) CHAR(((const SEXP *) DATAPTR_RO(x))[n])
-#define NANO_INTEGER(x) *(int *) DATAPTR_RO(x)
+#if R_VERSION < R_Version(4, 5, 0)
+# define VECTOR_PTR_RO(x) ((const SEXP *) DATAPTR_RO(x))
+#endif
+#define NANO_INTEGER(x) *(const int *) DATAPTR_RO(x)
 
 #define ERROR_OUT(xc) Rf_error("%d | %s", xc, nng_strerror(xc))
 #define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
@@ -195,15 +192,16 @@ typedef struct nano_aio_s {
   void *cb;
   void *next;
   int result;
-  uint8_t mode;
   nano_aio_typ type;
+  uint8_t mode;
 } nano_aio;
 
 typedef struct nano_saio_s {
-  nng_ctx *ctx;
   nng_aio *aio;
+  void *disp;
   void *cb;
   int id;
+  int type;
 } nano_saio;
 
 typedef struct nano_cv_s {
@@ -277,14 +275,14 @@ typedef enum {
 
 // Base connection structure - common fields for linked list and lifecycle
 typedef struct nano_conn_s {
-  nano_conn_type type;              // Connection type (for dispatch)
   nng_aio *send_aio;                // For async send (both types)
   nano_http_handler_info *handler;  // Back-reference to handler
   struct nano_conn_s *next;         // Linked list
   struct nano_conn_s *prev;         // Doubly-linked for O(1) removal
   SEXP xptr;                        // R external pointer
-  int id;                           // Unique connection ID (server-wide)
+  nano_conn_type type;              // Connection type (for dispatch)
   nano_conn_state state;            // Connection state
+  int id;                           // Unique connection ID (server-wide)
   int onclose_scheduled;            // Prevents duplicate on_close callbacks
 } nano_conn;
 
@@ -334,22 +332,22 @@ typedef struct nano_http_request_s {
 } nano_http_request;
 
 typedef enum {
-  SERVER_CREATED,   // Server created but not started
-  SERVER_STARTED,   // Server running
-  SERVER_STOPPED    // Server stopped
+  SERVER_CREATED,
+  SERVER_STARTED,
+  SERVER_STOPPED
 } nano_server_state;
 
 typedef struct nano_http_server_s {
   nng_http_server *server;          // NNG HTTP server
   nng_tls_config *tls;              // TLS configuration
   nano_http_handler_info *handlers; // Array of handler info
-  int handler_count;                // Number of handlers
   nano_http_request *pending_reqs;  // Linked list of pending HTTP requests
   nng_mtx *mtx;                     // Mutex for thread safety
-  int conn_counter;                 // Server-wide unique connection ID counter
-  nano_server_state state;          // Server lifecycle state
   SEXP xptr;                        // R external pointer for this server
   SEXP prot;                        // Pairlist for GC protection of callbacks
+  int handler_count;                // Number of handlers
+  int conn_counter;                 // Server-wide unique connection ID counter
+  nano_server_state state;          // Server lifecycle state
 } nano_http_server;
 
 typedef struct ws_message_s {
@@ -437,6 +435,7 @@ SEXP mk_error(const int);
 SEXP mk_error_data(const int);
 SEXP nano_raw_char(const unsigned char *, const size_t);
 void nano_serialize(nano_buf *, const SEXP, SEXP, int);
+void nano_msg_set_body(nng_msg *, nano_buf *);
 SEXP nano_unserialize(unsigned char *, const size_t, SEXP);
 SEXP nano_decode(unsigned char *, const size_t, const uint8_t, SEXP);
 SEXP nano_url_with_port(nng_url *, int);
@@ -448,6 +447,7 @@ SEXP nano_aio_get_msg(SEXP);
 SEXP nano_aio_http_status(SEXP);
 
 void pipe_cb_signal(nng_pipe, nng_pipe_ev, void *);
+void pipe_cb_monitor(nng_pipe, nng_pipe_ev, void *);
 void tls_finalizer(SEXP);
 
 void nano_load_later(void);
@@ -457,6 +457,7 @@ void nano_ReleaseObject(SEXP);
 
 void nano_list_do(nano_list_op, nano_aio *);
 void nano_thread_shutdown(void);
+int dispatch_cancel_direct(void *, int);
 
 SEXP rnng_advance_rng_state(void);
 SEXP rnng_aio_call(SEXP);
@@ -485,7 +486,14 @@ SEXP rnng_cv_wait_safe(SEXP);
 SEXP rnng_dial(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_dialer_close(SEXP);
 SEXP rnng_dialer_start(SEXP, SEXP);
+SEXP rnng_dispatcher_capacity(SEXP);
+SEXP rnng_dispatcher_gate(SEXP);
+SEXP rnng_dispatcher_try_gate(SEXP);
+SEXP rnng_dispatcher_info(SEXP);
 SEXP rnng_dispatcher_run(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_dispatcher_start(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_dispatcher_stop(SEXP);
+SEXP rnng_dispatcher_wait(SEXP, SEXP);
 SEXP rnng_eval_safe(SEXP);
 SEXP rnng_fini(void);
 SEXP rnng_fini_priors(void);
@@ -501,8 +509,6 @@ SEXP rnng_listen(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_listener_close(SEXP);
 SEXP rnng_listener_start(SEXP);
 SEXP rnng_marker_set(SEXP);
-SEXP rnng_messenger(SEXP);
-SEXP rnng_messenger_thread_create(SEXP);
 SEXP rnng_monitor_create(SEXP, SEXP);
 SEXP rnng_monitor_read(SEXP);
 SEXP rnng_ncurl(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -515,8 +521,8 @@ SEXP rnng_protocol_open(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_random(SEXP, SEXP);
 SEXP rnng_read_stdin(SEXP);
 SEXP rnng_reap(SEXP);
-SEXP rnng_recv(SEXP, SEXP, SEXP, SEXP);
-SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_recv(SEXP, SEXP, SEXP);
+SEXP rnng_recv_aio(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_request(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_request_stop(SEXP);
 SEXP rnng_send(SEXP, SEXP, SEXP, SEXP, SEXP);

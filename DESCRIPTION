@@ -1,13 +1,23 @@
 Type: Package
 Package: nanonext
 Title: Lightweight Toolkit for Messaging, Concurrency and the Web
-Version: 1.8.2
+Version: 1.9.0
 Authors@R: c(
     person("Charlie", "Gao", , "charlie.gao@posit.co", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-0750-061X")),
     person("Posit Software, PBC", role = c("cph", "fnd"),
            comment = c(ROR = "03wc8by49")),
     person("Hibiki AI Limited", role = "cph"),
+    person("Staysail Systems, Inc.", role = "cph",
+           comment = "NNG library"),
+    person("Capitar IT Group BV", role = "cph",
+           comment = "NNG library"),
+    person("The Mbed TLS Contributors", role = "cph",
+           comment = "Mbed TLS library"),
+    person("Pierre", "L'Ecuyer", role = "cph",
+           comment = "RngStreams library"),
+    person("sakura authors", role = "cph",
+           comment = "Serialization hooks"),
     person("R Consortium", role = "fnd",
            comment = c(ROR = "01z833950"))
   )
@@ -32,17 +42,24 @@ VignetteBuilder: litedown
 Biarch: true
 Config/build/compilation-database: true
 Config/Needs/website: tidyverse/tidytemplate
+Config/roxygen2/markdown: TRUE
+Config/roxygen2/version: 8.0.0
 Config/usethis/last-upkeep: 2025-04-23
 Encoding: UTF-8
-RoxygenNote: 7.3.3
-SystemRequirements: 'libnng' >= 1.9 and 'libmbedtls' >= 2.5, or 'cmake'
-        to compile NNG and/or Mbed TLS included in package sources
+SystemRequirements: 'libnng' >= 1.11 and 'libmbedtls' >= 2.5, or
+        'cmake' to compile NNG and/or Mbed TLS included in package
+        sources
 NeedsCompilation: yes
-Packaged: 2026-04-03 19:32:38 UTC; cg334
+Packaged: 2026-05-04 12:51:18 UTC; cg334
 Author: Charlie Gao [aut, cre] (ORCID: <https://orcid.org/0000-0002-0750-061X>),
   Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>),
   Hibiki AI Limited [cph],
+  Staysail Systems, Inc. [cph] (NNG library),
+  Capitar IT Group BV [cph] (NNG library),
+  The Mbed TLS Contributors [cph] (Mbed TLS library),
+  Pierre L'Ecuyer [cph] (RngStreams library),
+  sakura authors [cph] (Serialization hooks),
   R Consortium [fnd] (ROR: <https://ror.org/01z833950>)
 Maintainer: Charlie Gao <charlie.gao@posit.co>
 Repository: CRAN
-Date/Publication: 2026-04-04 05:10:30 UTC
+Date/Publication: 2026-05-04 13:40:02 UTC

@@ -60,8 +60,7 @@ s1 <- socket("rep", listen = "tcp://127.0.0.1:5556")
 s2 <- socket("req", dial = "tcp://127.0.0.1:5556")
 
 # Sender
-s2 |> send("async request")
-#> [1] 0
+s2 |> send_aio("async request")
 
 # Async operations return immediately
 aio <- recv_aio(s1)
@@ -128,8 +127,8 @@ install.packages("nanonext", repos = "https://r-lib.r-universe.dev")
 
 #### Linux / Mac / Solaris
 
-Requires ‘libnng’ \>= v1.9.0 and ‘libmbedtls’ \>= 2.5.0, or ‘cmake’ to
-compile bundled libraries (libnng v1.11.0, libmbedtls v3.6.5).
+Requires ‘libnng’ \>= v1.11.0 and ‘libmbedtls’ \>= 2.5.0, or ‘cmake’ to
+compile bundled libraries (libnng v1.11.1-pre, libmbedtls v3.6.5).
 
 Recommended: Let the package compile bundled libraries for optimal
 performance:

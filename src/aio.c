@@ -232,13 +232,17 @@ static inline SEXP create_aio_msg(SEXP env, SEXP aio, nano_aio *raio, int res) {
   if (raio->type == IOV_RECVAIO || raio->type == IOV_RECVAIOS) {
     buf = raio->data;
     sz = nng_aio_count(raio->aio);
+    PROTECT(out = nano_decode(buf, sz, raio->mode, NANO_PROT(aio)));
+    free(raio->data);
   } else {
     nng_msg *msg = (nng_msg *) raio->data;
     buf = nng_msg_body(msg);
     sz = nng_msg_len(msg);
+    PROTECT(out = nano_decode(buf, sz, raio->mode, NANO_PROT(aio)));
+    nng_msg_free(msg);
   }
+  raio->data = NULL;
 
-  PROTECT(out = nano_decode(buf, sz, raio->mode, NANO_PROT(aio)));
   PROTECT(pipe = Rf_ScalarInteger(-res));
   Rf_defineVar(nano_ValueSymbol, out, env);
   Rf_defineVar(nano_AioSymbol, pipe, env);
@@ -393,7 +397,7 @@ SEXP rnng_aio_call(SEXP x) {
   case VECSXP: {
     const R_xlen_t xlen = Rf_xlength(x);
     for (R_xlen_t i = 0; i < xlen; i++) {
-      rnng_aio_call(NANO_VECTOR(x)[i]);
+      rnng_aio_call(VECTOR_PTR_RO(x)[i]);
     }
     break;
   }
@@ -419,7 +423,7 @@ static SEXP rnng_aio_collect_impl(SEXP x, SEXP (*const func)(SEXP)) {
     const R_xlen_t xlen = Rf_xlength(x);
     PROTECT(out = Rf_allocVector(VECSXP, xlen));
     for (R_xlen_t i = 0; i < xlen; i++) {
-      env = func(NANO_VECTOR(x)[i]);
+      env = func(VECTOR_PTR_RO(x)[i]);
       if (TYPEOF(env) != ENVSXP) goto fail;
       val = nano_findVarInFrame(env, nano_ValueSymbol, &found);
       if (!found) goto fail;
@@ -474,7 +478,7 @@ SEXP rnng_aio_stop(SEXP x) {
   case VECSXP: {
     const R_xlen_t xlen = Rf_xlength(x);
     for (R_xlen_t i = 0; i < xlen; i++) {
-      rnng_aio_stop(NANO_VECTOR(x)[i]);
+      rnng_aio_stop(VECTOR_PTR_RO(x)[i]);
     }
     break;
   }
@@ -489,7 +493,6 @@ SEXP rnng_request_stop(SEXP x) {
   SEXP out;
   switch (TYPEOF(x)) {
   case ENVSXP: {
-    nng_msg *msgp = NULL;
     int res = 0;
     SEXP coreaio;
     PROTECT(coreaio = nano_findVarInFrame(x, nano_AioSymbol, NULL));
@@ -498,27 +501,32 @@ SEXP rnng_request_stop(SEXP x) {
     if (aiop->type != REQAIOS && aiop->type != REQAIO) goto fail;
     nng_aio_stop(aiop->aio);
     nano_saio *saio = (nano_saio *) aiop->cb;
-    if (saio->id == 0) goto fail;
-
-    const SEXP context = Rf_getAttrib(coreaio, nano_ContextSymbol);
-    if (NANO_PTR_CHECK(context, nano_ContextSymbol)) goto fail;
-    nng_ctx *ctx = (nng_ctx *) NANO_PTR(context);
-    const nng_duration dur = NANONEXT_WAIT_DUR;
-    if (nng_ctx_set_ms(*ctx, "send-timeout", dur) ||
-        nng_ctx_set_ms(*ctx, "recv-timeout", dur) ||
-        nng_msg_alloc(&msgp, 0) ||
-        nng_msg_append_u32(msgp, 0) ||
-        nng_msg_append(msgp, &saio->id, sizeof(int)) ||
-        nng_ctx_sendmsg(*ctx, msgp, 0)) {
-      goto fail;
+    if (saio->disp == NULL) goto fail;
+    if (saio->type) {
+      nng_msg *msgp = NULL;
+      nng_ctx *ctx = (nng_ctx *) saio->disp;
+      const nng_duration dur = NANONEXT_WAIT_DUR;
+      if (nng_ctx_set_ms(*ctx, "send-timeout", dur) ||
+          nng_ctx_set_ms(*ctx, "recv-timeout", dur) ||
+          nng_msg_alloc(&msgp, 0) ||
+          nng_msg_append_u32(msgp, 0) ||
+          nng_msg_append(msgp, &saio->id, sizeof(int)) ||
+          nng_ctx_sendmsg(*ctx, msgp, 0)) {
+        nng_msg_free(msgp);
+        goto fail;
+      }
+      msgp = NULL;
+      if (nng_ctx_recvmsg(*ctx, &msgp, 0)) {
+        nng_msg_free(msgp);
+        goto fail;
+      }
+      memcpy(&res, nng_msg_body(msgp), sizeof(int));
+      nng_msg_free(msgp);
+    } else {
+      res = dispatch_cancel_direct(saio->disp, saio->id);
     }
-    msgp = NULL;
-    if (nng_ctx_recvmsg(*ctx, &msgp, 0))
-      goto fail;
-    memcpy(&res, nng_msg_body(msgp), sizeof(int));
 
     fail:
-    nng_msg_free(msgp);
     UNPROTECT(1);
     out = Rf_ScalarLogical(res != 0);
     break;
@@ -527,7 +535,7 @@ SEXP rnng_request_stop(SEXP x) {
     const R_xlen_t xlen = Rf_xlength(x);
     PROTECT(out = Rf_allocVector(LGLSXP, xlen));
     for (R_xlen_t i = xlen - 1; i >= 0; i--) {
-      SEXP item = rnng_request_stop(NANO_VECTOR(x)[i]);
+      SEXP item = rnng_request_stop(VECTOR_PTR_RO(x)[i]);
       SET_LOGICAL_ELT(out, i, NANO_INTEGER(item));
     }
     UNPROTECT(1);
@@ -587,7 +595,7 @@ SEXP rnng_unresolved(SEXP x) {
   case VECSXP: {
     const R_xlen_t xlen = Rf_xlength(x);
     for (R_xlen_t i = 0; i < xlen; i++) {
-      if (rnng_unresolved_impl(NANO_VECTOR(x)[i]))
+      if (rnng_unresolved_impl(VECTOR_PTR_RO(x)[i]))
         return Rf_ScalarLogical(1);
     }
   }
@@ -620,7 +628,7 @@ SEXP rnng_unresolved2(SEXP x) {
     int xc = 0;
     const R_xlen_t xlen = Rf_xlength(x);
     for (R_xlen_t i = 0; i < xlen; i++) {
-      xc += rnng_unresolved2_impl(NANO_VECTOR(x)[i]);
+      xc += rnng_unresolved2_impl(VECTOR_PTR_RO(x)[i]);
     }
     return Rf_ScalarInteger(xc);
   }
@@ -632,7 +640,7 @@ SEXP rnng_unresolved2(SEXP x) {
 
 static inline R_xlen_t race_find_resolved(SEXP x, R_xlen_t xlen) {
   for (R_xlen_t i = 0; i < xlen; i++) {
-    SEXP elem = NANO_VECTOR(x)[i];
+    SEXP elem = VECTOR_PTR_RO(x)[i];
     if (TYPEOF(elem) == ENVSXP && !rnng_unresolved2_impl(elem))
       return i + 1;
   }
@@ -642,7 +650,7 @@ static inline R_xlen_t race_find_resolved(SEXP x, R_xlen_t xlen) {
 static inline int race_count_unresolved(SEXP x, R_xlen_t xlen) {
   int n = 0;
   for (R_xlen_t i = 0; i < xlen; i++)
-    n += rnng_unresolved2_impl(NANO_VECTOR(x)[i]);
+    n += rnng_unresolved2_impl(VECTOR_PTR_RO(x)[i]);
   return n;
 }
 
@@ -731,13 +739,13 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
     NANO_ENSURE_ALLOC(saio);
     saio->type = SENDAIO;
 
-    if ((xc = nng_msg_alloc(&msg, buf.cur)) ||
+    if ((xc = nng_msg_alloc(&msg, 0)) ||
         (xc = nng_aio_alloc(&saio->aio, saio_complete, saio))) {
       nng_msg_free(msg);
       goto fail;
     }
 
-    memcpy(nng_msg_body(msg), buf.buf, buf.cur);
+    nano_msg_set_body(msg, &buf);
 
     if (pipeid) {
       nng_pipe p;
@@ -823,7 +831,7 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
 
 }
 
-SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEXP clo) {
+SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP clo) {
 
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) nano_integer(timeout);
   const int signal = cvar != R_NilValue && !NANO_PTR_CHECK(cvar, nano_CvSymbol);
@@ -868,13 +876,7 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP bytes, SEX
       if ((xc = nng_aio_alloc(&raio->aio, raio_complete, raio)))
         goto fail;
     } else {
-      size_t xlen;
-      if (bytes != R_NilValue) {
-        xlen = (size_t) nano_integer(bytes);
-        Rf_warning("argument 'n' is deprecated; set 'buffer' in stream() instead");
-      } else {
-        xlen = nst->bufsize;
-      }
+      size_t xlen = nst->bufsize;
       raio->type = signal ? IOV_RECVAIOS : IOV_RECVAIO;
       raio->data = malloc(xlen);
       NANO_ENSURE_ALLOC(raio->data);
