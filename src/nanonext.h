@@ -72,9 +72,6 @@ typedef struct nano_handle_s {
 
 #ifdef NANONEXT_TLS
 #include <mbedtls/version.h>
-#if MBEDTLS_VERSION_MAJOR < 3
-#include <mbedtls/config.h>
-#endif
 #include <mbedtls/platform.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/rsa.h>
@@ -125,6 +122,7 @@ extern int R_interrupts_pending;
 #define ERROR_OUT(xc) Rf_error("%d | %s", xc, nng_strerror(xc))
 #define ERROR_RET(xc) { Rf_warning("%d | %s", xc, nng_strerror(xc)); return mk_error(xc); }
 #define NANONEXT_INIT_BUFSIZE 4096
+#define NANO_HEADROOM 32
 #define NANONEXT_SERIAL_VER 3
 #define NANONEXT_SERIAL_THR 67108864
 #define NANONEXT_CHUNK_SIZE 67108864 // must be <= INT_MAX
@@ -434,14 +432,14 @@ void haio_invoke_cb(void *);
 SEXP mk_error(const int);
 SEXP mk_error_data(const int);
 SEXP nano_raw_char(const unsigned char *, const size_t);
-void nano_serialize(nano_buf *, const SEXP, SEXP, int);
-void nano_msg_set_body(nng_msg *, nano_buf *);
+void nano_serialize(nano_buf *, const SEXP, SEXP, int, size_t);
+void nano_msg_set_body(nng_msg *, nano_buf *, size_t);
 SEXP nano_unserialize(unsigned char *, const size_t, SEXP);
 SEXP nano_decode(unsigned char *, const size_t, const uint8_t, SEXP);
 SEXP nano_url_with_port(nng_url *, int);
 void nano_encode(nano_buf *, const SEXP);
 int nano_encode_mode(const SEXP);
-int nano_matcharg(const SEXP);
+uint8_t nano_matcharg(const SEXP);
 SEXP nano_aio_result(SEXP);
 SEXP nano_aio_get_msg(SEXP);
 SEXP nano_aio_http_status(SEXP);
@@ -483,6 +481,7 @@ SEXP rnng_cv_until_safe(SEXP, SEXP);
 SEXP rnng_cv_value(SEXP);
 SEXP rnng_cv_wait(SEXP);
 SEXP rnng_cv_wait_safe(SEXP);
+SEXP rnng_device_aio(SEXP, SEXP, SEXP);
 SEXP rnng_dial(SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_dialer_close(SEXP);
 SEXP rnng_dialer_start(SEXP, SEXP);

@@ -243,8 +243,8 @@ SEXP mk_error_data(const int xc) {
 SEXP nano_raw_char(const unsigned char *buf, const size_t sz) {
 
   SEXP out;
-  int i;
-  for (i = 0; i < sz; i++) if (!buf[i]) break;
+  const unsigned char *nul = sz ? memchr(buf, 0, sz) : NULL;
+  size_t i = nul == NULL ? sz : (size_t) (nul - buf);
   if (sz - i > 1) {
     Rf_warningcall_immediate(R_NilValue, "data could not be converted to a character string");
     out = Rf_allocVector(RAWSXP, sz);
@@ -253,7 +253,7 @@ SEXP nano_raw_char(const unsigned char *buf, const size_t sz) {
   }
 
   PROTECT(out = Rf_allocVector(STRSXP, 1));
-  SET_STRING_ELT(out, 0, Rf_mkCharLenCE((const char *) buf, i, CE_NATIVE));
+  SET_STRING_ELT(out, 0, Rf_mkCharLenCE((const char *) buf, (int) i, CE_NATIVE));
 
   UNPROTECT(1);
   return out;
@@ -302,17 +302,21 @@ SEXP nano_url_with_port(nng_url *up, int port) {
 
 }
 
-void nano_serialize(nano_buf *buf, SEXP object, SEXP hook, int header) {
+void nano_serialize(nano_buf *buf, SEXP object, SEXP hook, int header, size_t headroom) {
 
   NANO_ALLOC(buf, NANONEXT_INIT_BUFSIZE);
   struct R_outpstream_st output_stream;
 
+  // Reserve headroom so a zero-copy body (nano_msg_set_body) leaves room for
+  // NNG to prepend protocol headers in place, as a native nng_msg would.
+  buf->cur = headroom;
+
   if (header || special_marker) {
-    memset(buf->buf, 0, 8);
-    buf->buf[0] = 0x7;
-    buf->buf[3] = (uint8_t) special_marker;
+    memset(buf->buf + headroom, 0, 8);
+    buf->buf[headroom] = 0x7;
+    buf->buf[headroom + 3] = (uint8_t) special_marker;
     if (header)
-      memcpy(buf->buf + 4, &header, sizeof(int));
+      memcpy(buf->buf + headroom + 4, &header, sizeof(int));
     buf->cur += 8;
   }
 
@@ -336,15 +340,15 @@ void nano_serialize(nano_buf *buf, SEXP object, SEXP hook, int header) {
 
 }
 
-void nano_msg_set_body(nng_msg *msg, nano_buf *buf) {
+void nano_msg_set_body(nng_msg *msg, nano_buf *buf, size_t headroom) {
 
   if (buf->len) {
     nano_nng_msg *m = (nano_nng_msg *) msg;
     free(m->body.buf);
     m->body.buf = buf->buf;
-    m->body.ptr = buf->buf;
-    m->body.len = buf->cur;
-    m->body.cap = buf->len;
+    m->body.ptr = buf->buf + headroom;
+    m->body.len = buf->cur - headroom;
+    m->body.cap = buf->cur;
     buf->len = 0;
   } else {
     nng_msg_append(msg, buf->buf, buf->cur);
@@ -405,28 +409,28 @@ SEXP nano_decode(unsigned char *buf, const size_t sz, const uint8_t mod, SEXP ho
   size_t size;
 
   switch (mod) {
-  case 2:
-    size = sz / 2 + 1;
-    PROTECT(data = Rf_allocVector(STRSXP, size));
-    R_xlen_t i, m, nbytes = sz, np = 0;
-    for (i = 0, m = 0; i < size; i++) {
-      unsigned char *p;
-      R_xlen_t j;
-      SEXP res;
-
-      for (j = np, p = buf + np; j < nbytes; p++, j++)
-        if (*p == '\0') break;
-
-      res = Rf_mkCharLenCE((const char *) (buf + np), (int) (j - np), CE_NATIVE);
+  case 2: {
+    R_xlen_t n = 0;
+    for (size_t k = 0; k < sz; k++)
+      n += (buf[k] == '\0');
+    if (sz && buf[sz - 1] != '\0')
+      n++;
+    PROTECT(data = Rf_allocVector(STRSXP, n));
+    R_xlen_t i;
+    size_t np = 0;
+    for (i = 0; i < n; i++) {
+      const unsigned char *nul = memchr(buf + np, 0, sz - np);
+      size_t j = nul == NULL ? sz : (size_t) (nul - buf);
+      SEXP res = Rf_mkCharLenCE((const char *) (buf + np), (int) (j - np), CE_NATIVE);
       if (res == R_NilValue) break;
       SET_STRING_ELT(data, i, res);
-      if (XLENGTH(res) > 0) m = i;
-      np = j < nbytes ? j + 1 : nbytes;
+      np = j < sz ? j + 1 : sz;
     }
-    if (i)
-      data = Rf_xlengthgets(data, m + 1);
+    if (i < n)
+      data = Rf_xlengthgets(data, i);
     UNPROTECT(1);
     return data;
+  }
   case 3:
     size = 2 * sizeof(double);
     if (sz % size) {
@@ -556,14 +560,14 @@ int nano_encode_mode(const SEXP mode) {
 
 }
 
-int nano_matcharg(const SEXP mode) {
+uint8_t nano_matcharg(const SEXP mode) {
 
   if (TYPEOF(mode) == INTSXP)
-    return NANO_INTEGER(mode);
+    return (uint8_t) NANO_INTEGER(mode);
 
   const char *mod = CHAR(STRING_ELT(mode, 0));
   size_t slen = strlen(mod);
-  int i;
+  uint8_t i;
   switch (slen) {
   case 3:
     if (!memcmp(mod, "raw", slen)) { i = 8; break; }

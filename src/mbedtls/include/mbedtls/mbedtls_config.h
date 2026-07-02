@@ -49,7 +49,6 @@
 #define MBEDTLS_SHA384_C
 #define MBEDTLS_SHA512_C
 #define MBEDTLS_MD_C
-#define MBEDTLS_HKDF_C
 
 #define MBEDTLS_MD5_C
 #define MBEDTLS_SHA1_C
@@ -72,14 +71,10 @@
 #define MBEDTLS_X509_CSR_PARSE_C
 #define MBEDTLS_X509_CREATE_C
 #define MBEDTLS_X509_CRT_WRITE_C
-#define MBEDTLS_X509_CSR_WRITE_C
 
 #define MBEDTLS_SSL_TLS_C
 #define MBEDTLS_SSL_CLI_C
 #define MBEDTLS_SSL_SRV_C
-#define MBEDTLS_SSL_CACHE_C
-#define MBEDTLS_SSL_COOKIE_C
-#define MBEDTLS_SSL_TICKET_C
 #define MBEDTLS_SSL_ALPN
 #define MBEDTLS_SSL_SERVER_NAME_INDICATION
 #define MBEDTLS_SSL_SESSION_TICKETS
@@ -98,16 +93,21 @@
 #define MBEDTLS_ASN1_WRITE_C
 #define MBEDTLS_BASE64_C
 #define MBEDTLS_CIPHER_C
-#define MBEDTLS_CMAC_C
 #define MBEDTLS_ERROR_C
-#define MBEDTLS_NET_C
 #define MBEDTLS_OID_C
 #define MBEDTLS_PEM_PARSE_C
 #define MBEDTLS_PEM_WRITE_C
 #define MBEDTLS_PKCS5_C
 #define MBEDTLS_PKCS12_C
 #define MBEDTLS_PLATFORM_C
-#define MBEDTLS_TIMING_C
+/* nanonext: alias printf/fprintf/exit to no-op macros so the compiled
+ * shared object imports none of these libc symbols (see tools/patch_mbedtls.sh).
+ * The (void) cast keeps statement-context calls free of -Wunused-value; the
+ * only compiled call site (mbedtls_mpi_write_file, MBEDTLS_FS_IO) ignores the
+ * return value, all others are self-test only. */
+#define MBEDTLS_PLATFORM_PRINTF_MACRO(...) ((void) 0)
+#define MBEDTLS_PLATFORM_FPRINTF_MACRO(...) ((void) 0)
+#define MBEDTLS_PLATFORM_EXIT_MACRO(...) ((void) 0)
 #define MBEDTLS_VERSION_C
 #define MBEDTLS_GENPRIME
 #define MBEDTLS_PK_RSA_ALT_SUPPORT

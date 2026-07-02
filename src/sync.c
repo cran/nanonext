@@ -126,7 +126,7 @@ static void request_complete(void *arg) {
 
 }
 
-void delayed_sigterm(void *arg) {
+static void delayed_sigterm(void *arg) {
   (void) arg;
   nng_msleep(NANONEXT_SLEEP_DUR);
 #ifdef _WIN32
@@ -468,7 +468,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   nng_ctx *ctx = (nng_ctx *) NANO_PTR(con);
 
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) nano_integer(timeout);
-  const uint8_t mod = (uint8_t) nano_matcharg(recvmode);
+  const uint8_t mod = nano_matcharg(recvmode);
   const int raw = nano_encode_mode(sendmode);
   const int id = nng_ctx_id(*ctx);
   const int signal = cvar != R_NilValue && !NANO_PTR_CHECK(cvar, nano_CvSymbol);
@@ -485,7 +485,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
   if (raw) {
     nano_encode(&buf, data);
   } else {
-    nano_serialize(&buf, data, NANO_PROT(con), id);
+    nano_serialize(&buf, data, NANO_PROT(con), id, NANO_HEADROOM);
   }
 
   saio = calloc(1, sizeof(nano_saio));
@@ -510,7 +510,7 @@ SEXP rnng_request(SEXP con, SEXP data, SEXP sendmode, SEXP recvmode, SEXP timeou
     goto fail;
   }
 
-  nano_msg_set_body(msg, &buf);
+  nano_msg_set_body(msg, &buf, raw ? 0 : NANO_HEADROOM);
 
   nng_aio_set_msg(saio->aio, msg);
   nng_ctx_send(*ctx, saio->aio);

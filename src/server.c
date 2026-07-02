@@ -354,7 +354,7 @@ static void http_invoke_callback(void *arg) {
   PROTECT(req_list = make_request_list(r->req));
   PROTECT(call = Rf_lang2(r->callback, req_list));
   int err;
-  SEXP result = R_tryEval(call, R_GlobalEnv, &err);
+  SEXP result = R_tryEvalSilent(call, R_GlobalEnv, &err);
   UNPROTECT(2);
 
   nng_http_res *res = NULL;
@@ -624,7 +624,7 @@ static void ws_invoke_onmessage(void *arg) {
 
   SEXP data;
   if (info->textframes) {
-    PROTECT(data = Rf_ScalarString(Rf_mkCharLenCE((char *) buf, len, CE_UTF8)));
+    PROTECT(data = Rf_ScalarString(Rf_mkCharLenCE((char *) buf, (int) len, CE_UTF8)));
   } else {
     PROTECT(data = Rf_allocVector(RAWSXP, len));
     memcpy(NANO_DATAPTR(data), buf, len);
@@ -683,7 +683,7 @@ SEXP rnng_http_server_create(SEXP url, SEXP handlers, SEXP tls) {
   }
   srv->xptr = R_NilValue;
   srv->prot = R_NilValue;
-  srv->handler_count = handler_count;
+  srv->handler_count = (int) handler_count;
   for (R_xlen_t i = 0; i < handler_count; i++) {
     srv->handlers[i].callback = R_NilValue;
     srv->handlers[i].on_open = R_NilValue;

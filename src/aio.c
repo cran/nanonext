@@ -731,7 +731,7 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
     if (raw) {
       nano_encode(&buf, data);
     } else {
-      nano_serialize(&buf, data, NANO_PROT(con), 0);
+      nano_serialize(&buf, data, NANO_PROT(con), 0, NANO_HEADROOM);
     }
     nng_msg *msg = NULL;
 
@@ -745,7 +745,7 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
       goto fail;
     }
 
-    nano_msg_set_body(msg, &buf);
+    nano_msg_set_body(msg, &buf, raw ? 0 : NANO_HEADROOM);
 
     if (pipeid) {
       nng_pipe p;
@@ -831,6 +831,50 @@ SEXP rnng_send_aio(SEXP con, SEXP data, SEXP mode, SEXP timeout, SEXP pipe, SEXP
 
 }
 
+SEXP rnng_device_aio(SEXP s1, SEXP s2, SEXP clo) {
+
+  if (NANO_PTR_CHECK(s1, nano_SocketSymbol))
+    Rf_error("`s1` is not a valid Socket");
+  if (NANO_PTR_CHECK(s2, nano_SocketSymbol))
+    Rf_error("`s2` is not a valid Socket");
+
+  SEXP aio, env, fun, prot;
+  nano_aio *saio = NULL;
+  int xc;
+
+  saio = calloc(1, sizeof(nano_aio));
+  NANO_ENSURE_ALLOC(saio);
+  // a device runs until stopped and resolves only to an integer result code
+  // (no message), so it reuses the result-only IOV_SENDAIO machinery
+  saio->type = IOV_SENDAIO;
+
+  if ((xc = nng_aio_alloc(&saio->aio, isaio_complete, saio)))
+    goto fail;
+
+  nng_device_aio(saio->aio, *(nng_socket *) NANO_PTR(s1), *(nng_socket *) NANO_PTR(s2));
+
+  // keep both sockets alive for as long as the running device references them
+  PROTECT(prot = Rf_list2(s1, s2));
+  PROTECT(aio = R_MakeExternalPtr(saio, nano_AioSymbol, prot));
+  R_RegisterCFinalizerEx(aio, saio_finalizer, TRUE);
+
+  PROTECT(env = R_NewEnv(R_NilValue, 0, 0));
+  Rf_classgets(env, nano_sendAio);
+  Rf_defineVar(nano_AioSymbol, aio, env);
+
+  PROTECT(fun = R_mkClosure(R_NilValue, nano_aioFuncRes, clo));
+  R_MakeActiveBinding(nano_ResultSymbol, fun, env);
+
+  UNPROTECT(4);
+  return env;
+
+  fail:
+  free(saio);
+  failmem:
+  return mk_error_data(-xc);
+
+}
+
 SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP clo) {
 
   const nng_duration dur = timeout == R_NilValue ? NNG_DURATION_DEFAULT : (nng_duration) nano_integer(timeout);
@@ -843,7 +887,7 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP clo) {
 
   if ((sock = !NANO_PTR_CHECK(con, nano_SocketSymbol)) || !NANO_PTR_CHECK(con, nano_ContextSymbol)) {
 
-    const uint8_t mod = (uint8_t) nano_matcharg(mode);
+    const uint8_t mod = nano_matcharg(mode);
     raio = calloc(1, sizeof(nano_aio));
     NANO_ENSURE_ALLOC(raio);
     raio->next = ncv;
@@ -862,7 +906,9 @@ SEXP rnng_recv_aio(SEXP con, SEXP mode, SEXP timeout, SEXP cvar, SEXP clo) {
 
   } else if (!NANO_PTR_CHECK(con, nano_StreamSymbol)) {
 
-    const uint8_t mod = (uint8_t) (nano_matcharg(mode) == 1 ? 2 : nano_matcharg(mode));
+    uint8_t mod = nano_matcharg(mode);
+    if (mod == 1)
+      mod = 2;
     nano_stream *nst = (nano_stream *) NANO_PTR(con);
     nng_stream *sp = nst->stream;
 

@@ -20,23 +20,19 @@
 void
 nni_plat_abort(void)
 {
-	abort();
+	__builtin_trap();
 }
 
 void
 nni_plat_printf(const char *fmt, ...)
 {
-	va_list ap;
-	va_start(ap, fmt);
-	(void) vprintf(fmt, ap);
-	va_end(ap);
+	(void) fmt;
 }
 
 void
 nni_plat_println(const char *message)
 {
-	fputs(message, stderr);
-	fputc('\n', stderr);
+	(void) message;
 }
 
 const char *
@@ -52,7 +48,6 @@ static struct {
 	int posix_err;
 	int nng_err;
 } nni_plat_errnos[] = {
-	// clang-format off
 	{ EINTR,	   NNG_EINTR	    },
 	{ EINVAL,	   NNG_EINVAL	    },
 	{ ENOMEM,	   NNG_ENOMEM	    },
@@ -90,7 +85,6 @@ static struct {
 	{ EMFILE,	   NNG_ENOFILES	    },
 	{ EEXIST,	   NNG_EEXIST	    },
 	{		0,		  0 },
-	// clang-format on
 };
 
 int

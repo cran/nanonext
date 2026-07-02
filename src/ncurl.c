@@ -32,6 +32,36 @@ static SEXP build_all_headers(nng_http_res *res) {
   return rvec;
 }
 
+// Helper to set request headers from a named character vector or named list
+static int nano_set_req_headers(nng_http_req *req, SEXP headers) {
+  if (headers == R_NilValue)
+    return 0;
+  const R_xlen_t hlen = XLENGTH(headers);
+  SEXP hnames = Rf_getAttrib(headers, R_NamesSymbol);
+  if (TYPEOF(hnames) != STRSXP || XLENGTH(hnames) != hlen)
+    return 0;
+  const SEXP *hnames_p = STRING_PTR_RO(hnames);
+  int xc = 0;
+  switch (TYPEOF(headers)) {
+  case STRSXP: {
+    const SEXP *headers_p = STRING_PTR_RO(headers);
+    for (R_xlen_t i = 0; i < hlen; i++)
+      if ((xc = nng_http_req_set_header(req, CHAR(hnames_p[i]), CHAR(headers_p[i]))))
+        break;
+    break;
+  }
+  case VECSXP:
+    for (R_xlen_t i = 0; i < hlen; i++) {
+      SEXP h = VECTOR_ELT(headers, i);
+      if (TYPEOF(h) == STRSXP && XLENGTH(h) &&
+          (xc = nng_http_req_set_header(req, CHAR(hnames_p[i]), CHAR(STRING_ELT(h, 0)))))
+        break;
+    }
+    break;
+  }
+  return xc;
+}
+
 static SEXP mk_error_haio(const int xc, SEXP env) {
 
   SEXP err;
@@ -300,18 +330,8 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
   if (mthd != NULL && (xc = nng_http_req_set_method(req, mthd)))
     goto fail;
 
-  if (headers != R_NilValue && TYPEOF(headers) == STRSXP) {
-    const R_xlen_t hlen = XLENGTH(headers);
-    SEXP hnames = Rf_getAttrib(headers, R_NamesSymbol);
-    if (TYPEOF(hnames) == STRSXP && XLENGTH(hnames) == hlen) {
-      const SEXP *hnames_p = STRING_PTR_RO(hnames);
-      const SEXP *headers_p = STRING_PTR_RO(headers);
-      for (R_xlen_t i = 0; i < hlen; i++) {
-        if ((xc = nng_http_req_set_header(req, CHAR(hnames_p[i]), CHAR(headers_p[i]))))
-          goto fail;
-      }
-    }
-  }
+  if ((xc = nano_set_req_headers(req, headers)))
+    goto fail;
   if (data != R_NilValue) {
     nano_buf enc = nano_char_buf(data);
     if (enc.cur && (xc = nng_http_req_set_data(req, enc.buf, enc.cur)))
@@ -331,8 +351,10 @@ SEXP rnng_ncurl(SEXP http, SEXP convert, SEXP follow, SEXP method, SEXP headers,
       cfg = (nng_tls_config *) NANO_PTR(tls);
       nng_tls_config_hold(cfg);
 
-      if ((xc = nng_tls_config_server_name(cfg, url->u_hostname)) ||
-          (xc = nng_http_client_set_tls(client, cfg)))
+      // tolerate NNG_EBUSY when re-applying server name (SNI) on a reused config
+      xc = nng_tls_config_server_name(cfg, url->u_hostname);
+      if (xc == NNG_EBUSY) xc = 0;
+      if (xc || (xc = nng_http_client_set_tls(client, cfg)))
         goto fail;
     }
 
@@ -478,18 +500,8 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
   if (mthd != NULL && (xc = nng_http_req_set_method(handle->req, mthd)))
     goto fail;
 
-  if (headers != R_NilValue && TYPEOF(headers) == STRSXP) {
-    const R_xlen_t hlen = XLENGTH(headers);
-    SEXP hnames = Rf_getAttrib(headers, R_NamesSymbol);
-    if (TYPEOF(hnames) == STRSXP && XLENGTH(hnames) == hlen) {
-      const SEXP *hnames_p = STRING_PTR_RO(hnames);
-      const SEXP *headers_p = STRING_PTR_RO(headers);
-      for (R_xlen_t i = 0; i < hlen; i++) {
-        if ((xc = nng_http_req_set_header(handle->req, CHAR(hnames_p[i]), CHAR(headers_p[i]))))
-          goto fail;
-      }
-    }
-  }
+  if ((xc = nano_set_req_headers(handle->req, headers)))
+    goto fail;
   if (data != R_NilValue) {
     nano_buf enc = nano_char_buf(data);
     if (enc.cur && (xc = nng_http_req_copy_data(handle->req, enc.buf, enc.cur)))
@@ -509,8 +521,10 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
       handle->cfg = (nng_tls_config *) NANO_PTR(tls);
       nng_tls_config_hold(handle->cfg);
 
-      if ((xc = nng_tls_config_server_name(handle->cfg, handle->url->u_hostname)) ||
-          (xc = nng_http_client_set_tls(handle->cli, handle->cfg)))
+      // tolerate NNG_EBUSY when re-applying server name (SNI) on a reused config
+      xc = nng_tls_config_server_name(handle->cfg, handle->url->u_hostname);
+      if (xc == NNG_EBUSY) xc = 0;
+      if (xc || (xc = nng_http_client_set_tls(handle->cli, handle->cfg)))
         goto fail;
     }
 
@@ -531,9 +545,9 @@ SEXP rnng_ncurl_aio(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP dat
   for (SEXP fnlist = nano_aioNFuncs; fnlist != R_NilValue; fnlist = CDR(fnlist)) {
     PROTECT(fun = R_mkClosure(R_NilValue, CAR(fnlist), clo));
     switch (++i) {
-    case 1: R_MakeActiveBinding(nano_StatusSymbol, fun, env);
-    case 2: R_MakeActiveBinding(nano_HeadersSymbol, fun, env);
-    case 3: R_MakeActiveBinding(nano_DataSymbol, fun, env);
+    case 1: R_MakeActiveBinding(nano_StatusSymbol, fun, env); break;
+    case 2: R_MakeActiveBinding(nano_HeadersSymbol, fun, env); break;
+    case 3: R_MakeActiveBinding(nano_DataSymbol, fun, env); break;
     }
     UNPROTECT(1);
   }
@@ -605,18 +619,8 @@ SEXP rnng_ncurl_session(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP
   if (mthd != NULL && (xc = nng_http_req_set_method(handle->req, mthd)))
     goto fail;
 
-  if (headers != R_NilValue && TYPEOF(headers) == STRSXP) {
-    const R_xlen_t hlen = XLENGTH(headers);
-    SEXP hnames = Rf_getAttrib(headers, R_NamesSymbol);
-    if (TYPEOF(hnames) == STRSXP && XLENGTH(hnames) == hlen) {
-      const SEXP *hnames_p = STRING_PTR_RO(hnames);
-      const SEXP *headers_p = STRING_PTR_RO(headers);
-      for (R_xlen_t i = 0; i < hlen; i++) {
-        if ((xc = nng_http_req_set_header(handle->req, CHAR(hnames_p[i]), CHAR(headers_p[i]))))
-          goto fail;
-      }
-    }
-  }
+  if ((xc = nano_set_req_headers(handle->req, headers)))
+    goto fail;
   if (data != R_NilValue) {
     nano_buf enc = nano_char_buf(data);
     if (enc.cur && (xc = nng_http_req_copy_data(handle->req, enc.buf, enc.cur)))
@@ -637,8 +641,10 @@ SEXP rnng_ncurl_session(SEXP http, SEXP convert, SEXP method, SEXP headers, SEXP
       handle->cfg = (nng_tls_config *) NANO_PTR(tls);
       nng_tls_config_hold(handle->cfg);
 
-      if ((xc = nng_tls_config_server_name(handle->cfg, handle->url->u_hostname)) ||
-          (xc = nng_http_client_set_tls(handle->cli, handle->cfg)))
+      // tolerate NNG_EBUSY when re-applying server name (SNI) on a reused config
+      xc = nng_tls_config_server_name(handle->cfg, handle->url->u_hostname);
+      if (xc == NNG_EBUSY) xc = 0;
+      if (xc || (xc = nng_http_client_set_tls(handle->cli, handle->cfg)))
         goto fail;
     }
 

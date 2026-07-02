@@ -142,9 +142,13 @@ SEXP rnng_dial(SEXP socket, SEXP url, SEXP tls, SEXP autostart, SEXP fail) {
   if (sec) {
     cfg = (nng_tls_config *) NANO_PTR(tls);
     if ((xc = nng_dialer_create(dp, *sock, ur)) ||
-        (xc = nng_url_parse(&up, ur)) ||
-        (xc = nng_tls_config_server_name(cfg, up->u_hostname)) ||
-        (xc = nng_dialer_set_ptr(*dp, NNG_OPT_TLS_CONFIG, cfg)))
+        (xc = nng_url_parse(&up, ur)))
+      goto fail;
+    // re-applying server name (SNI) to an already-used config returns
+    // NNG_EBUSY (config is read-only once in use); tolerate it on reuse
+    xc = nng_tls_config_server_name(cfg, up->u_hostname);
+    if (xc == NNG_EBUSY) xc = 0;
+    if (xc || (xc = nng_dialer_set_ptr(*dp, NNG_OPT_TLS_CONFIG, cfg)))
       goto fail;
     nng_url_free(up);
     if (start && (xc = nng_dialer_start(*dp, start == 1 ? NNG_FLAG_NONBLOCK : 0)))
@@ -365,14 +369,14 @@ SEXP rnng_send(SEXP con, SEXP data, SEXP mode, SEXP block, SEXP pipe) {
     if (raw) {
       nano_encode(&buf, data);
     } else {
-      nano_serialize(&buf, data, NANO_PROT(con), 0);
+      nano_serialize(&buf, data, NANO_PROT(con), 0, NANO_HEADROOM);
     }
     nng_msg *msgp = NULL;
 
     if ((xc = nng_msg_alloc(&msgp, 0)))
       goto fail;
 
-    nano_msg_set_body(msgp, &buf);
+    nano_msg_set_body(msgp, &buf, raw ? 0 : NANO_HEADROOM);
 
     if (pipeid) {
       nng_pipe p;
@@ -475,7 +479,7 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block) {
 
   if (!NANO_PTR_CHECK(con, nano_SocketSymbol)) {
 
-    const int mod = nano_matcharg(mode);
+    const uint8_t mod = nano_matcharg(mode);
     nng_socket *sock = (nng_socket *) NANO_PTR(con);
     nng_msg *msgp = NULL;
 
@@ -506,7 +510,7 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block) {
 
   } else if (!NANO_PTR_CHECK(con, nano_ContextSymbol)) {
 
-    const int mod = nano_matcharg(mode);
+    const uint8_t mod = nano_matcharg(mode);
     nng_ctx *ctxp = (nng_ctx *) NANO_PTR(con);
     nng_msg *msgp = NULL;
 
@@ -546,7 +550,9 @@ SEXP rnng_recv(SEXP con, SEXP mode, SEXP block) {
 
   } else if (!NANO_PTR_CHECK(con, nano_StreamSymbol)) {
 
-    const int mod = nano_matcharg(mode) == 1 ? 2 : nano_matcharg(mode);
+    uint8_t mod = nano_matcharg(mode);
+    if (mod == 1)
+      mod = 2;
     nano_stream *nst = (nano_stream *) NANO_PTR(con);
     nng_stream *sp = nst->stream;
     nng_aio *aiop = NULL;
