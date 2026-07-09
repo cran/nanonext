@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# nanonext <a href="https://nanonext.r-lib.org/" alt="nanonext"><img src="man/figures/logo.png" alt="nanonext logo" align="right" width="120" /></a>
+# nanonext <a href="https://nanonext.r-lib.org/" alt="nanonext"><img src="man/figures/logo.svg" alt="nanonext logo" align="right" width="120" /></a>
 
 <!-- badges: start -->
 
@@ -96,7 +96,7 @@ server$start()
 
 # Async HTTPS client
 aio <- ncurl_aio(server$url, tls = tls_config(client = cert$client))
-while (unresolved(aio)) later::run_now(1)
+while (unresolved(aio)) run_event_loop(1000)
 aio$data
 #> [1] "{\"status\":\"ok\"}"
 

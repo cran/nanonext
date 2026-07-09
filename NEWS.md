@@ -1,3 +1,9 @@
+# nanonext 1.10.1
+
+#### New Features
+
+* Adds `run_event_loop()` for running the 'later' event loop to process HTTP/WebSocket server (`http_server()`) callbacks on R's main thread.
+
 # nanonext 1.10.0
 
 #### New Features
