@@ -60,6 +60,7 @@ typedef struct nano_handle_s {
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <net/if.h>
+#include <netinet/in.h>
 #endif
 #endif
 
@@ -489,7 +490,7 @@ SEXP rnng_dispatcher_capacity(SEXP);
 SEXP rnng_dispatcher_gate(SEXP);
 SEXP rnng_dispatcher_try_gate(SEXP);
 SEXP rnng_dispatcher_info(SEXP);
-SEXP rnng_dispatcher_start(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+SEXP rnng_dispatcher_start(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 SEXP rnng_dispatcher_stop(SEXP);
 SEXP rnng_dispatcher_wait(SEXP, SEXP);
 SEXP rnng_eval_safe(SEXP);

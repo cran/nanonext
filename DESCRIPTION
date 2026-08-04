@@ -1,7 +1,7 @@
 Type: Package
 Package: nanonext
 Title: Lightweight Toolkit for Messaging, Concurrency and the Web
-Version: 1.10.1
+Version: 1.10.2
 Authors@R: c(
     person("Charlie", "Gao", , "charlie.gao@posit.co", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-0750-061X")),
@@ -44,12 +44,12 @@ Config/build/compilation-database: true
 Config/Needs/website: tidyverse/tidytemplate
 Config/roxygen2/markdown: TRUE
 Config/roxygen2/version: 8.0.0
-Config/usethis/last-upkeep: 2025-04-23
+Config/usethis/last-upkeep: 2026-07-11
 Encoding: UTF-8
 SystemRequirements: 'libnng' >= 1.12 and 'libmbedtls' >= 3.0 (optional,
         bundled sources compiled otherwise)
 NeedsCompilation: yes
-Packaged: 2026-07-09 21:03:53 UTC; shikokuchuo
+Packaged: 2026-08-02 22:34:46 UTC; cg334
 Author: Charlie Gao [aut, cre] (ORCID: <https://orcid.org/0000-0002-0750-061X>),
   Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>),
   Hibiki AI Limited [cph],
@@ -61,4 +61,4 @@ Author: Charlie Gao [aut, cre] (ORCID: <https://orcid.org/0000-0002-0750-061X>),
   R Consortium [fnd] (ROR: <https://ror.org/01z833950>)
 Maintainer: Charlie Gao <charlie.gao@posit.co>
 Repository: CRAN
-Date/Publication: 2026-07-09 21:50:02 UTC
+Date/Publication: 2026-08-04 14:30:02 UTC
