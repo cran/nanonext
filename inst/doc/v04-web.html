@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-<meta name="generator" content="litedown 0.10">
+<meta name="generator" content="litedown 0.11">
 <title>nanonext - Web Toolkit</title>
 <style type="text/css">
 body {
@@ -145,11 +145,11 @@ section.footnotes {
 #&gt; 
 #&gt; $headers
 #&gt; $headers$date
-#&gt; [1] &quot;Sun, 05 Jul 2026 19:15:16 GMT&quot;
+#&gt; [1] &quot;Mon, 21 Sep 2026 14:07:55 GMT&quot;
 #&gt; 
 #&gt; 
 #&gt; $data
-#&gt; [1] &quot;{\&quot;args\&quot;:{},\&quot;data\&quot;:{\&quot;key\&quot;:\&quot;value\&quot;},\&quot;files\&quot;:{},\&quot;form\&quot;:{},\&quot;headers\&quot;:{\&quot;host\&quot;:\&quot;postman-echo.com\&quot;,\&quot;content-length\&quot;:\&quot;16\&quot;,\&quot;accept-encoding\&quot;:\&quot;gzip, br\&quot;,\&quot;authorization\&quot;:\&quot;Bearer APIKEY\&quot;,\&quot;content-type\&quot;:\&quot;application/json\&quot;,\&quot;x-forwarded-proto\&quot;:\&quot;https\&quot;},\&quot;json\&quot;:{\&quot;key\&quot;:\&quot;value\&quot;},\&quot;url\&quot;:\&quot;https://postman-echo.com/post\&quot;}&quot;
+#&gt; [1] &quot;{\&quot;args\&quot;:{},\&quot;data\&quot;:{\&quot;key\&quot;:\&quot;value\&quot;},\&quot;files\&quot;:{},\&quot;form\&quot;:{},\&quot;headers\&quot;:{\&quot;host\&quot;:\&quot;postman-echo.com\&quot;,\&quot;accept-encoding\&quot;:\&quot;gzip, br\&quot;,\&quot;content-length\&quot;:\&quot;16\&quot;,\&quot;authorization\&quot;:\&quot;Bearer APIKEY\&quot;,\&quot;content-type\&quot;:\&quot;application/json\&quot;,\&quot;x-forwarded-proto\&quot;:\&quot;https\&quot;},\&quot;json\&quot;:{\&quot;key\&quot;:\&quot;value\&quot;},\&quot;url\&quot;:\&quot;https://postman-echo.com/post\&quot;}&quot;
 </code></pre>
 <p>Specify <code>response = TRUE</code> to return all response headers.</p>
 <pre><code class="language-r">ncurl(&quot;https://postman-echo.com/get&quot;,
@@ -159,7 +159,7 @@ section.footnotes {
 #&gt; 
 #&gt; $headers
 #&gt; $headers$Date
-#&gt; [1] &quot;Sun, 05 Jul 2026 19:15:16 GMT&quot;
+#&gt; [1] &quot;Mon, 21 Sep 2026 14:07:56 GMT&quot;
 #&gt; 
 #&gt; $headers$`Content-Type`
 #&gt; [1] &quot;application/json; charset=utf-8&quot;
@@ -183,13 +183,13 @@ section.footnotes {
 #&gt; [1] &quot;DYNAMIC&quot;
 #&gt; 
 #&gt; $headers$`Set-Cookie`
-#&gt; [1] &quot;sails.sid=s%3AJIdUH3NucudRVnQSLVN7QfVEQU33l0RN.wc7HBFcv4XLsZ3G9eU9Ciu9%2FBel%2B6e%2BNsXhUj3EV9Ks; Path=/; HttpOnly, __cf_bm=a1KzDWBH09YSc2rP_ebFWq8XOfEvClkixjfDNiNTxh4-1783278916.2187917-1.0.1.1-yX1QjB79cofq5s6Pk_Cd.gdmhJkW5MMHcfteqjXy6K9v0ny_S1KSizHcKCdstu7oNgXRWbI5jT7E2ofybX.Q6l4kpI21QUxuPSC3.BrcEC0UcI7Ch9jij52vI.EYv0KN; HttpOnly; Secure; Path=/; Domain=postman-echo.com; Expires=Sun, 05 Jul 2026 19:45:16 GMT, _cfuvid=WI07rjRKmhgxa9V_aeSjLvL_MkJBjoZhMy0.jjGo4Vc-1783278916.2187917-1.0.1.1-yolJaR2uA.9DJfZ4VytqkOIgMUIH82OcidMtO3d8738; HttpOnly; SameSite=None; Secure; Path=/; Domain=postman-echo.com&quot;
+#&gt; [1] &quot;sails.sid=s%3ATmScuC42WfYj-8dIwp3riw3Hhvlwxj3h.VRMXmAwU7Yg3RIUeW0XOGLJpEI1uzFCoIkGTs6ca63I; Path=/; HttpOnly, __cf_bm=6smcLgYJ6intspW2a9hkkaciqfRDZajzOjhiF8LFZGg-1789999675.9257994-1.0.1.1-z3l2bDrhhu6KYrMVC1y3vkhwia1cMJuUq1lZ.URaur07OlqJifukf62kaw3Ka_be5acwHMqtBqfRMdVdFmVEELboZfQOMP847Vw0kNvGmAQu8dVhkSVCkI.Kwit0jLLb; HttpOnly; Secure; Path=/; Domain=postman-echo.com; Expires=Mon, 21 Sep 2026 14:37:56 GMT, _cfuvid=LbqgnUnkuRhcvj3QAKP_lhXY7xwk7cHAhY0zDcGc.8g-1789999675.9257994-1.0.1.1-7Qb0aZ9HwVusMLnILFNze.HVfw1ggLQvPF0y5yb4JTs; HttpOnly; SameSite=None; Secure; Path=/; Domain=postman-echo.com&quot;
 #&gt; 
 #&gt; $headers$Server
 #&gt; [1] &quot;cloudflare&quot;
 #&gt; 
 #&gt; $headers$`CF-RAY`
-#&gt; [1] &quot;a168b28a5de3d29e-FRA&quot;
+#&gt; [1] &quot;a3e9a3968c62ef23-LHR&quot;
 #&gt; 
 #&gt; 
 #&gt; $data
@@ -207,13 +207,13 @@ res
 
 call_aio(res)$headers
 #&gt; $date
-#&gt; [1] &quot;Sun, 05 Jul 2026 19:15:16 GMT&quot;
+#&gt; [1] &quot;Mon, 21 Sep 2026 14:07:56 GMT&quot;
 
 res$status
 #&gt; [1] 200
 
 res$data
-#&gt; [1] &quot;{\&quot;args\&quot;:{},\&quot;data\&quot;:{\&quot;async\&quot;:true},\&quot;files\&quot;:{},\&quot;form\&quot;:{},\&quot;headers\&quot;:{\&quot;host\&quot;:\&quot;postman-echo.com\&quot;,\&quot;content-length\&quot;:\&quot;15\&quot;,\&quot;content-type\&quot;:\&quot;application/json\&quot;,\&quot;accept-encoding\&quot;:\&quot;gzip, br\&quot;,\&quot;x-forwarded-proto\&quot;:\&quot;https\&quot;},\&quot;json\&quot;:{\&quot;async\&quot;:true},\&quot;url\&quot;:\&quot;https://postman-echo.com/post\&quot;}&quot;
+#&gt; [1] &quot;{\&quot;args\&quot;:{},\&quot;data\&quot;:{\&quot;async\&quot;:true},\&quot;files\&quot;:{},\&quot;form\&quot;:{},\&quot;headers\&quot;:{\&quot;host\&quot;:\&quot;postman-echo.com\&quot;,\&quot;accept-encoding\&quot;:\&quot;gzip, br\&quot;,\&quot;content-type\&quot;:\&quot;application/json\&quot;,\&quot;content-length\&quot;:\&quot;15\&quot;,\&quot;x-forwarded-proto\&quot;:\&quot;https\&quot;},\&quot;json\&quot;:{\&quot;async\&quot;:true},\&quot;url\&quot;:\&quot;https://postman-echo.com/post\&quot;}&quot;
 </code></pre>
 <h5 id="sec:promises-integration">Promises Integration</h5>
 <p>‘ncurlAio’ objects work anywhere that accepts a ‘promise’ from the promises package, including Shiny ExtendedTask.</p>
@@ -238,19 +238,21 @@ transact(sess)
 #&gt; 
 #&gt; $headers
 #&gt; $headers$Date
-#&gt; [1] &quot;Sun, 05 Jul 2026 19:15:17 GMT&quot;
+#&gt; [1] &quot;Mon, 21 Sep 2026 14:07:58 GMT&quot;
 #&gt; 
 #&gt; $headers$`Content-Type`
 #&gt; [1] &quot;application/json; charset=utf-8&quot;
 #&gt; 
 #&gt; 
 #&gt; $data
-#&gt;   [1] 7b 22 61 72 67 73 22 3a 7b 7d 2c 22 68 65 61 64 65 72 73 22 3a 7b 22 68 6f 73 74 22 3a 22 70 6f
-#&gt;  [33] 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 22 63 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 22
-#&gt;  [65] 61 70 70 6c 69 63 61 74 69 6f 6e 2f 6a 73 6f 6e 22 2c 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70
-#&gt;  [97] 72 6f 74 6f 22 3a 22 68 74 74 70 73 22 2c 22 61 63 63 65 70 74 2d 65 6e 63 6f 64 69 6e 67 22 3a
-#&gt; [129] 22 67 7a 69 70 2c 20 62 72 22 7d 2c 22 75 72 6c 22 3a 22 68 74 74 70 73 3a 2f 2f 70 6f 73 74 6d
-#&gt; [161] 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f 67 65 74 22 7d
+#&gt;   [1] 7b 22 61 72 67 73 22 3a 7b 7d 2c 22 68 65 61 64 65 72 73 22 3a 7b 22 68 6f
+#&gt;  [26] 73 74 22 3a 22 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 22 2c 22 63
+#&gt;  [51] 6f 6e 74 65 6e 74 2d 74 79 70 65 22 3a 22 61 70 70 6c 69 63 61 74 69 6f 6e
+#&gt;  [76] 2f 6a 73 6f 6e 22 2c 22 78 2d 66 6f 72 77 61 72 64 65 64 2d 70 72 6f 74 6f
+#&gt; [101] 22 3a 22 68 74 74 70 73 22 2c 22 61 63 63 65 70 74 2d 65 6e 63 6f 64 69 6e
+#&gt; [126] 67 22 3a 22 67 7a 69 70 2c 20 62 72 22 7d 2c 22 75 72 6c 22 3a 22 68 74 74
+#&gt; [151] 70 73 3a 2f 2f 70 6f 73 74 6d 61 6e 2d 65 63 68 6f 2e 63 6f 6d 2f 67 65 74
+#&gt; [176] 22 7d
 
 close(sess)
 
@@ -508,7 +510,7 @@ server &lt;- http_server(
 server$start()
 server
 #&gt; &lt; nanoServer &gt;
-#&gt;  - url: https://127.0.0.1:49772 
+#&gt;  - url: https://127.0.0.1:49943 
 #&gt;  - state: started
 
 # HTTPS client request
@@ -586,6 +588,38 @@ server$url
 # Browse to the URL to see your Quarto site with a live API behind it
 </code></pre>
 <p>Static pages are served at native speed by NNG while the prediction endpoint is handled by R – no separate processes or ports required. Adding TLS is a single argument.</p>
+<h3 id="sec:7-server-deployment-with-server-yml">7. Server Deployment with <code>_server.yml</code></h3>
+<p>nanonext implements the <a href="https://plumber2.posit.co/articles/server_yml.html"><code>_server.yml</code> standard</a> for R server frameworks. This allows a deployment platform to launch a nanonext server without knowing anything about its implementation: it reads the <code>_server.yml</code> file at the root of the deployment, installs the package named by <code>engine</code>, and calls its launch function.</p>
+<p>A minimal <code>_server.yml</code> for nanonext:</p>
+<pre><code class="language-yaml">engine: nanonext
+constructor: server.R
+</code></pre>
+<ul>
+<li><code>engine</code> must be <code>nanonext</code>.</li>
+<li><code>constructor</code> is the path to an R file whose final expression evaluates to a handler or list of handlers, as created by <code>handler()</code>, <code>handler_ws()</code>, <code>handler_stream()</code> etc. The constructor must not create a server itself.</li>
+</ul>
+<p>Optional server settings go under <code>options</code>:</p>
+<pre><code class="language-yaml">engine: nanonext
+constructor: server.R
+options:
+  host: 127.0.0.1
+  port: 8080
+  tls:
+    server: cert-and-key.pem
+</code></pre>
+<ul>
+<li><code>host</code> / <code>port</code>: the address to listen on. Values passed by the platform take precedence, followed by the <code>HOST</code> / <code>PORT</code> environment variables, then these values, falling back to <code>127.0.0.1:8080</code>.</li>
+<li><code>tls</code>: arguments to <code>tls_config()</code>. If <code>server</code> is set, the server is served over HTTPS.</li>
+</ul>
+<p>All paths are resolved relative to the <code>_server.yml</code> file. Reading the configuration requires the <code>yaml</code> package.</p>
+<p>A complete example deployment ships with the package:</p>
+<pre><code class="language-r">dir &lt;- system.file(&quot;examples&quot;, &quot;server-yml&quot;, package = &quot;nanonext&quot;)
+list.files(dir, recursive = TRUE)
+#&gt; [1] &quot;_server.yml&quot;    &quot;server.R&quot;       &quot;www/index.html&quot;
+</code></pre>
+<p>It can be launched locally as follows. This is a blocking call that serves until interrupted, and is what the deployment platform calls:</p>
+<pre><code class="language-r">nanonext:::launch_server(file.path(dir, &quot;_server.yml&quot;))
+</code></pre>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>

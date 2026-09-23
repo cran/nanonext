@@ -257,6 +257,13 @@ status_code <- function(x) .Call(rnng_status_code, x)
 #'
 #' This feature utilises the 'refhook' system of R native serialization.
 #'
+#' If `sfunc` errors during serialization, the error propagates to the caller
+#' and no message is sent.
+#'
+#' If `ufunc` errors during unserialization, the error is caught and the
+#' object instead unserializes as an 'errorValue' 1000 ('Internal error
+#' detected'), rather than the error propagating to the caller.
+#'
 #' @param class a character string (or vector) of the class of object custom
 #'   serialization functions are applied to, e.g. `'ArrowTabular'` or
 #'   `c('torch_tensor', 'ArrowTabular')`.
@@ -373,6 +380,24 @@ ip_addr <- function() .Call(rnng_ip_addr)
 #'
 .mark <- function(bool = TRUE) .Call(rnng_marker_set, bool)
 
+#' Suspend Interrupts
+#'
+#' Internal package function.
+#'
+#' @param suspend (logical) if `TRUE`, suspends interrupts; if `FALSE`,
+#'   clears any pending interrupt and then un-suspends interrupts.
+#'
+#' @return NULL.
+#'
+#' @details Whilst interrupts are suspended, a pending interrupt is held and
+#'   never raised, as `R_CheckUserInterrupt()` becomes a no-op. Un-suspending
+#'   first clears any pending interrupt (still whilst suspended) so a stale
+#'   interrupt cannot fire subsequently.
+#'
+#' @keywords internal
+#' @export
+#'
+.suspend_interrupts <- function(suspend = TRUE) .Call(rnng_suspend_interrupts, suspend)
 
 #' Internal Package Function
 #'

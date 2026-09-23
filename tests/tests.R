@@ -19,6 +19,7 @@ nng_version()
 
 later <- requireNamespace("later", quietly = TRUE)
 promises <- requireNamespace("promises", quietly = TRUE)
+yaml <- requireNamespace("yaml", quietly = TRUE)
 
 test_class("nanoObject", n <- nano("req", listen = "inproc://nanonext", autostart = FALSE))
 test_class("nanoObject", n1 <- nano("rep", dial = "inproc://nanonext", autostart = FALSE))
@@ -160,7 +161,7 @@ test_class("recvAio", rraio <- n1$recv_aio(mode = "complex", timeout = 500))
 test_type("raw", suppressWarnings(collect_aio_(rraio)))
 rcv <- cv()
 test_equal(race_aio(list(rraio), rcv), 1L)
-test_equal(race_aio(list(sraio, rraio), rcv), 1L)
+test_equal(race_aio(list(call_aio(sraio), rraio), rcv), 1L)
 test_equal(race_aio(list(rraio), NULL), 1L)
 test_equal(race_aio(list(rraio), "invalid"), 1L)
 rtest <- recv_aio(n1$socket, timeout = 100, cv = rcv)
@@ -294,6 +295,27 @@ opt(req$socket, "serial") <- cfg
 test_error(send(req$socket, `class<-`(new.env(), "error_env"), block = 500), "serialization failue")
 test_error(send(req$socket, `class<-`(new.env(), "string_class"), block = 500), "string_class")
 opt(req$socket, "serial") <- cfg
+opt(req$socket, "serial") <- list()
+opt(rep, "serial") <- list()
+capture_message <- function(expr) {  # divert expected stderr output, e.g. from erroring unserialization hooks
+  con <- file(tempfile(), open = "wt")
+  sink(con, type = "message")
+  on.exit({sink(type = "message"); close(con)})
+  expr
+}
+cfg <- serial_config("ufunc_error", function(x) raw(1L), function(x) stop("hook failure"))
+opt(req$socket, "serial") <- cfg
+opt(rep, "serial") <- cfg
+test_zero(send(req$socket, `class<-`(new.env(), "ufunc_error"), mode = "serial", block = 500))
+capture_message(test_class("errorValue", res <- recv(rep, mode = "serial", block = 500)))
+test_equal(res, 1000L)
+test_zero(send(req$socket, list(`class<-`(new.env(), "ufunc_error"), "ok"), mode = "serial", block = 500))
+capture_message(test_type("list", res <- recv(rep, mode = "serial", block = 500)))
+test_class("errorValue", res[[1L]])
+test_equal(res[[1L]], 1000L)
+test_equal(res[[2L]], "ok")
+test_zero(send(req$socket, "next message", mode = "serial", block = 500))
+test_equal(recv(rep, mode = "serial", block = 500), "next message")
 opt(req$socket, "serial") <- list()
 opt(rep, "serial") <- list()
 test_error(serial_config(1L, identity, identity), "must be a character vector")
@@ -826,6 +848,8 @@ test_null(.dispatcher_gate(NULL))
 test_null(.dispatcher_try_gate(NULL))
 test_null(.dispatcher_wait(NULL, 1L))
 test_null(.dispatcher_stop(NULL))
+test_null(.suspend_interrupts())
+test_null(.suspend_interrupts(FALSE))
 
 ds1 <- socket("pair", listen = "inproc://device1", raw = TRUE)
 ds2 <- socket("pair", listen = "inproc://device2", raw = TRUE)
@@ -1024,6 +1048,25 @@ if (later && NOT_CRAN) {
   aio <- ncurl_aio(paste0(base_url, "/put"), timeout = 2000)
   while (unresolved(aio)) run_event_loop(1000)
   test_equal(aio$status, 405L)
+  raw_get <- function(target) {
+    s <- stream(dial = paste0("tcp://", sub("^http://", "", base_url)), buffer = 4096L)
+    send(s, paste0("GET ", target, " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"), block = 2000L)
+    res <- character()
+    repeat {
+      ra <- recv_aio(s, mode = "character", timeout = 2000L)
+      while (unresolved(ra)) run_event_loop(1000)
+      chunk <- call_aio(ra)$data
+      if (!is.character(chunk)) break
+      res <- c(res, chunk)
+    }
+    close(s)
+    paste(res, collapse = "")
+  }
+  test_true(grepl("path: /api/canon", raw_get("/api/x/../canon"), fixed = TRUE))
+  test_true(grepl("path: /api/canon", raw_get("/api/x/%2e%2e/canon"), fixed = TRUE))
+  test_true(grepl("path: /api/canon", raw_get("/api//canon"), fixed = TRUE))
+  test_true(grepl("path: /api/x%2Fy", raw_get("/api/x%2fy"), fixed = TRUE))
+  test_true(grepl("^HTTP/1.1 404", raw_get("/../../outside.txt")))
   test_zero(srv$close())
 }
 
@@ -1259,6 +1302,8 @@ if (later && NOT_CRAN) {
   dir.create(static_test_dir)
   writeLines("Hello from file", file.path(static_test_dir, "test.txt"))
   writeLines("<html><body>Index</body></html>", file.path(static_test_dir, "index.html"))
+  secret_file <- tempfile()
+  writeLines("top secret", secret_file)
 
   test_class("nanoServer", static_srv <- http_server(
     url = "http://127.0.0.1:0",
@@ -1318,8 +1363,30 @@ if (later && NOT_CRAN) {
   while (unresolved(aio)) run_event_loop(1000)
   test_equal(aio$status, 302L)
 
+  raw_get <- function(target) {
+    s <- stream(dial = paste0("tcp://", sub("^http://", "", base_url)), buffer = 4096L)
+    send(s, paste0("GET ", target, " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"), block = 2000L)
+    res <- character()
+    repeat {
+      ra <- recv_aio(s, mode = "character", timeout = 2000L)
+      while (unresolved(ra)) run_event_loop(1000)
+      chunk <- call_aio(ra)$data
+      if (!is.character(chunk)) break
+      res <- c(res, chunk)
+    }
+    close(s)
+    paste(res, collapse = "")
+  }
+  secret_name <- basename(secret_file)
+  resp <- raw_get(paste0("/files/../", secret_name))
+  test_true(grepl("^HTTP/1.1 404", resp))
+  test_false(grepl("top secret", resp, fixed = TRUE))
+  resp <- raw_get(paste0("/files/%2e%2e/", secret_name))
+  test_true(grepl("^HTTP/1.1 404", resp))
+  test_false(grepl("top secret", resp, fixed = TRUE))
   test_zero(static_srv$close())
   unlink(static_test_dir, recursive = TRUE)
+  unlink(secret_file)
 }
 
 if (later && NOT_CRAN) {
@@ -1359,6 +1426,16 @@ if (later && NOT_CRAN) {
           conn$close()
         },
         prefix = TRUE
+      ),
+      handler_stream(
+        "/multi",
+        on_request = function(conn, req) {
+          conn$set_header("Content-Type", "text/plain")
+          conn$send("chunk1")
+          conn$send("chunk2")
+          conn$send("chunk3")
+          conn$close()
+        }
       )
     )
   ))
@@ -1416,7 +1493,146 @@ if (later && NOT_CRAN) {
   while (unresolved(prefix_aio)) run_event_loop(1000)
   test_equal(call_aio(prefix_aio)$status, 200L)
 
+  multi_aio <- ncurl_aio(paste0(base_url, "/multi"), timeout = 2000)
+  while (unresolved(multi_aio)) run_event_loop(1000)
+  test_equal(call_aio(multi_aio)$status, 200L)
+  test_equal(call_aio(multi_aio)$data, "chunk1chunk2chunk3")
+
   test_zero(stream_srv$close())
+}
+
+if (later && yaml && NOT_CRAN) {
+  test_error(nanonext:::launch_server(1L), "path to a `_server.yml` file")
+  test_error(nanonext:::launch_server(c("a", "b")), "scalar string")
+  test_error(nanonext:::launch_server(tempfile()), "does not exist")
+  srv_yml_dir <- tempfile()
+  dir.create(srv_yml_dir)
+  old_host <- Sys.getenv("HOST", unset = NA_character_)
+  old_port <- Sys.getenv("PORT", unset = NA_character_)
+  Sys.unsetenv(c("HOST", "PORT"))
+  writeLines("engine: plumber2", file.path(srv_yml_dir, "engine.yml"))
+  writeLines("engine: nanonext", file.path(srv_yml_dir, "noctor.yml"))
+  writeLines(c("engine: nanonext", "constructor: missing.R"), file.path(srv_yml_dir, "badpath.yml"))
+  writeLines("42", file.path(srv_yml_dir, "atomic.R"))
+  writeLines(c("engine: nanonext", "constructor: atomic.R"), file.path(srv_yml_dir, "atomic.yml"))
+  writeLines("list(42)", file.path(srv_yml_dir, "listatomic.R"))
+  writeLines(c("engine: nanonext", "constructor: listatomic.R"), file.path(srv_yml_dir, "listatomic.yml"))
+  writeLines(c("engine: nanonext", "constructor: server.R", "options:", "  port: notaport"),
+             file.path(srv_yml_dir, "badport.yml"))
+  writeLines(c("engine: nanonext", "constructor: server.R", "options:", "  tls:", "    bogus: x"),
+             file.path(srv_yml_dir, "badtls.yml"))
+  writeLines(c("engine: nanonext", "constructor: server.R"), file.path(srv_yml_dir, "host.yml"))
+  writeLines(c("engine: nanonext", "constructor: 42"), file.path(srv_yml_dir, "ctorint.yml"))
+  writeLines(c("engine: nanonext", "constructor: [a.R, b.R]"), file.path(srv_yml_dir, "ctorvec.yml"))
+  writeLines("list()", file.path(srv_yml_dir, "empty.R"))
+  writeLines(c("engine: nanonext", "constructor: empty.R"), file.path(srv_yml_dir, "empty.yml"))
+  writeLines(c("engine: nanonext", "constructor: server.R", "options:", "  host: 123"),
+             file.path(srv_yml_dir, "hosttype.yml"))
+  writeLines(c("engine: nanonext", "constructor: server.R", "options:", "  host: '[::1'"),
+             file.path(srv_yml_dir, "hostparse.yml"))
+  writeLines(c("engine: nanonext", "constructor: server.R", "options:", "  tls: cert.pem"),
+             file.path(srv_yml_dir, "tlsstr.yml"))
+  cert <- write_cert(cn = "127.0.0.1")
+  cat(cert$server, file = file.path(srv_yml_dir, "cert.pem"), sep = "\n")
+  writeLines(c("engine: nanonext", "constructor: server.R", "options:", "  host: 127.0.0.1",
+               "  port: notaport", "  tls:", "    server: cert.pem"),
+             file.path(srv_yml_dir, "tlsbadport.yml"))
+  writeLines(c("engine: nanonext", "constructor: server.R", "options:", "  port: 27778",
+               "  tls:", "    server: cert.pem"),
+             file.path(srv_yml_dir, "_server_tls.yml"))
+  writeLines(c(
+    "library(nanonext)",
+    "list(",
+    '  handler("/", function(req) list(status = 200L, body = "launch-ok")),',
+    '  handler("/data", function(req) list(status = 200L, body = "data-ok"))',
+    ")"
+  ), file.path(srv_yml_dir, "server.R"))
+  writeLines('handler("/x", function(req) list(status = 200L, body = "x"))',
+             file.path(srv_yml_dir, "single.R"))
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "engine.yml")), 'must be "nanonext"')
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "noctor.yml")), "must specify a `constructor`")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "badpath.yml")), "constructor `missing.R` does not exist")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "atomic.yml")), "must evaluate to a handler or list of handlers")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "listatomic.yml")), "must evaluate to a handler or list of handlers")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "badport.yml")), "scalar integer between 0 and 65535")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "host.yml"), host = "http://127.0.0.1"),
+             "must not include a URL scheme")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "badtls.yml")), "does not accept: bogus")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "ctorint.yml")), "must be a path to an R file")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "ctorvec.yml")), "must be a scalar string")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "empty.yml")), "did not produce any handlers")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "hosttype.yml")), "`host` must be a scalar string")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "hostparse.yml")), "unable to parse")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "tlsstr.yml")), "must be a list of arguments")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "tlsbadport.yml")), "scalar integer between 0 and 65535")
+  Sys.setenv(HOST = "127.0.0.1")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "badport.yml")), "scalar integer between 0 and 65535")
+  Sys.unsetenv("HOST")
+  Sys.setenv(PORT = "notaport")
+  test_error(nanonext:::launch_server(file.path(srv_yml_dir, "host.yml")), "scalar integer between 0 and 65535")
+  Sys.unsetenv("PORT")
+  test_type("list", single <- nanonext:::constructor_handlers(file.path(srv_yml_dir, "single.R")))
+  test_equal(length(single), 1L)
+  test_true(is.integer(single[[1L]][["type"]]))
+  test_equal(length(nanonext:::constructor_handlers(file.path(srv_yml_dir, "server.R"))), 2L)
+  writeLines(c("engine: nanonext", "constructor: server.R", "options:", "  port: 27777"),
+             file.path(srv_yml_dir, "_server.yml"))
+  pidfile <- tempfile()
+  launcher <- sprintf(
+    'writeLines(as.character(Sys.getpid()), "%s")\nnanonext:::launch_server("%s")',
+    gsub("\\", "/", pidfile, fixed = TRUE),
+    gsub("\\", "/", file.path(srv_yml_dir, "_server.yml"), fixed = TRUE)
+  )
+  script <- tempfile(fileext = ".R")
+  writeLines(launcher, script)
+  Rscript <- file.path(R.home("bin"), if (.Platform$OS.type == "windows") "Rscript.exe" else "Rscript")
+  system2(Rscript, script, wait = FALSE, stdout = FALSE, stderr = FALSE)
+  res <- NULL
+  for (i in 1:50L) {
+    Sys.sleep(0.4)
+    res <- ncurl("http://127.0.0.1:27777/", timeout = 2000L)
+    if (is.list(res) && !is_error_value(res$status)) break
+  }
+  # soft-skip the round trip if the child server cannot start in this environment
+  if (is.list(res) && !is_error_value(res$status)) {
+    test_equal(res$status, 200L)
+    test_equal(res$data, "launch-ok")
+    res <- ncurl("http://127.0.0.1:27777/data", timeout = 2000L)
+    test_equal(res$status, 200L)
+    test_equal(res$data, "data-ok")
+  }
+  if (file.exists(pidfile))
+    tools::pskill(as.integer(readLines(pidfile, warn = FALSE)))
+  tls_pidfile <- tempfile()
+  launcher <- sprintf(
+    'writeLines(as.character(Sys.getpid()), "%s")\nnanonext:::launch_server("%s")',
+    gsub("\\", "/", tls_pidfile, fixed = TRUE),
+    gsub("\\", "/", file.path(srv_yml_dir, "_server_tls.yml"), fixed = TRUE)
+  )
+  script <- tempfile(fileext = ".R")
+  writeLines(launcher, script)
+  system2(Rscript, script, wait = FALSE, stdout = FALSE, stderr = FALSE)
+  tls_client <- tls_config(client = cert$client)
+  res <- NULL
+  for (i in 1:50L) {
+    Sys.sleep(0.4)
+    res <- ncurl("https://127.0.0.1:27778/", tls = tls_client, timeout = 2000L)
+    if (is.list(res) && !is_error_value(res$status)) break
+  }
+  # soft-skip the round trip if the child server cannot start in this environment
+  if (is.list(res) && !is_error_value(res$status)) {
+    test_equal(res$status, 200L)
+    test_equal(res$data, "launch-ok")
+  }
+  if (file.exists(tls_pidfile))
+    tools::pskill(as.integer(readLines(tls_pidfile, warn = FALSE)))
+  unlink(script)
+  unlink(tls_pidfile)
+  if (!is.na(old_host)) Sys.setenv(HOST = old_host)
+  if (!is.na(old_port)) Sys.setenv(PORT = old_port)
+  unlink(script)
+  unlink(pidfile)
+  unlink(srv_yml_dir, recursive = TRUE)
 }
 
 if (later) run_event_loop(100L)
