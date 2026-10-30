@@ -1,8 +1,8 @@
-cbbc8baa80f85579d587172bd10bbe2e *DESCRIPTION
+b9604ba968001255e32c3f528e277a24 *DESCRIPTION
 ac718869ba024194348697eb8f88de17 *LICENSE
 c1e0bc5184e9171960feaa0bf798acbb *LICENSE.note
 b254159373300ffa80c511251cceb987 *NAMESPACE
-a9722d3daff3c5110a29c951c91e286b *NEWS.md
+d2cbb57f119e458705957d200c024796 *NEWS.md
 c3bfbb4de9159fde86a12484238a0400 *R/aio.R
 4361aeb1f10ac8b59dfd99fa0e360057 *R/context.R
 02acc6fd81b350376517c58f1c68ec47 *R/dispatcher.R
@@ -21,7 +21,7 @@ cf2da3fdbcbb8714845cc44f90e13f2a *R/socket.R
 db77a18e14b5a7b155fc55b52409e6e3 *R/sync.R
 2882dfcb2f753b10ea509e5f88f7a16c *R/tls.R
 f4f57d6f47c20702e698974b85e343bc *R/utils.R
-6390dd913b5e37c83b653440a3191d8d *README.md
+01b62e164519fb854b478796d493c398 *README.md
 06843ce9346eba898dc5cb03a02ff1ee *build/vignette.rds
 b7952a7dc387ef41c813fbc08db8cfe6 *cleanup
 16a71c48d94c68bf07094a1791ed1e99 *cleanup.win
@@ -121,7 +121,7 @@ cdbdaad300eea3fe00439a7934b6b87b *man/unresolved.Rd
 9886ae1e2468de387ddc180d679cd22f *src/Makevars.in
 d0575bcbb9c6dd41c20e99e60a46165b *src/Makevars.ucrt
 a3aaef90076c0fa53ed7795d8f2313d5 *src/Makevars.win
-e43c3fa5df254813d94879417daa313c *src/aio.c
+059fba5b39bdf062a2817443c8efa66f *src/aio.c
 de9cef7edf7a52a19c408670744ecd6e *src/comms.c
 09225d765b93715d44fb4df239265fd5 *src/core.c
 f11202d77f861a9dfa957b2129b3ed95 *src/dispatcher.c
@@ -453,7 +453,7 @@ ba2f08d7d3c743ca35ae10de44e4c57a *src/nng/src/supplemental/websocket/websocket.h
 2430858eb1b8407b4598ed906c471987 *src/nng_structs.h
 156dce67a16114bb4a4d00255bb34e37 *src/proto.c
 070982806f4d86bd0df540217e776cd0 *src/server.c
-75317c83813e2e6a4b72e32d27126b06 *src/sync.c
+5bd44f9da2bee6b48d55ba55d3e99a43 *src/sync.c
 1ec4d3674299da65687c6470ebcf42c2 *src/thread.c
 a05f4ef1b5bc08cf85c145aa2f248a06 *src/tls.c
 322c144aa3107b006cdafc2f3bae7cf1 *src/utils.c
